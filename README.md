@@ -12,6 +12,20 @@ O LibStock permitirá cadastrar e administrar obras e exemplares físicos, consu
 - Backend em produção: Render
 - Frontend em produção: Vercel
 
+## Estrutura
+
+```text
+libstock/
+├── backend/    # API FastAPI
+└── frontend/   # Aplicação Angular (a iniciar)
+```
+
+## Backend
+
+O primeiro incremento implementa autenticação própria com JWT de acesso, refresh token rotativo e persistência das sessões no PostgreSQL.
+
+Consulte as instruções em [`backend/README.md`](backend/README.md).
+
 ## Status
 
-Projeto em fase inicial de planejamento e estruturação.
+Backend de autenticação em desenvolvimento. Frontend ainda não iniciado.
