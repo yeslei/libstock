@@ -1,0 +1,35 @@
+{
+  "name": "@supabase/cli-linux-x64",
+  "version": "2.116.0",
+  "description": "Supabase CLI binary (linux-x64)",
+  "homepage": "https://github.com/supabase/cli#readme",
+  "bugs": {
+    "url": "https://github.com/supabase/cli/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/supabase/cli.git",
+    "directory": "packages/cli-linux-x64"
+  },
+  "files": [
+    "bin/"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "executableFiles": [
+      "bin/supabase",
+      "bin/supabase-go"
+    ]
+  },
+  "preferUnplugged": true
+}
