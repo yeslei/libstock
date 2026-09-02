@@ -5,7 +5,7 @@ API REST construída com FastAPI seguindo MVC com camadas de serviço e reposit�
 ## Requisitos
 
 - Python 3.12
-- PostgreSQL no Supabase para produção
+- PostgreSQL 17 (Supabase local ou hospedado)
 
 ## Execução local
 
@@ -19,7 +19,15 @@ Ative o ambiente virtual e instale as dependências:
 pip install -r requirements.txt
 ```
 
-Copie `.env.example` para `.env`, ajuste as variáveis e aplique as migrations:
+Na raiz do repositório, inicie o PostgreSQL local do Supabase:
+
+```bash
+npm install
+npx supabase start
+```
+
+Copie `.env.example` para `.env`, ajuste as variáveis e aplique todas as
+migrations exclusivamente com Alembic:
 
 ```bash
 alembic upgrade head
@@ -48,3 +56,11 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 ## Variáveis de ambiente
 
 Consulte `.env.example`. Segredos e URLs reais não devem ser versionados.
+
+## Banco de dados
+
+O Supabase é usado como provedor PostgreSQL. O FastAPI acessa o banco por
+SQLAlchemy/psycopg e é a única API consumida pelo frontend. A CLI instalada na
+raiz serve apenas para executar o ambiente local; ela não é uma dependência do
+backend e não gerencia o esquema. Toda alteração estrutural deve ser criada em
+`backend/migrations` com Alembic.

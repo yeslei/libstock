@@ -1,6 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.domain import Client, Profile
 from app.models.user import AccountType, User
 
 
@@ -31,5 +32,10 @@ class UserRepository:
         )
         self.db.add(user)
         self.db.flush()
+        # Cadastros públicos são clientes. Funcionários são criados por um
+        # fluxo administrativo separado.
+        self.db.add(Profile(id=user.id))
+        self.db.flush()
+        self.db.add(Client(id=user.id))
         self.db.refresh(user)
         return user
