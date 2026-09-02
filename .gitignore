@@ -7,7 +7,7 @@ __pycache__/
 htmlcov/
 .venv/
 venv/
-
+node_modules/
 # Environment variables
 .env
 .env.*

@@ -7,7 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_env: str = "development"
-    database_url: str = "sqlite:///./libstock.db"
+    database_url: str = (
+        "postgresql+psycopg://postgres:postgres@127.0.0.1:54322/postgres"
+    )
 
     jwt_secret_key: str = Field(
         default="development-only-secret-change-before-production",
