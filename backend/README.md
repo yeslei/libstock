@@ -33,6 +33,9 @@ migrations exclusivamente com Alembic:
 alembic upgrade head
 ```
 
+Como alternativa, execute `./start-backend.sh` na raiz do projeto. O script
+instala as dependências, aplica as migrations pendentes e só então inicia a API.
+
 Inicie a API:
 
 ```bash
