@@ -1,7 +1,8 @@
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
-from app.models.domain import Client, Profile
+from app.models.domain import Client, Profile, UserRole
 from app.models.user import AccountType, User
 
 
@@ -10,11 +11,20 @@ class UserRepository:
         self.db = db
 
     def find_by_email(self, email: str) -> User | None:
-        statement = select(User).where(func.lower(User.email) == email.lower())
+        statement = (
+            select(User)
+            .options(selectinload(User.roles).selectinload(UserRole.role))
+            .where(func.lower(User.email) == email.lower())
+        )
         return self.db.scalar(statement)
 
     def find_by_id(self, user_id: int) -> User | None:
-        return self.db.get(User, user_id)
+        statement = (
+            select(User)
+            .options(selectinload(User.roles).selectinload(UserRole.role))
+            .where(User.id == user_id)
+        )
+        return self.db.scalar(statement)
 
     def create(
         self,

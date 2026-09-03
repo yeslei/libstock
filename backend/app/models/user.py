@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.domain import UserRole
     from app.models.user_session import UserSession
 
 
@@ -38,3 +39,12 @@ class User(Base):
         cascade="all, delete-orphan",
         foreign_keys="UserSession.user_id",
     )
+    roles: Mapped[list["UserRole"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="UserRole.user_id",
+    )
+
+    @property
+    def role_codes(self) -> list[str]:
+        return [user_role.role.code for user_role in self.roles]

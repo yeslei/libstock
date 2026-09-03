@@ -1,7 +1,7 @@
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.core.exceptions import InvalidTokenError, UserNotFoundError
+from app.core.exceptions import InvalidTokenError, PermissionDeniedError, UserNotFoundError
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.services.user_service import UserService
@@ -23,3 +23,15 @@ def get_current_user(
         return user_service.get_by_id(user_id)
     except UserNotFoundError as exc:
         raise InvalidTokenError() from exc
+
+
+def require_roles(*allowed_role_codes: str):
+    allowed_roles = set(allowed_role_codes)
+
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
+        current_roles = set(current_user.role_codes)
+        if current_roles.isdisjoint(allowed_roles):
+            raise PermissionDeniedError()
+        return current_user
+
+    return dependency
