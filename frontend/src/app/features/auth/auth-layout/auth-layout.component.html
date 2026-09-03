@@ -2,10 +2,24 @@
   <div class="auth__shell">
     <!--
       Painel de marca: só existe a partir de 1024px, onde sobra largura. Traz a
-      identidade em texto porque as logos são verde-escuro sobre claro e não
-      teriam contraste sobre o painel.
+      identidade da marca; o ícone ganha uma placa clara porque sua arte é o
+      mesmo verde-escuro do painel e desapareceria sobre ele.
     -->
     <aside class="auth__aside">
+      <!--
+        alt vazio de propósito: o ícone é decorativo aqui, porque o wordmark
+        logo abaixo já dá o nome da marca ao leitor de tela.
+      -->
+      <span class="auth__plate">
+        <img
+          class="auth__icon"
+          src="/assets/logo-libstock-icon.png"
+          alt=""
+          width="72"
+          height="72"
+        />
+      </span>
+
       <p class="auth__wordmark">LibStock</p>
       <p class="auth__tagline">Livros &middot; Gestão &middot; Confiança</p>
       <p class="auth__pitch">Acervo, empréstimos, reservas e vendas em um só sistema.</p>

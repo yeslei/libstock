@@ -57,6 +57,25 @@
   }
 }
 
+.auth__plate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  margin-bottom: $space-2;
+  padding: $space-2;
+  background-color: $creme;
+  border-radius: $radius-lg;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+.auth__icon {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .auth__wordmark {
   font-size: 2.25rem;
   font-weight: 700;
