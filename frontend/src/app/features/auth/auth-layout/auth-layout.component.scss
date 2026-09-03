@@ -13,10 +13,74 @@
   padding: $space-6 $space-4;
   background-color: $bg-page;
 
+  // Em telas estreitas o card costuma passar da altura da viewport: ancorar no
+  // topo evita que o começo do formulário fique cortado acima da dobra.
   @include until($bp-sm) {
     align-items: flex-start;
     padding: $space-6 $space-4 $space-10;
   }
+
+  @include from($bp-md) {
+    padding: $space-8 $space-6;
+  }
+}
+
+// Até 1024px o shell é só o próprio card. A partir daí vira a moldura das duas
+// colunas, e o card abre mão da borda e da sombra em favor dela.
+.auth__shell {
+  width: 100%;
+  max-width: $card-max-width;
+
+  @include from($bp-lg) {
+    display: grid;
+    grid-template-columns: 5fr 6fr;
+    max-width: 940px;
+    overflow: hidden;
+    border: 1px solid rgba(175, 189, 182, 0.6);
+    border-radius: $radius-lg;
+    box-shadow: $shadow-md;
+    background-color: $bg-surface;
+  }
+}
+
+.auth__aside {
+  display: none;
+
+  @include from($bp-lg) {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: $space-3;
+    padding: $space-10;
+    background-color: $primary;
+    color: #fff; // ~11:1 sobre o verde profundo
+  }
+}
+
+.auth__wordmark {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.auth__tagline {
+  padding-bottom: $space-4;
+  // O dourado fica em 4,3:1 sobre o verde profundo — abaixo do mínimo para
+  // texto. Aqui ele é só o filete decorativo; a legenda em si vai em branco.
+  border-bottom: 2px solid $accent;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: $font-size-xs;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.auth__pitch {
+  max-width: 26ch;
+  padding-top: $space-3;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: $font-size-sm;
+  line-height: 1.6;
 }
 
 .auth__card {
@@ -24,7 +88,6 @@
   flex-direction: column;
   gap: $space-6;
   width: 100%;
-  max-width: $card-max-width;
   padding: $space-8;
   background-color: $bg-surface;
   border: 1px solid rgba(175, 189, 182, 0.6);
@@ -35,11 +98,32 @@
     padding: $space-6 $space-5;
     border-radius: $radius-md;
   }
+
+  @include from($bp-md) {
+    padding: $space-10 $space-8;
+  }
+
+  @include from($bp-lg) {
+    justify-content: center;
+    // Menos folga vertical que no tablet: o card mais alto (cadastro) passa a
+    // caber em 800px de altura sem acionar a barra de rolagem por 7px.
+    padding: $space-8 $space-10;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 .auth__brand {
   display: flex;
   justify-content: center;
+
+  // No desktop o painel ao lado já diz "LibStock": repetir a logo aqui só
+  // empurraria o formulário para baixo (e duplicaria a marca no leitor de
+  // tela). Esconder o <picture> inteiro também elimina o gap do flex.
+  @include from($bp-lg) {
+    display: none;
+  }
 }
 
 .auth__logo {

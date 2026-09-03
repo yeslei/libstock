@@ -1,17 +1,30 @@
 <main class="auth">
-  <section class="auth__card">
-    <picture class="auth__brand">
-      <!-- Abaixo de 480px o wordmark economiza altura vertical sem perder a marca. -->
-      <source media="(max-width: 479px)" srcset="/assets/logo-libstock-wordmark.png" />
-      <img
-        class="auth__logo"
-        src="/assets/logo-libstock-full.png"
-        alt="LibStock — Livros, Gestão, Confiança"
-        width="180"
-        height="180"
-      />
-    </picture>
+  <div class="auth__shell">
+    <!--
+      Painel de marca: só existe a partir de 1024px, onde sobra largura. Traz a
+      identidade em texto porque as logos são verde-escuro sobre claro e não
+      teriam contraste sobre o painel.
+    -->
+    <aside class="auth__aside">
+      <p class="auth__wordmark">LibStock</p>
+      <p class="auth__tagline">Livros &middot; Gestão &middot; Confiança</p>
+      <p class="auth__pitch">Acervo, empréstimos, reservas e vendas em um só sistema.</p>
+    </aside>
 
-    <router-outlet />
-  </section>
+    <section class="auth__card">
+      <picture class="auth__brand">
+        <!-- Abaixo de 480px o wordmark economiza altura vertical sem perder a marca. -->
+        <source media="(max-width: 479px)" srcset="/assets/logo-libstock-wordmark.png" />
+        <img
+          class="auth__logo"
+          src="/assets/logo-libstock-full.png"
+          alt="LibStock — Livros, Gestão, Confiança"
+          width="180"
+          height="180"
+        />
+      </picture>
+
+      <router-outlet />
+    </section>
+  </div>
 </main>
