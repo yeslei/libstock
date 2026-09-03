@@ -3,7 +3,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
 from app.models.domain import Client, Profile, UserRole
-from app.models.user import AccountType, User
+from app.models.user import User
 
 
 class UserRepository:
@@ -32,13 +32,11 @@ class UserRepository:
         name: str,
         email: str,
         password_hash: str,
-        account_type: AccountType,
     ) -> User:
         user = User(
             name=name,
             email=email,
             password_hash=password_hash,
-            account_type=account_type,
         )
         self.db.add(user)
         self.db.flush()

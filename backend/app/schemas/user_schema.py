@@ -2,14 +2,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.models.user import AccountType
-
 
 class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=150)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    account_type: AccountType
 
     @field_validator("name")
     @classmethod
@@ -24,7 +21,6 @@ class UserResponse(BaseModel):
     id: int
     name: str
     email: EmailStr
-    account_type: AccountType
     role_codes: list[str]
     created_at: datetime
 

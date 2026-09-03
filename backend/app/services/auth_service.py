@@ -58,7 +58,6 @@ class AuthService:
                 name=data.name,
                 email=email,
                 password_hash=hash_password(data.password),
-                account_type=data.account_type,
             )
             self.role_repository.assign_to_user(user_id=user.id, role_code="USER")
             self.db.commit()

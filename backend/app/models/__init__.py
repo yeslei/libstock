@@ -14,11 +14,10 @@ from app.models.domain import (
     SaleItem,
     UserRole,
 )
-from app.models.user import AccountType, User
+from app.models.user import User
 from app.models.user_session import UserSession
 
 __all__ = [
-    "AccountType",
     "AuditLog",
     "Base",
     "Book",
