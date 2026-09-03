@@ -21,6 +21,11 @@ class InvalidTokenError(ApplicationError):
         super().__init__(message, "invalid_token", 401)
 
 
+class PermissionDeniedError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Permissão insuficiente.", "permission_denied", 403)
+
+
 class RefreshTokenReuseError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(

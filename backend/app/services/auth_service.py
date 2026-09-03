@@ -23,6 +23,7 @@ from app.core.security import (
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.repositories.user_session_repository import UserSessionRepository
+from app.repositories.role_repository import RoleRepository
 from app.schemas.user_schema import UserCreate
 
 
@@ -40,10 +41,12 @@ class AuthService:
         db: Session,
         user_repository: UserRepository,
         session_repository: UserSessionRepository,
+        role_repository: RoleRepository,
     ) -> None:
         self.db = db
         self.user_repository = user_repository
         self.session_repository = session_repository
+        self.role_repository = role_repository
 
     def register(self, data: UserCreate) -> User:
         email = str(data.email).strip().lower()
@@ -55,9 +58,10 @@ class AuthService:
                 name=data.name,
                 email=email,
                 password_hash=hash_password(data.password),
-                account_type=data.account_type,
             )
+            self.role_repository.assign_to_user(user_id=user.id, role_code="USER")
             self.db.commit()
+            self.db.refresh(user)
             return user
         except IntegrityError as exc:
             self.db.rollback()

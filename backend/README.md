@@ -56,6 +56,18 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `POST` | `/api/v1/auth/logout-all` | Bearer | Revoga todas as sessões do usuário |
 | `GET` | `/api/v1/users/me` | Bearer | Retorna o usuário autenticado |
 
+## Permissionamento
+
+O backend usa RBAC com `roles` e `user_roles`. Os códigos técnicos iniciais são
+`USER`, `SELLER` e `MANAGER`; o campo `name` pode mudar sem quebrar regras do
+sistema. Cadastros públicos recebem `USER` automaticamente.
+
+Rotas futuras podem reutilizar a dependency `require_roles(...)`:
+
+```python
+Depends(require_roles("SELLER", "MANAGER"))
+```
+
 ## Variáveis de ambiente
 
 Consulte `.env.example`. Segredos e URLs reais não devem ser versionados.

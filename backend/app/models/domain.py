@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -22,8 +23,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import relationship
 
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class NotificationChannel(str, Enum):
@@ -96,8 +101,31 @@ class Role(Base):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(String(255))
+
+    users: Mapped[list["UserRole"]] = relationship(
+        back_populates="role",
+        cascade="all, delete-orphan",
+    )
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    user: Mapped["User"] = relationship(back_populates="roles")
+    role: Mapped[Role] = relationship(back_populates="users")
 
 
 class Client(Base):

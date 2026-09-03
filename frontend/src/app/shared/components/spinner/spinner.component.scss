@@ -1,0 +1,30 @@
+:host {
+  display: inline-flex;
+}
+
+.spinner {
+  --spinner-size: 18px;
+
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Sem animação: um traço estático ainda comunica "há algo acontecendo" junto ao
+// texto do botão, que também muda durante o envio.
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: currentColor;
+    opacity: 0.6;
+  }
+}

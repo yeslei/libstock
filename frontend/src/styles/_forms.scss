@@ -1,0 +1,190 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+/// Estilos de campo compartilhados entre os componentes de formulário.
+/// (Como o encapsulamento de estilo do Angular é por componente, o mixin é
+/// aplicado em cada um em vez de viver no CSS global.)
+@mixin field {
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  .field__label {
+    font-size: $font-size-sm;
+    font-weight: 600;
+    color: $text-primary;
+  }
+
+  .field__control {
+    display: flex;
+    align-items: stretch;
+    background-color: $bg-surface;
+    border: 1px solid $border;
+    border-radius: $radius-md;
+
+    @include motion(border-color, box-shadow);
+
+    &:hover {
+      border-color: $verde-acinzentado;
+    }
+
+    // O anel de foco vai no contêiner porque o input e o botão de visibilidade
+    // formam um controle só aos olhos do usuário.
+    &:focus-within {
+      border-color: $border-focus;
+      @include focus-ring;
+    }
+
+    &--invalid {
+      border-color: $error;
+    }
+  }
+
+  .field__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: $control-height;
+    padding: 0 $space-4;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    font-size: $font-size-base; // 16px — abaixo disso o iOS aplica zoom no foco
+
+    &:focus {
+      outline: none; // o anel é desenhado pelo contêiner (:focus-within)
+    }
+
+    &::placeholder {
+      color: $text-muted;
+    }
+  }
+
+  .field__toggle {
+    @include touch-target;
+
+    flex: 0 0 auto;
+    padding: 0 $space-3;
+    margin: 0;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: $primary;
+    font-size: $font-size-sm;
+    font-weight: 600;
+    cursor: pointer;
+
+    @include motion(background-color, color);
+
+    &:hover {
+      background-color: rgba(10, 59, 41, 0.06);
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+      outline-offset: -2px;
+    }
+  }
+
+  .field__error {
+    display: flex;
+    gap: $space-2;
+    align-items: baseline;
+    font-size: $font-size-sm;
+    color: $error;
+
+    &::before {
+      content: '!';
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: $error;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      align-self: center;
+    }
+  }
+
+  .field__hint {
+    font-size: $font-size-sm;
+    color: $text-muted;
+  }
+}
+
+@mixin password-requirements {
+  .requirements {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: $font-size-sm;
+    color: $text-muted;
+  }
+
+  .requirements__item {
+    display: flex;
+    gap: $space-2;
+    align-items: center;
+
+    @include motion(color);
+
+    &--met {
+      color: #2b4a2e; // verde escuro o bastante para 4.5:1 sobre branco
+    }
+  }
+
+  .requirements__mark {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    font-weight: 700;
+  }
+
+  .requirements__item--met .requirements__mark {
+    color: $success;
+  }
+}
+
+@mixin button-primary {
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-2;
+    width: 100%;
+    min-height: $control-height; // alvo generoso (Lei de Fitts)
+    padding: 0 $space-5;
+    border: 1px solid transparent;
+    border-radius: $radius-md;
+    background-color: $primary;
+    color: #fff; // ~11:1 sobre o verde profundo
+    font-size: $font-size-base;
+    font-weight: 600;
+    cursor: pointer;
+
+    @include motion(background-color, box-shadow, opacity);
+
+    &:hover:not(:disabled) {
+      background-color: $primary-hover;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+  }
+}

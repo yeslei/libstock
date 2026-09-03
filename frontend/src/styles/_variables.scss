@@ -1,0 +1,75 @@
+// ---------------------------------------------------------------------------
+// LibStock — tokens de identidade visual
+// Fonte de verdade: IDVISUAL.md (cores amostradas de logo-libstock-full.png).
+// ---------------------------------------------------------------------------
+
+// ---- Marca (extraídas da logo) ----
+$verde-profundo:    #0a3b29; // dominante — "Lib", contorno do livro
+$verde-sage:        #496b4c; // "Stock", livro grande
+$verde-medio:       #2f573c; // tom intermediário
+$dourado:           #a99654; // marcador de página, livro mostarda
+$terracota:         #b36626; // livro laranja queimado
+$verde-acinzentado: #768e83; // neutro frio
+$verde-claro:       #afbdb6; // bordas, divisores
+$creme:             #fef8f0; // fundo off-white da marca
+
+// ---- Semânticas ----
+$primary:       $verde-profundo; // botões principais, links, foco
+$primary-hover: #0d4e36;         // clarear ~8% no hover
+$secondary:     $verde-sage;     // botões secundários, badges
+$accent:        $dourado;        // destaques, ícones decorativos
+$warning:       $terracota;      // avisos
+$error:         #b3261e;         // erros — vermelho harmonizado com a terracota
+$success:       $verde-sage;     // confirmações
+
+// ---- Superfícies e texto ----
+$bg-page:       $creme;
+$bg-surface:    #ffffff;
+$bg-subtle:     #f4f6f3;
+$text-primary:  #1a1a1a;
+$text-secondary:#6b5644; // marrom da tagline
+$text-muted:    #5f6b64;
+$border:        $verde-claro;
+$border-focus:  $primary;
+
+// ---- Elevação ----
+$shadow-sm: 0 1px 3px rgba(10, 59, 41, 0.1);
+$shadow-md: 0 10px 24px rgba(10, 59, 41, 0.12);
+
+// ---- Tipografia ----
+$font-sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+$font-size-base: 1rem;     // 16px — evita o zoom automático do iOS nos inputs
+$font-size-sm: 0.875rem;
+$font-size-xs: 0.8125rem;
+$line-height-base: 1.5;
+
+// ---- Espaçamento (escala de 4px) ----
+$space-1: 0.25rem;
+$space-2: 0.5rem;   // espaçamento mínimo entre alvos clicáveis (Lei de Fitts)
+$space-3: 0.75rem;
+$space-4: 1rem;
+$space-5: 1.25rem;
+$space-6: 1.5rem;
+$space-8: 2rem;
+$space-10: 2.5rem;
+
+// ---- Formas ----
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 16px;
+
+// ---- Alvos de toque (WCAG 2.5.5 / Lei de Fitts) ----
+$target-min: 44px;   // mínimo absoluto
+$control-height: 48px; // inputs e botão primário
+
+// ---- Layout ----
+$card-max-width: 420px;
+
+// ---- Movimento ----
+$transition-fast: 150ms ease;
+$transition-base: 200ms ease;
+
+// ---- Breakpoints (mobile-first) ----
+$bp-sm: 480px;
+$bp-md: 768px;
+$bp-lg: 1024px;

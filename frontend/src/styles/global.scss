@@ -1,0 +1,71 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: $bg-page;
+  color: $text-primary;
+  font-family: $font-sans;
+  font-size: $font-size-base;
+  line-height: $line-height-base;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: $primary;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: $radius-sm;
+
+  @include motion(color);
+
+  &:hover {
+    color: $primary-hover;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+// Desliga todo movimento quando o sistema pede redução (WCAG 2.3.3).
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.visually-hidden {
+  @include visually-hidden;
+}
