@@ -1,0 +1,48 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+@use 'auth-screen' as *;
+
+@include auth-screen;
+
+.auth-form__row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -$space-2;
+}
+
+// "Esqueceu a senha?" ainda não existe. O estado indisponível é dito pelo texto
+// visível, não só por um `title` — tooltips não chegam a teclado nem a toque.
+.link-button {
+  display: inline-flex;
+  gap: $space-2;
+  align-items: center;
+  min-height: $target-min;
+  padding: 0 $space-1;
+  border: 0;
+  background: none;
+  color: $primary;
+  font-size: $font-size-sm;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:disabled {
+    color: $text-muted;
+    cursor: default;
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.link-button__badge {
+  padding: 2px $space-2;
+  border: 1px solid $border;
+  border-radius: 999px;
+  background-color: $bg-subtle;
+  color: $text-muted;
+  font-size: $font-size-xs;
+  text-decoration: none;
+}

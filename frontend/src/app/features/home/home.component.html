@@ -1,0 +1,31 @@
+<main class="home">
+  <section class="home__card">
+    <img
+      class="home__logo"
+      src="/assets/logo-libstock-wordmark.png"
+      alt="LibStock"
+      width="160"
+      height="40"
+    />
+
+    @if (user$ | async; as user) {
+      <h1 class="home__title">Olá, {{ user.name }}</h1>
+      <p class="home__email">{{ user.email }}</p>
+
+      <ul class="roles" aria-label="Seus papéis no sistema">
+        @for (role of user.role_codes; track role) {
+          <li class="roles__item">{{ role }}</li>
+        }
+      </ul>
+    }
+
+    <button class="button" type="button" [disabled]="leaving()" [attr.aria-busy]="leaving()" (click)="logout()">
+      @if (leaving()) {
+        <app-spinner />
+        <span>Saindo…</span>
+      } @else {
+        <span>Sair</span>
+      }
+    </button>
+  </section>
+</main>

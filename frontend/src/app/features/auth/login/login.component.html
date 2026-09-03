@@ -1,0 +1,64 @@
+<header class="auth-header">
+  <h1 class="auth-header__title">Entrar</h1>
+  <p class="auth-header__subtitle">Acesse sua conta LibStock para continuar.</p>
+</header>
+
+@if (notice(); as flash) {
+  <app-alert [message]="flash.message" [variant]="flash.variant" />
+}
+
+@if (formError; as message) {
+  <app-alert [message]="message" variant="error" />
+}
+
+<form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <div class="field">
+    <label class="field__label" for="login-email">E-mail</label>
+    <div class="field__control" [class.field__control--invalid]="emailError() !== null">
+      <input
+        class="field__input"
+        id="login-email"
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        inputmode="email"
+        autocapitalize="none"
+        spellcheck="false"
+        placeholder="nome@dominio.com"
+        [attr.aria-invalid]="emailError() !== null"
+        [attr.aria-describedby]="emailError() ? 'login-email-error' : null"
+      />
+    </div>
+    @if (emailError(); as message) {
+      <p class="field__error" id="login-email-error" aria-live="polite">{{ message }}</p>
+    }
+  </div>
+
+  <app-password-field
+    inputId="login-password"
+    label="Senha"
+    autocomplete="current-password"
+    [control]="form.controls.password"
+    [errorMessage]="passwordError()"
+  />
+
+  <div class="auth-form__row">
+    <button class="link-button" type="button" disabled title="Em breve">
+      Esqueceu a senha? <span class="link-button__badge">em breve</span>
+    </button>
+  </div>
+
+  <button class="button" type="submit" [disabled]="isSubmitting" [attr.aria-busy]="isSubmitting">
+    @if (isSubmitting) {
+      <app-spinner />
+      <span>Entrando…</span>
+    } @else {
+      <span>Entrar</span>
+    }
+  </button>
+</form>
+
+<p class="auth-footer">
+  Não tem conta?
+  <a routerLink="/register">Criar conta</a>
+</p>

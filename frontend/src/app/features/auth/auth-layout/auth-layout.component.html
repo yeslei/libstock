@@ -1,0 +1,17 @@
+<main class="auth">
+  <section class="auth__card">
+    <picture class="auth__brand">
+      <!-- Abaixo de 480px o wordmark economiza altura vertical sem perder a marca. -->
+      <source media="(max-width: 479px)" srcset="/assets/logo-libstock-wordmark.png" />
+      <img
+        class="auth__logo"
+        src="/assets/logo-libstock-full.png"
+        alt="LibStock — Livros, Gestão, Confiança"
+        width="180"
+        height="180"
+      />
+    </picture>
+
+    <router-outlet />
+  </section>
+</main>
