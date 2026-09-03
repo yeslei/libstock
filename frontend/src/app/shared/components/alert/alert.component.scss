@@ -1,0 +1,72 @@
+@use 'variables' as *;
+
+:host {
+  display: block;
+}
+
+.alert {
+  display: flex;
+  gap: $space-3;
+  align-items: flex-start;
+  padding: $space-3 $space-4;
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+}
+
+.alert__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+
+.alert__body {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+  min-width: 0;
+}
+
+.alert__message {
+  font-weight: 500;
+}
+
+.alert--error {
+  border-color: $error;
+  background-color: #fdf2f1;
+  color: #7c1a15; // 4.5:1+ sobre o fundo claro
+
+  .alert__icon {
+    background-color: $error;
+  }
+}
+
+.alert--success {
+  border-color: $success;
+  background-color: #f0f6f0;
+  color: #2b4a2e;
+
+  .alert__icon {
+    background-color: $success;
+  }
+}
+
+.alert--info {
+  border-color: $verde-acinzentado;
+  background-color: $bg-subtle;
+  color: #3c4a43;
+
+  .alert__icon {
+    background-color: $verde-acinzentado;
+  }
+}
