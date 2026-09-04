@@ -28,3 +28,10 @@ Thumbs.db
 frontend/node_modules/
 frontend/dist/
 frontend/.angular/
+# Backlog migration - generated runtime files
+backlog-migration/analysis/*-result.json
+backlog-migration/analysis/*-state.json
+
+# Python cache
+__pycache__/
+*.py[cod]
