@@ -1,5 +1,5 @@
 {
-  "mode": "dry-run",
+  "mode": "apply",
   "repo": "yeslei/libstock",
   "processed": 61,
   "errors": 0,
