@@ -1,0 +1,28 @@
+{
+  "children": {
+    "12:1": {
+      "number": 67,
+      "url": "https://github.com/yeslei/libstock/issues/67",
+      "title": "[US] Consultar usuário",
+      "parent": 12
+    },
+    "12:2": {
+      "number": 68,
+      "url": "https://github.com/yeslei/libstock/issues/68",
+      "title": "[US] Atualizar dados de usuário",
+      "parent": 12
+    },
+    "18:1": {
+      "number": 69,
+      "url": "https://github.com/yeslei/libstock/issues/69",
+      "title": "[US] Consultar obra",
+      "parent": 18
+    },
+    "18:2": {
+      "number": 70,
+      "url": "https://github.com/yeslei/libstock/issues/70",
+      "title": "[US] Atualizar obra",
+      "parent": 18
+    }
+  }
+}
