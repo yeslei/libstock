@@ -39,28 +39,26 @@ As três histórias pertencem ao mesmo domínio de consulta e devem reutilizar a
 
 ---
 
-# Arquitetura
+## Arquitetura oficial da feature
 
-Seguir o padrão existente:
+As buscas públicas pertencem ao domínio de catálogo.
 
-Controller
-→ Service
-→ Repository
-→ SQLAlchemy
-→ PostgreSQL
+Controller:
+`CatalogController`
 
-Arquivos de referência já existentes:
+Service:
+`CatalogService`
 
-- `backend/app/controllers/book_controller.py`
-- `backend/app/services/book_service.py`
-- `backend/app/repositories/book_repository.py`
-- `backend/app/schemas/book_schema.py`
-- `backend/app/dependencies/services.py`
-- `backend/app/main.py`
+Repository:
+`CatalogRepository`
 
-Não criar uma nova arquitetura para as próximas buscas.
+Models:
+`Book`
+`Copy`
 
----
+A implementação de #23 em `book_*` é anterior à introdução do módulo
+`catalog_*` e deve ser incorporada ao módulo de catálogo antes da
+conclusão da feature.
 
 # Issue #23 — Busca por título
 
