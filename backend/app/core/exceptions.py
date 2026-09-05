@@ -40,6 +40,56 @@ class BookNotFoundError(ApplicationError):
         super().__init__("Livro não encontrado.", "book_not_found", 404)
 
 
+class DuplicateIsbnError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("ISBN já cadastrado.", "duplicate_isbn", 409)
+
+
+class EmployeeRecordRequiredError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O usuário autenticado não possui cadastro de funcionário.",
+            "employee_record_required",
+            403,
+        )
+
+
+class GoogleBooksNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "ISBN não encontrado na base externa do Google Books.",
+            "google_books_not_found",
+            404,
+        )
+
+
+class GoogleBooksUnavailableError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível consultar o Google Books.",
+            "google_books_unavailable",
+            503,
+        )
+
+
+class GoogleBooksInvalidResponseError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O Google Books não retornou os dados obrigatórios da obra.",
+            "google_books_invalid_response",
+            502,
+        )
+
+
+class BookPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível cadastrar a obra.",
+            "book_persistence_error",
+            500,
+        )
+
+
 class DuplicateGenreError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Gênero já cadastrado.", "duplicate_genre", 409)
