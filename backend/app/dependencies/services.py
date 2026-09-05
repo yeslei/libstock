@@ -5,7 +5,9 @@ from app.core.database import get_db
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.user_session_repository import UserSessionRepository
+from app.repositories.book_repository import BookRepository
 from app.services.auth_service import AuthService
+from app.services.book_service import BookService
 from app.services.user_service import UserService
 
 
@@ -20,3 +22,7 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
 
 def get_user_service(db: Session = Depends(get_db)) -> UserService:
     return UserService(UserRepository(db))
+
+
+def get_book_service(db: Session = Depends(get_db)) -> BookService:
+    return BookService(BookRepository(db))
