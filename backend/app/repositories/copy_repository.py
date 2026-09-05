@@ -8,10 +8,12 @@ class CopyRepository:
 
     def create_copy(self, copy_data: CopyCreate) -> Copy:
         db_copy = Copy(
-            barcode=copy_data.barcode,
-            destinationTag=copy_data.destinationTag,
             book_id=copy_data.book_id,
-            status="Available"
+            barcode=copy_data.barcode,
+            destination=copy_data.destination,
+            condition=copy_data.condition,
+            sale_price=copy_data.sale_price,
+            acquired_at=copy_data.acquired_at,
         )
         self.db.add(db_copy)
         self.db.commit()
