@@ -5,7 +5,7 @@
 | Issue | EAP | História | Prioridade | Tamanho | Status |
 |---|---|---|---|---|---|
 | #23 | 1.4.1 | Busca por título | P0 | XS | Implementada |
-| #24 | 1.4.2 | Busca por autor | P0 | XS | Pendente |
+| #24 | 1.4.2 | Busca por autor | P0 | XS | Implementada |
 | #25 | 1.4.3 | Busca por ISBN ou código de barras | P0 | S | Pendente |
 
 Branch:
@@ -28,37 +28,63 @@ Dependência EAP comum:
 
 # Objetivo da feature
 
-Permitir que o usuário localize obras e exemplares do acervo através de diferentes critérios de busca:
+Permitir que o usuário localize obras e exemplares do acervo por:
 
 - título;
 - autor;
 - ISBN;
 - código de barras.
 
-As três histórias pertencem ao mesmo domínio de consulta e devem reutilizar a mesma arquitetura de busca já implementada no backend.
+As histórias pertencem ao domínio de consulta do acervo e devem reutilizar a arquitetura pública de catálogo.
 
 ---
 
-## Arquitetura oficial da feature
+# Arquitetura oficial da feature
 
 As buscas públicas pertencem ao domínio de catálogo.
 
-Controller:
+Fluxo:
+
 `CatalogController`
+→ `CatalogService`
+→ `CatalogRepository`
+→ SQLAlchemy
+→ PostgreSQL
 
-Service:
-`CatalogService`
+Models principais:
 
-Repository:
-`CatalogRepository`
+- `Book`
+- `Copy`
 
-Models:
-`Book`
-`Copy`
+Arquivos principais:
 
-A implementação de #23 em `book_*` é anterior à introdução do módulo
-`catalog_*` e deve ser incorporada ao módulo de catálogo antes da
-conclusão da feature.
+- `backend/app/controllers/catalog_controller.py`
+- `backend/app/services/catalog_service.py`
+- `backend/app/repositories/catalog_repository.py`
+- `backend/app/schemas/catalog_schema.py`
+- `backend/app/models/domain.py`
+
+A implementação inicial da #23 em `book_*` foi criada antes da introdução do módulo `catalog_*`.
+
+Título e autor foram consolidados no catálogo público.
+
+A rota legada `/api/v1/books/` permanece temporariamente disponível para evitar quebra de consumidores e testes existentes, mas novas buscas devem evoluir o módulo `catalog_*`.
+
+---
+
+# Regras gerais do catálogo público
+
+As consultas públicas:
+
+- não exigem autenticação;
+- retornam somente obras ativas;
+- retornam somente obras que possuam ao menos um exemplar ativo;
+- não alteram dados;
+- utilizam a mesma regra-base de visibilidade do catálogo.
+
+Uma obra pode continuar visível mesmo quando nenhum exemplar está disponível, desde que exista ao menos um exemplar ativo.
+
+---
 
 # Issue #23 — Busca por título
 
@@ -70,7 +96,7 @@ para **localizar rapidamente uma obra no acervo**.
 
 ## Situação
 
-Implementada.
+Implementada e consolidada no catálogo público.
 
 ## Contrato aprovado
 
@@ -82,29 +108,32 @@ A busca por título:
 - utiliza correspondência parcial por substring;
 - é case-insensitive;
 - trata `%` e `_` como caracteres literais;
-- retorna somente obras ativas;
+- utiliza as regras de visibilidade do catálogo;
 - retorna coleção vazia quando não há correspondência;
 - não altera dados.
 
-## Endpoint atual
+## Endpoint principal
+
+`GET /api/v1/catalog/books?title=<termo>`
+
+## Endpoint legado
 
 `GET /api/v1/books/?title=<termo>`
 
+Mantido temporariamente por compatibilidade.
+
 ## Testes
 
-Cobertura existente para:
+Cobertura para:
 
-- schema;
-- repository;
-- service;
-- controller;
+- validação;
+- acesso público;
 - substring;
 - case-insensitive;
-- filtro de obras ativas;
-- `%` literal;
-- `_` literal;
-- validação do parâmetro;
-- acesso público.
+- escaping de `%`;
+- escaping de `_`;
+- visibilidade do catálogo;
+- serialização da resposta.
 
 ---
 
@@ -118,59 +147,94 @@ para **localizar obras relacionadas ao autor informado**.
 
 ## Situação
 
-Pendente.
+Implementada.
 
-## Escopo confirmado pela Story
-
-A operação deve permitir localizar obras relacionadas ao autor informado.
-
-## Decisões necessárias antes da implementação
+## Decisões aprovadas
 
 ### AUT-01 — Correspondência
 
-Status: OPEN
+Status: APPROVED
 
-Definir se a busca por autor será:
+Busca por substring.
 
-- exata;
-- prefixo;
-- substring.
+Exemplo:
+
+`Assis`
+
+pode encontrar:
+
+`Machado de Assis`
 
 ### AUT-02 — Case sensitivity
 
-Status: OPEN
+Status: APPROVED
 
-Definir se:
+A busca é case-insensitive.
+
+Exemplo:
 
 `machado`
 
-deve encontrar:
+encontra:
 
 `Machado de Assis`
 
 ### AUT-03 — Obras inativas
 
-Status: OPEN
+Status: APPROVED
 
-Definir se obras inativas devem aparecer.
+A busca segue a regra de visibilidade do catálogo:
+
+- `Book.is_active = true`;
+- deve existir ao menos um `Copy.is_active = true`.
 
 ### AUT-04 — Normalização
 
-Status: OPEN
+Status: APPROVED
 
-Definir se será aplicado somente trim ou alguma normalização adicional.
+Aplicar trim somente nas extremidades.
 
-## Reutilização esperada
+`%` e `_` devem ser tratados como caracteres literais na busca.
 
-A implementação deve reutilizar:
+## Endpoint
 
-- `BookRepository`;
-- `BookService`;
-- `BookController`;
-- schemas de busca existentes;
-- infraestrutura de testes criada na #23.
+`GET /api/v1/catalog/books?author=<termo>`
 
-Não criar novo módulo de busca apenas para autor.
+## Testes
+
+Cobertura adicionada para:
+
+- busca por autor;
+- acesso público;
+- validação de ausência de critérios;
+- integração com o catálogo.
+
+---
+
+# Contrato do endpoint de busca
+
+Endpoint:
+
+`GET /api/v1/catalog/books`
+
+Critérios atualmente suportados:
+
+- `title`
+- `author`
+
+Exemplos:
+
+`GET /api/v1/catalog/books?title=dom`
+
+`GET /api/v1/catalog/books?author=machado`
+
+Ao menos um critério deve ser informado.
+
+Entrada sem título e sem autor:
+
+`GET /api/v1/catalog/books`
+
+deve resultar em erro HTTP de validação.
 
 ---
 
@@ -186,9 +250,9 @@ para **localizar rapidamente a obra ou exemplar a partir de um identificador**.
 
 Pendente.
 
-## Observação importante de domínio
+## Observação de domínio
 
-Esta Story envolve dois identificadores de entidades diferentes:
+A Story envolve identificadores pertencentes a entidades diferentes.
 
 ### ISBN
 
@@ -202,24 +266,32 @@ Pertence ao exemplar:
 
 `copies.barcode`
 
-Portanto, apesar de estarem na mesma Story, a implementação provavelmente exigirá consultas diferentes.
+A implementação deve permanecer no domínio de catálogo, mas pode exigir consultas diferentes no `CatalogRepository`.
 
-Não assumir que ISBN e barcode possuem a mesma semântica de busca.
+Não criar outro módulo de busca apenas para a #25.
 
-## Decisões necessárias
+---
 
-### ID-01 — ISBN exato ou parcial
+# Decisões pendentes da #25
+
+## ID-01 — Correspondência de ISBN
 
 Status: OPEN
 
-Definir se ISBN deve usar correspondência:
+Definir:
 
 - exata;
 - parcial.
 
-### ID-02 — Normalização de ISBN
+Recomendação técnica:
 
-Status: OPEN
+- correspondência exata.
+
+---
+
+## ID-02 — Normalização de ISBN
+
+Status: OPEN / BLOCKING
 
 Definir tratamento de:
 
@@ -228,41 +300,63 @@ Definir tratamento de:
 - ISBN-10;
 - ISBN-13.
 
-### ID-03 — Barcode exato ou parcial
+Essa decisão não deve ser inferida apenas pelo tipo da coluna no banco.
+
+---
+
+## ID-03 — Código de barras
 
 Status: OPEN
 
-Definir se código de barras exige correspondência exata.
+Definir:
 
-### ID-04 — Exemplares inativos
+- correspondência exata;
+- correspondência parcial.
 
-Status: OPEN
+Recomendação técnica:
 
-Definir se exemplares com:
+- correspondência exata.
 
-`is_active = false`
+---
 
-podem ser encontrados.
+## ID-04 — Exemplares inativos
 
-### ID-05 — Resultado
+Status: APPROVED
 
-Status: OPEN
+Consultas públicas do catálogo não devem localizar exemplares inativos.
 
-Definir se o endpoint:
+Para busca por barcode:
 
-- retorna obra para ISBN;
-- retorna exemplar para barcode;
-- utiliza schemas diferentes;
-- utiliza um response discriminado.
+`Copy.is_active = true`
 
-## Banco já disponível
+---
 
-Não há evidência de necessidade de migration para a busca:
+## ID-05 — Resultado
 
-- `books.isbn` já existe;
-- `copies.barcode` já existe.
+Status: OPEN / BLOCKING
 
-A implementação deve primeiro tentar utilizar o schema atual.
+Definir o contrato de resposta para código de barras.
+
+Possibilidades:
+
+1. retornar a obra relacionada ao exemplar;
+2. retornar dados do exemplar;
+3. retornar uma resposta específica contendo obra + exemplar.
+
+A decisão precisa ser definida antes da implementação completa da busca por barcode.
+
+---
+
+# Banco disponível
+
+Não há necessidade identificada de nova migration para a #25.
+
+Campos existentes:
+
+- `books.isbn`;
+- `copies.barcode`.
+
+A implementação deve utilizar o schema atual, salvo descoberta concreta em contrário.
 
 ---
 
@@ -270,66 +364,49 @@ A implementação deve primeiro tentar utilizar o schema atual.
 
 Para cada modalidade implementada:
 
-- [ ] entrada obrigatória validada;
-- [ ] entrada inválida produz erro adequado;
-- [ ] consulta não modifica dados;
-- [ ] resultado é serializável pela API;
-- [ ] nenhuma regra de negócio é inventada;
-- [ ] repository contém a consulta;
-- [ ] service coordena a operação;
-- [ ] controller trata HTTP;
-- [ ] testes automatizados cobrem o comportamento;
-- [ ] testes existentes continuam passando.
+- [x] entrada obrigatória validada;
+- [x] entrada inválida produz erro HTTP adequado;
+- [x] consulta não modifica dados;
+- [x] resultado é serializável pela API;
+- [x] repository contém a consulta;
+- [x] service coordena a operação;
+- [x] controller trata HTTP;
+- [x] testes automatizados cobrem o comportamento;
+- [x] testes existentes continuam passando.
+
+Esses itens estão atendidos para #23 e #24.
+
+Para #25, devem ser reavaliados após a implementação.
 
 ---
 
-# Fora do escopo da feature
+# Fora do escopo
 
-Não implementar durante estas três histórias:
+Não implementar nesta feature:
 
 - cadastro de obras;
 - atualização de obras;
 - cadastro de exemplares;
-- disponibilidade;
-- venda;
-- empréstimo;
-- reserva;
-- paginação genérica, salvo decisão posterior;
+- empréstimos;
+- vendas;
+- reservas;
 - motor de busca externo;
 - Elasticsearch;
-- ranking avançado;
 - fuzzy search;
-- busca full-text genérica.
+- ranking avançado;
+- busca full-text genérica;
+- refatorações amplas não necessárias à busca.
 
 ---
 
-# Definition of Done
+# Validação atual
 
-A feature estará concluída quando:
+Última suíte completa executada:
 
-## #23
+`33 passed, 1 warning`
 
-- [x] busca por título implementada;
-- [x] testes implementados.
+Comando:
 
-## #24
-
-- [ ] decisões de autor resolvidas;
-- [ ] busca por autor implementada;
-- [ ] testes implementados.
-
-## #25
-
-- [ ] decisões de ISBN/barcode resolvidas;
-- [ ] busca por ISBN implementada;
-- [ ] busca por barcode implementada;
-- [ ] testes implementados.
-
-## Feature
-
-- [ ] todos os testes passando;
-- [ ] diff revisado;
-- [ ] nenhuma migration desnecessária;
-- [ ] nenhuma alteração fora do escopo;
-- [ ] PR da branch `feature/busca-livros` aprovada;
-- [ ] integração com `integracao` concluída.
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/python -m pytest -q
