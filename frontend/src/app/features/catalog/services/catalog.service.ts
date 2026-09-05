@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { CatalogBook, Genre, PagedBooks } from '../models/catalog.model';
 
 export const CATALOG_API = '/api/v1/catalog';
+export type CatalogSearchCriterion = 'title' | 'author' | 'isbn' | 'barcode';
 
 /**
  * Leitura do catálogo público. Não usa `withCredentials`: são endpoints
@@ -26,6 +27,12 @@ export class CatalogService {
   getBooksByGenre(slug: string, page = 1): Observable<PagedBooks> {
     return this.http.get<PagedBooks>(`${CATALOG_API}/genres/${slug}/books`, {
       params: { page },
+    });
+  }
+
+  searchBooks(criterion: CatalogSearchCriterion, value: string): Observable<CatalogBook[]> {
+    return this.http.get<CatalogBook[]>(`${CATALOG_API}/books`, {
+      params: { [criterion]: value },
     });
   }
 }

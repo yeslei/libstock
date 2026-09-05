@@ -10,7 +10,7 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
 import { CatalogCapability, capabilitiesFor } from '../models/catalog-capabilities';
 import { BookOffer, CatalogBook, Genre, LoadState } from '../models/catalog.model';
 import { CatalogAdminService } from '../services/catalog-admin.service';
-import { CatalogService } from '../services/catalog.service';
+import { CatalogSearchCriterion, CatalogService } from '../services/catalog.service';
 
 /**
  * Vitrine pública. Qualquer visitante navega sem sessão; o login só é cobrado
@@ -72,8 +72,37 @@ export class CatalogHomeComponent {
     ),
   );
 
-  /** A busca é de outra frente de trabalho; o campo fica visível e inerte. */
-  protected readonly searchDisabled = signal(true);
+  protected readonly searchCriterion = signal<CatalogSearchCriterion>('title');
+  protected readonly searchValue = signal('');
+  protected readonly searchState = signal<LoadState<CatalogBook[]> | null>(null);
+
+  protected setSearchCriterion(value: string): void {
+    this.searchCriterion.set(value as CatalogSearchCriterion);
+  }
+
+  protected setSearchValue(value: string): void {
+    this.searchValue.set(value);
+  }
+
+  protected searchBooks(): void {
+    const value = this.searchValue().trim();
+    if (!value) {
+      this.searchState.set({ status: 'error', message: 'Digite um termo para buscar.' });
+      return;
+    }
+    this.searchState.set({ status: 'loading' });
+    this.catalog
+      .searchBooks(this.searchCriterion(), value)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (data) => this.searchState.set({ status: 'loaded', data }),
+        error: () =>
+          this.searchState.set({
+            status: 'error',
+            message: 'Não foi possível realizar a busca. Tente novamente.',
+          }),
+      });
+  }
 
   protected isHidden(book: CatalogBook): boolean {
     return this.unfeatured().has(book.id);
