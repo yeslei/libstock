@@ -1,0 +1,30 @@
+<main class="genre">
+  <a class="genre__back" routerLink="/">← Voltar para a home</a>
+
+  @if (books$ | async; as state) {
+    @switch (state.status) {
+      @case ('loading') {
+        <p class="genre__state"><app-spinner /> <span>Carregando…</span></p>
+      }
+      @case ('error') {
+        <app-alert [message]="state.message" variant="error" />
+      }
+      @case ('loaded') {
+        <h1 class="genre__title">{{ state.data.genre.name }}</h1>
+        @if (state.data.items.length === 0) {
+          <p class="genre__state">Nenhum livro disponível nesta categoria.</p>
+        } @else {
+          <p class="genre__count">{{ state.data.total }} livro(s)</p>
+          <ul class="genre__list">
+            @for (book of state.data.items; track book.id) {
+              <li class="genre__item">
+                <strong>{{ book.title }}</strong>
+                <span>{{ book.author }}</span>
+              </li>
+            }
+          </ul>
+        }
+      }
+    }
+  }
+</main>

@@ -6,8 +6,25 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
+    title: 'LibStock — Encontre livros, compartilhe histórias',
+    loadComponent: () =>
+      import('./features/catalog/catalog-home/catalog-home.component').then(
+        (m) => m.CatalogHomeComponent,
+      ),
+  },
+  {
+    path: 'generos/:slug',
+    title: 'Categoria · LibStock',
+    loadComponent: () =>
+      import('./features/catalog/genre-books/genre-books.component').then(
+        (m) => m.GenreBooksComponent,
+      ),
+  },
+  {
+    path: 'painel',
+    pathMatch: 'full',
     canActivate: [authGuard],
-    title: 'Início · LibStock',
+    title: 'Painel · LibStock',
     loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
   },
   {
