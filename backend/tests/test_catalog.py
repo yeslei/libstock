@@ -10,12 +10,14 @@ from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from app.core.exceptions import GenreNotFoundError
 from app.dependencies.authentication import get_current_user
 from app.dependencies.services import get_catalog_service
 from app.main import app
-from app.models.domain import CopyStatus, DestinationType
+from app.models.domain import Book, BookGenre, Copy, CopyStatus, DestinationType, Genre
 from app.repositories.catalog_repository import CatalogRepository
 from app.schemas.catalog_schema import (
     BookOffer,
@@ -33,6 +35,7 @@ client = TestClient(app)
 class FakeCatalogService:
     def __init__(self) -> None:
         self.featured_set: list[tuple[int, FeaturedUpdate]] = []
+        self.last_search: dict[str, object] | None = None
 
     def list_featured_books(self) -> list[CatalogBookResponse]:
         return [
@@ -67,6 +70,12 @@ class FakeCatalogService:
         )
 
     def search_books(self, *, title=None, author=None, isbn=None, barcode=None):
+        self.last_search = {
+            "title": title,
+            "author": author,
+            "isbn": isbn,
+            "barcode": barcode,
+        }
         return [
             CatalogBookResponse(
                 id=1,
@@ -134,11 +143,20 @@ def test_busca_no_catalogo_exige_titulo_ou_autor():
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize("query", ["isbn=978-85-1", "barcode=BC-1"])
-def test_busca_por_identificador_no_catalogo(query):
-    _use_fake_service()
+@pytest.mark.parametrize(
+    ("query", "criterion", "value"),
+    [("isbn=978-85-1", "isbn", "978-85-1"), ("barcode=BC-1", "barcode", "BC-1")],
+)
+def test_busca_por_identificador_no_catalogo(query, criterion, value):
+    fake = _use_fake_service()
     response = client.get(f"/api/v1/catalog/books?{query}")
     assert response.status_code == 200
+    assert fake.last_search == {
+        "title": None,
+        "author": None,
+        "isbn": value if criterion == "isbn" else None,
+        "barcode": value if criterion == "barcode" else None,
+    }
 
 
 def test_identificador_em_branco_e_invalido():
@@ -159,6 +177,49 @@ def test_service_delega_busca_por_identificador(field, method, value):
     service = CatalogService(db=Mock(), catalog_repository=repository, genre_repository=Mock())
     assert service.search_books(**{field: value}) == []
     getattr(repository, method).assert_called_once_with(value)
+
+
+class TestCatalogRepositorySearch:
+    def setup_method(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        for table in (Book.__table__, Genre.__table__, BookGenre.__table__, Copy.__table__):
+            table.create(self.engine)
+        self.db = Session(self.engine)
+        self.db.add_all(
+            [
+                Book(id=1, isbn="978-85-1", title="Livro ISBN", author="Autor", is_active=True),
+                Book(id=2, isbn="978-85-2", title="Livro inativo", author="Autor", is_active=False),
+                Book(id=3, isbn="978-85-3", title="Livro sem cópia ativa", author="Autor", is_active=True),
+            ]
+        )
+        self.db.flush()
+        self.db.add_all(
+            [
+                Copy(id=1, book_id=1, barcode="BC-1", destination=DestinationType.DIDACTIC, is_active=True),
+                Copy(id=2, book_id=2, barcode="BC-2", destination=DestinationType.DIDACTIC, is_active=True),
+                Copy(id=3, book_id=3, barcode="BC-3", destination=DestinationType.DIDACTIC, is_active=False),
+            ]
+        )
+        self.db.commit()
+        self.repository = CatalogRepository(self.db)
+
+    def teardown_method(self):
+        self.db.close()
+        self.engine.dispose()
+
+    def test_isbn_exact_match_and_non_match(self):
+        assert [book.id for book in self.repository.search_by_isbn("978-85-1")] == [1]
+        assert self.repository.search_by_isbn("978-85") == []
+
+    def test_barcode_exact_match_and_inactive_copy_excluded(self):
+        assert [book.id for book in self.repository.search_by_barcode("BC-1")] == [1]
+        assert self.repository.search_by_barcode("BC") == []
+        assert self.repository.search_by_barcode("BC-3") == []
+
+    def test_catalog_visibility_excludes_inactive_or_copyless_books(self):
+        assert self.repository.search_by_isbn("978-85-2") == []
+        assert self.repository.search_by_isbn("978-85-3") == []
+        assert self.repository.search_by_barcode("unknown") == []
 
 
 def test_featured_genres_dispensa_autenticacao():
