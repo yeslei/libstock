@@ -1,0 +1,89 @@
+<header class="auth-header">
+  <h1 class="auth-header__title">Criar conta</h1>
+  <p class="auth-header__subtitle">Leva menos de um minuto.</p>
+</header>
+
+@if (formError; as message) {
+  <app-alert [message]="message" variant="error">
+    @if (isDuplicateEmail) {
+      <a routerLink="/login">Entrar com este e-mail</a>
+    }
+  </app-alert>
+}
+
+<form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <div class="field">
+    <label class="field__label" for="register-name">Nome</label>
+    <div class="field__control" [class.field__control--invalid]="nameError() !== null">
+      <input
+        class="field__input"
+        id="register-name"
+        type="text"
+        formControlName="name"
+        autocomplete="name"
+        autocapitalize="words"
+        maxlength="150"
+        placeholder="Como devemos chamar você"
+        [attr.aria-invalid]="nameError() !== null"
+        [attr.aria-describedby]="nameError() ? 'register-name-error' : null"
+        (blur)="normalizeName()"
+      />
+    </div>
+    @if (nameError(); as message) {
+      <p class="field__error" id="register-name-error" aria-live="polite">{{ message }}</p>
+    }
+  </div>
+
+  <div class="field">
+    <label class="field__label" for="register-email">E-mail</label>
+    <div class="field__control" [class.field__control--invalid]="emailError() !== null">
+      <input
+        class="field__input"
+        id="register-email"
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        inputmode="email"
+        autocapitalize="none"
+        spellcheck="false"
+        placeholder="nome@dominio.com"
+        [attr.aria-invalid]="emailError() !== null"
+        [attr.aria-describedby]="emailError() ? 'register-email-error' : null"
+      />
+    </div>
+    @if (emailError(); as message) {
+      <p class="field__error" id="register-email-error" aria-live="polite">{{ message }}</p>
+    }
+  </div>
+
+  <app-password-field
+    inputId="register-password"
+    label="Senha"
+    autocomplete="new-password"
+    [control]="form.controls.password"
+    [errorMessage]="passwordError()"
+    [showRequirements]="true"
+  />
+
+  <app-password-field
+    inputId="register-password-confirmation"
+    label="Confirmar senha"
+    autocomplete="new-password"
+    [control]="form.controls.passwordConfirmation"
+    [errorMessage]="confirmationError()"
+  />
+
+  <button class="button" type="submit" [disabled]="isSubmitting" [attr.aria-busy]="isSubmitting">
+    @if (isSubmitting) {
+      <app-spinner />
+      <span>Criando conta…</span>
+    } @else {
+      <span>Criar conta</span>
+    }
+  </button>
+</form>
+
+<p class="auth-footer">
+  Já tem conta?
+  <a routerLink="/login">Entrar</a>
+</p>

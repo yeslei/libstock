@@ -8,10 +8,28 @@ O LibStock permitirá cadastrar e administrar obras e exemplares físicos, consu
 
 - Backend: Python e FastAPI
 - Frontend: Angular
-- Banco de dados: PostgreSQL no Supabase
+- Banco de dados: PostgreSQL no Supabase, acessado pelo FastAPI via SQLAlchemy
 - Backend em produção: Render
 - Frontend em produção: Vercel
 
+## Estrutura
+
+```text
+libstock/
+├── backend/    # API FastAPI
+└── frontend/   # Aplicação Angular (a iniciar)
+```
+
+## Backend
+
+O primeiro incremento implementa autenticação própria com JWT de acesso, refresh token rotativo e persistência das sessões no PostgreSQL.
+
+O FastAPI é a única porta de entrada para dados e regras de negócio. A CLI do
+Supabase na raiz é utilizada somente para o PostgreSQL local; o esquema é
+versionado exclusivamente pelas migrations Alembic do backend.
+
+Consulte as instruções em [`backend/README.md`](backend/README.md).
+
 ## Status
 
-Projeto em fase inicial de planejamento e estruturação.
+Backend de autenticação em desenvolvimento. Frontend ainda não iniciado.

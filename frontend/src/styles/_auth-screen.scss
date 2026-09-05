@@ -1,0 +1,49 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+@use 'forms' as *;
+
+/// Estrutura comum às telas de login e registro. Vive num mixin porque o
+/// encapsulamento de estilo do Angular é por componente — cada tela aplica o
+/// mesmo conjunto em vez de depender de CSS global.
+@mixin auth-screen {
+  @include field;
+  @include button-primary;
+
+  :host {
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+  }
+
+  .auth-header {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    text-align: center;
+  }
+
+  .auth-header__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: $primary;
+  }
+
+  .auth-header__subtitle {
+    font-size: $font-size-sm;
+    color: $text-secondary;
+  }
+
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-5; // bem acima dos 8px mínimos entre alvos (Lei de Fitts)
+  }
+
+  .auth-footer {
+    padding-top: $space-4;
+    border-top: 1px solid rgba(175, 189, 182, 0.5);
+    text-align: center;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+  }
+}
