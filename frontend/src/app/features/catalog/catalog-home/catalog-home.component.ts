@@ -1,4 +1,4 @@
-import { AsyncPipe } from '@angular/common';
+import { AsyncPipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
@@ -22,7 +22,7 @@ import { CatalogSearchCriterion, CatalogService } from '../services/catalog.serv
 @Component({
   selector: 'app-catalog-home',
   standalone: true,
-  imports: [AsyncPipe, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [AsyncPipe, NgTemplateOutlet, RouterLink, AlertComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-home.component.html',
   styleUrl: './catalog-home.component.scss',
