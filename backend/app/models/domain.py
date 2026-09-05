@@ -178,8 +178,66 @@ class Book(Base):
     edition: Mapped[str | None] = mapped_column(String(50))
     cover_url: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    featured_position: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    genres: Mapped[list["BookGenre"]] = relationship(
+        back_populates="book",
+        cascade="all, delete-orphan",
+    )
+    copies: Mapped[list["Copy"]] = relationship(back_populates="book")
+
+
+class Genre(Base):
+    """Gênero literário.
+
+    Um livro pertence a vários gêneros, então o vínculo vive em `book_genres`
+    e não numa coluna de `books`. `is_featured` e `display_order` controlam os
+    chips exibidos na home e são editáveis pelo administrador.
+    """
+
+    __tablename__ = "genres"
+    __table_args__ = (Index("idx_genres_featured", "is_featured", "display_order"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    display_order: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    books: Mapped[list["BookGenre"]] = relationship(
+        back_populates="genre",
+        cascade="all, delete-orphan",
+    )
+
+
+class BookGenre(Base):
+    """Associação livro-gênero.
+
+    CASCADE nos dois lados, ao contrário do RESTRICT usado entre `books` e
+    `copies`: apagar um livro ou um gênero deve limpar o vínculo, nunca
+    travar em erro de integridade. O índice em `genre_id` serve a listagem
+    "livros deste gênero", que percorre a associação no sentido inverso da
+    chave primária.
+    """
+
+    __tablename__ = "book_genres"
+    __table_args__ = (Index("idx_book_genres_genre", "genre_id"),)
+
+    book_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("books.id", ondelete="CASCADE"), primary_key=True
+    )
+    genre_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("genres.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    book: Mapped[Book] = relationship(back_populates="genres")
+    genre: Mapped[Genre] = relationship(back_populates="books")
 
 
 class Copy(Base):
@@ -210,6 +268,8 @@ class Copy(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    book: Mapped[Book] = relationship(back_populates="copies")
 
 
 class Loan(Base):
