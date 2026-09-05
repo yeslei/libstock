@@ -273,78 +273,41 @@ Não criar outro módulo de busca apenas para a #25.
 ---
 
 # Decisões pendentes da #25
-
-## ID-01 — Correspondência de ISBN
-
-Status: OPEN
-
-Definir:
-
-- exata;
-- parcial.
-
-Recomendação técnica:
-
-- correspondência exata.
-
----
-
-## ID-02 — Normalização de ISBN
-
-Status: OPEN / BLOCKING
-
-Definir tratamento de:
-
-- hífens;
-- espaços;
-- ISBN-10;
-- ISBN-13.
-
-Essa decisão não deve ser inferida apenas pelo tipo da coluna no banco.
-
----
-
-## ID-03 — Código de barras
-
-Status: OPEN
-
-Definir:
-
-- correspondência exata;
-- correspondência parcial.
-
-Recomendação técnica:
-
-- correspondência exata.
-
----
-
-## ID-04 — Exemplares inativos
+### ID-01 — Correspondência de ISBN
 
 Status: APPROVED
 
-Consultas públicas do catálogo não devem localizar exemplares inativos.
+- correspondência exata.
 
-Para busca por barcode:
+### ID-02 — Normalização de ISBN
 
-`Copy.is_active = true`
+Status: APPROVED
 
----
+- trim somente nas extremidades;
+- não remover hífens;
+- não remover espaços internos;
+- não converter ISBN-10/ISBN-13;
+- não validar checksum na V1.
 
-## ID-05 — Resultado
+### ID-03 — Código de barras
 
-Status: OPEN / BLOCKING
+Status: APPROVED
 
-Definir o contrato de resposta para código de barras.
+- correspondência exata.
 
-Possibilidades:
+### ID-04 — Exemplares inativos
 
-1. retornar a obra relacionada ao exemplar;
-2. retornar dados do exemplar;
-3. retornar uma resposta específica contendo obra + exemplar.
+Status: APPROVED
 
-A decisão precisa ser definida antes da implementação completa da busca por barcode.
+- `Copy.is_active = true`.
 
+### ID-05 — Resultado
+
+Status: APPROVED
+
+- ISBN retorna `CatalogBookResponse`;
+- barcode também retorna `CatalogBookResponse` da obra associada;
+- não criar schema específico de exemplar nesta Story.
 ---
 
 # Banco disponível

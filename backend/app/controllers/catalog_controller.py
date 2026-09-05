@@ -22,9 +22,16 @@ router = APIRouter(prefix="/api/v1/catalog", tags=["Catálogo"])
 def get_catalog_search_params(
     title: Annotated[str | None, Query()] = None,
     author: Annotated[str | None, Query()] = None,
+    isbn: Annotated[str | None, Query()] = None,
+    barcode: Annotated[str | None, Query()] = None,
 ) -> CatalogSearchParams:
     try:
-        return CatalogSearchParams(title=title, author=author)
+        return CatalogSearchParams(
+            title=title,
+            author=author,
+            isbn=isbn,
+            barcode=barcode,
+        )
     except ValidationError as exc:
         raise RequestValidationError(exc.errors()) from exc
 
@@ -44,6 +51,8 @@ def search_books(
     return catalog_service.search_books(
         title=params.title,
         author=params.author,
+        isbn=params.isbn,
+        barcode=params.barcode,
     )
 
 

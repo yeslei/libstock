@@ -57,14 +57,26 @@ class CatalogService:
         return [self._to_response(book) for book in books]
 
     def search_books(
-        self, *, title: str | None = None, author: str | None = None
+        self,
+        *,
+        title: str | None = None,
+        author: str | None = None,
+        isbn: str | None = None,
+        barcode: str | None = None,
     ) -> list[CatalogBookResponse]:
-        if title is not None and author is None:
+        criteria = [title, author, isbn, barcode]
+        if sum(value is not None for value in criteria) == 1 and title is not None:
             books = self.catalog_repository.search_by_title(title)
-        elif author is not None and title is None:
+        elif sum(value is not None for value in criteria) == 1 and author is not None:
             books = self.catalog_repository.search_by_author(author)
+        elif sum(value is not None for value in criteria) == 1 and isbn is not None:
+            books = self.catalog_repository.search_by_isbn(isbn)
+        elif sum(value is not None for value in criteria) == 1 and barcode is not None:
+            books = self.catalog_repository.search_by_barcode(barcode)
         else:
-            books = self.catalog_repository.search_books(title=title, author=author)
+            books = self.catalog_repository.search_books(
+                title=title, author=author, isbn=isbn, barcode=barcode
+            )
         return [self._to_response(book) for book in books]
 
     def search_by_title(self, title: str) -> list[CatalogBookResponse]:

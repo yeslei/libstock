@@ -6,6 +6,7 @@ exercitadas direto.
 """
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,12 +16,14 @@ from app.dependencies.authentication import get_current_user
 from app.dependencies.services import get_catalog_service
 from app.main import app
 from app.models.domain import CopyStatus, DestinationType
+from app.repositories.catalog_repository import CatalogRepository
 from app.schemas.catalog_schema import (
     BookOffer,
     CatalogBookResponse,
     FeaturedUpdate,
     GenreResponse,
     PagedBooksResponse,
+    CatalogSearchParams,
 )
 from app.services.catalog_service import CatalogService, slugify
 
@@ -63,7 +66,7 @@ class FakeCatalogService:
             page_size=page_size,
         )
 
-    def search_books(self, *, title=None, author=None):
+    def search_books(self, *, title=None, author=None, isbn=None, barcode=None):
         return [
             CatalogBookResponse(
                 id=1,
@@ -129,6 +132,33 @@ def test_busca_no_catalogo_exige_titulo_ou_autor():
     response = client.get("/api/v1/catalog/books")
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("query", ["isbn=978-85-1", "barcode=BC-1"])
+def test_busca_por_identificador_no_catalogo(query):
+    _use_fake_service()
+    response = client.get(f"/api/v1/catalog/books?{query}")
+    assert response.status_code == 200
+
+
+def test_identificador_em_branco_e_invalido():
+    with pytest.raises(ValueError):
+        CatalogSearchParams(isbn="   ")
+
+
+@pytest.mark.parametrize(
+    "field, method, value",
+    [
+        ("isbn", "search_by_isbn", "978-85-1"),
+        ("barcode", "search_by_barcode", "BC-1"),
+    ],
+)
+def test_service_delega_busca_por_identificador(field, method, value):
+    repository = Mock(spec=CatalogRepository)
+    getattr(repository, method).return_value = []
+    service = CatalogService(db=Mock(), catalog_repository=repository, genre_repository=Mock())
+    assert service.search_books(**{field: value}) == []
+    getattr(repository, method).assert_called_once_with(value)
 
 
 def test_featured_genres_dispensa_autenticacao():

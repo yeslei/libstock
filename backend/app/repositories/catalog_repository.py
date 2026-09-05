@@ -48,7 +48,14 @@ class CatalogRepository:
     def _escape_like(value: str) -> str:
         return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
-    def search_books(self, *, title: str | None = None, author: str | None = None) -> list[Book]:
+    def search_books(
+        self,
+        *,
+        title: str | None = None,
+        author: str | None = None,
+        isbn: str | None = None,
+        barcode: str | None = None,
+    ) -> list[Book]:
         statement = self._catalog_books()
         if title is not None:
             statement = statement.where(
@@ -58,6 +65,18 @@ class CatalogRepository:
             statement = statement.where(
                 Book.author.ilike(f"%{self._escape_like(author)}%", escape="\\")
             )
+        if isbn is not None:
+            statement = statement.where(Book.isbn == isbn)
+        if barcode is not None:
+            statement = statement.where(
+                select(Copy.id)
+                .where(
+                    Copy.book_id == Book.id,
+                    Copy.barcode == barcode,
+                    Copy.is_active.is_(True),
+                )
+                .exists()
+            )
         return list(self.db.scalars(statement.order_by(Book.title.asc())))
 
     def search_by_title(self, title: str) -> list[Book]:
@@ -65,6 +84,12 @@ class CatalogRepository:
 
     def search_by_author(self, author: str) -> list[Book]:
         return self.search_books(author=author)
+
+    def search_by_isbn(self, isbn: str) -> list[Book]:
+        return self.search_books(isbn=isbn)
+
+    def search_by_barcode(self, barcode: str) -> list[Book]:
+        return self.search_books(barcode=barcode)
 
     def find_books_by_genre(
         self,
