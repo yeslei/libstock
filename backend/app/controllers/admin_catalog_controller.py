@@ -13,10 +13,9 @@ from app.services.catalog_service import CatalogService
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Administração do catálogo"])
 
-# US04 do SRS: operações de gestão do acervo são restritas a "Administrador
-# ou Gerente" — os dois compõem o mesmo nível de privilégio, e o SRS trata
-# "Gerente | Dono: Administrador" como um stakeholder só.
-require_management = require_roles("ADMINISTRATOR", "MANAGER")
+# US04 do SRS: gestão do acervo é restrita ao perfil "Gerente | Dono:
+# Administrador", que a migration 0007 consolidou no código ADMINISTRATOR.
+require_management = require_roles("ADMINISTRATOR")
 
 
 @router.post("/genres", response_model=GenreResponse, status_code=status.HTTP_201_CREATED)
