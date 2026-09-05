@@ -25,7 +25,7 @@
     </nav>
 
     <div class="topbar__actions">
-      @if (isAuthenticated$ | async) {
+      @if (isAuthenticated()) {
         <a class="btn btn--primary" routerLink="/painel">Meu painel</a>
       } @else {
         <a class="btn btn--ghost" routerLink="/login">Entrar</a>
@@ -33,6 +33,25 @@
       }
     </div>
   </div>
+
+  @if (canServeCounter() || canManageStock() || canManageCatalog()) {
+    <!-- Barra operacional: só existe para quem tem função de balcão ou
+         gestão, conforme as histórias US01, US03 e US04 do SRS. -->
+    <div class="opsbar">
+      <div class="opsbar__inner">
+        <span class="opsbar__label">Modo operação</span>
+        @if (canServeCounter()) {
+          <span class="opsbar__item">Registro de venda, empréstimo e devolução no card</span>
+        }
+        @if (canManageStock()) {
+          <span class="opsbar__item">Cadastro de obras</span>
+        }
+        @if (canManageCatalog()) {
+          <span class="opsbar__item">Gestão de destaques</span>
+        }
+      </div>
+    </div>
+  }
 </header>
 
 <main class="home">
@@ -86,6 +105,10 @@
       <h2 class="section__title" id="books-heading">Livros em destaque</h2>
     </div>
 
+    @if (featuredError(); as erro) {
+      <app-alert [message]="erro" variant="error" />
+    }
+
     @if (books$ | async; as state) {
       @switch (state.status) {
         @case ('loading') {
@@ -100,49 +123,65 @@
           } @else {
             <ul class="grid">
               @for (book of state.data; track book.id) {
-                <li class="card">
-                  @if (book.cover_url) {
-                    <img class="card__cover" [src]="book.cover_url" [alt]="'Capa de ' + book.title" />
-                  } @else {
-                    <div class="card__cover card__cover--empty" aria-hidden="true">
-                      {{ book.title.charAt(0) }}
-                    </div>
-                  }
-
-                  <h3 class="card__title">{{ book.title }}</h3>
-                  <p class="card__author">{{ book.author }}</p>
-
-                  @if (book.genres.length) {
-                    <ul class="card__genres" [attr.aria-label]="'Gêneros de ' + book.title">
-                      @for (genre of book.genres; track genre) {
-                        <li class="card__genre">{{ genre }}</li>
-                      }
-                    </ul>
-                  }
-
-                  <div class="card__offers">
-                    @for (offer of book.offers; track offer.destination) {
-                      <span
-                        class="badge"
-                        [class.badge--sale]="offer.destination === 'COMMERCIAL'"
-                        [class.badge--loan]="offer.destination === 'DIDACTIC'"
-                      >
-                        {{ offerLabel(offer) }}
-                      </span>
-                      @if (offerPrice(offer); as price) {
-                        <span class="card__price">{{ price }}</span>
-                      }
-                    }
-                  </div>
-
-                  <button class="btn btn--primary card__cta" type="button" (click)="startTransaction(book)">
-                    @if (book.offers[0]?.destination === 'COMMERCIAL') {
-                      Comprar
+                @if (!isHidden(book)) {
+                  <li class="card">
+                    @if (book.cover_url) {
+                      <img class="card__cover" [src]="book.cover_url" [alt]="'Capa de ' + book.title" />
                     } @else {
-                      Pedir emprestado
+                      <div class="card__cover card__cover--empty" aria-hidden="true">
+                        {{ book.title.charAt(0) }}
+                      </div>
                     }
-                  </button>
-                </li>
+
+                    <h3 class="card__title">{{ book.title }}</h3>
+                    <p class="card__author">{{ book.author }}</p>
+
+                    @if (book.genres.length) {
+                      <ul class="card__genres" [attr.aria-label]="'Gêneros de ' + book.title">
+                        @for (genre of book.genres; track genre) {
+                          <li class="card__genre">{{ genre }}</li>
+                        }
+                      </ul>
+                    }
+
+                    <div class="card__offers">
+                      @for (offer of book.offers; track offer.destination) {
+                        <span
+                          class="badge"
+                          [class.badge--sale]="offer.available && offer.destination === 'COMMERCIAL'"
+                          [class.badge--loan]="offer.available && offer.destination === 'DIDACTIC'"
+                          [class.badge--out]="!offer.available"
+                        >
+                          {{ offerLabel(offer) }}
+                        </span>
+                        @if (offerPrice(offer); as price) {
+                          <span class="card__price" [class.card__price--out]="!offer.available">
+                            {{ price }}
+                          </span>
+                        }
+                      }
+                    </div>
+
+                    <button
+                      class="btn btn--primary card__cta"
+                      type="button"
+                      [disabled]="actionDisabled(book)"
+                      (click)="startTransaction(book)"
+                    >
+                      {{ actionLabel(book) }}
+                    </button>
+
+                    @if (canManageCatalog()) {
+                      <button
+                        class="btn btn--outline card__manage"
+                        type="button"
+                        (click)="removeFromFeatured(book)"
+                      >
+                        Remover destaque
+                      </button>
+                    }
+                  </li>
+                }
               }
             </ul>
           }

@@ -3,8 +3,15 @@ export type OfferDestination = 'COMMERCIAL' | 'DIDACTIC';
 
 export interface BookOffer {
   readonly destination: OfferDestination;
+  /**
+   * Falso é o "Esgotado" da US02: o título continua no catálogo, sem
+   * exemplar livre no momento.
+   */
+  readonly available: boolean;
   /** Só vem preenchido em oferta de venda — empréstimo não tem preço. */
   readonly price: string | null;
+  /** RF07: exemplar de venda emprestado admite Reserva de Compra. */
+  readonly can_reserve: boolean;
 }
 
 export interface Genre {

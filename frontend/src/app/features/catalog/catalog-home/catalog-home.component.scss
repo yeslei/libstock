@@ -415,3 +415,62 @@ $content-max: 1180px;
   margin-top: auto;
   width: 100%;
 }
+
+// ------------------------------------------------------- Barra operacional --
+// Visível apenas para papéis com função de balcão ou gestão.
+.opsbar {
+  border-top: 1px solid rgba(175, 189, 182, 0.5);
+  background-color: $bg-subtle;
+}
+
+.opsbar__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2 $space-4;
+  align-items: center;
+  max-width: $content-max;
+  margin: 0 auto;
+  padding: $space-2 $space-4;
+}
+
+.opsbar__label {
+  color: $verde-medio;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.opsbar__item {
+  color: $text-muted;
+  font-size: $font-size-xs;
+
+  &:not(:last-child)::after {
+    content: ' ·';
+  }
+}
+
+// Selo de esgotado: cinza neutro, sem competir com venda nem empréstimo.
+.badge--out {
+  border: 1px solid $border;
+  background-color: $bg-subtle;
+  color: $text-muted;
+}
+
+// Preço de item esgotado continua legível, mas riscado para não sugerir
+// compra imediata.
+.card__price--out {
+  color: $text-muted;
+  font-weight: 600;
+  text-decoration: line-through;
+}
+
+.card__cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.card__manage {
+  width: 100%;
+  font-size: $font-size-xs;
+}
