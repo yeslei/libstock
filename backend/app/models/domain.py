@@ -17,7 +17,6 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
-    UniqueConstraint,
     func,
     text,
 )
@@ -179,8 +178,66 @@ class Book(Base):
     edition: Mapped[str | None] = mapped_column(String(50))
     cover_url: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    featured_position: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    genres: Mapped[list["BookGenre"]] = relationship(
+        back_populates="book",
+        cascade="all, delete-orphan",
+    )
+    copies: Mapped[list["Copy"]] = relationship(back_populates="book")
+
+
+class Genre(Base):
+    """Gênero literário.
+
+    Um livro pertence a vários gêneros, então o vínculo vive em `book_genres`
+    e não numa coluna de `books`. `is_featured` e `display_order` controlam os
+    chips exibidos na home e são editáveis pelo administrador.
+    """
+
+    __tablename__ = "genres"
+    __table_args__ = (Index("idx_genres_featured", "is_featured", "display_order"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    display_order: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    books: Mapped[list["BookGenre"]] = relationship(
+        back_populates="genre",
+        cascade="all, delete-orphan",
+    )
+
+
+class BookGenre(Base):
+    """Associação livro-gênero.
+
+    CASCADE nos dois lados, ao contrário do RESTRICT usado entre `books` e
+    `copies`: apagar um livro ou um gênero deve limpar o vínculo, nunca
+    travar em erro de integridade. O índice em `genre_id` serve a listagem
+    "livros deste gênero", que percorre a associação no sentido inverso da
+    chave primária.
+    """
+
+    __tablename__ = "book_genres"
+    __table_args__ = (Index("idx_book_genres_genre", "genre_id"),)
+
+    book_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("books.id", ondelete="CASCADE"), primary_key=True
+    )
+    genre_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("genres.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    book: Mapped[Book] = relationship(back_populates="genres")
+    genre: Mapped[Genre] = relationship(back_populates="books")
 
 
 class Copy(Base):
@@ -190,6 +247,10 @@ class Copy(Base):
         CheckConstraint(
             "destination <> 'COMMERCIAL' OR sale_price IS NOT NULL",
             name="chk_commercial_price",
+        ),
+        CheckConstraint(
+            "destination = 'COMMERCIAL' OR sale_price IS NULL",
+            name="chk_didactic_without_sale_price",
         ),
         Index("idx_copies_book", "book_id"),
         Index("idx_copies_book_status", "book_id", "status"),
@@ -208,12 +269,20 @@ class Copy(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
+    book: Mapped[Book] = relationship(back_populates="copies")
+
 
 class Loan(Base):
     __tablename__ = "loans"
     __table_args__ = (
         CheckConstraint("due_date > loan_date", name="chk_loan_due_date"),
         CheckConstraint("returned_at IS NULL OR returned_at >= loan_date", name="chk_loan_return_date"),
+        CheckConstraint(
+            "(status = 'OPEN' AND returned_at IS NULL) OR "
+            "(status = 'RETURNED' AND returned_at IS NOT NULL) OR "
+            "(status = 'CANCELLED' AND returned_at IS NULL)",
+            name="chk_loan_status_dates",
+        ),
         Index("uq_loans_open_copy", "copy_id", unique=True, postgresql_where=text("status = 'OPEN'")),
         Index("idx_loans_client_status", "client_id", "status"),
         Index("idx_loans_due_date", "due_date"),
@@ -251,7 +320,6 @@ class Sale(Base):
 class SaleItem(Base):
     __tablename__ = "sale_items"
     __table_args__ = (
-        UniqueConstraint("copy_id", name="uq_sale_item_copy"),
         CheckConstraint("unit_price >= 0", name="chk_sale_item_price"),
         Index("idx_sale_items_sale", "sale_id"),
     )
@@ -268,7 +336,17 @@ class PurchaseReservation(Base):
     __table_args__ = (
         CheckConstraint("queue_position IS NULL OR queue_position > 0", name="chk_reservation_queue_position"),
         CheckConstraint("expires_at IS NULL OR expires_at > requested_at", name="chk_reservation_expiration"),
+        CheckConstraint(
+            "(status = 'WAITING' AND queue_position IS NOT NULL "
+            "AND notified_at IS NULL AND fulfilled_copy_id IS NULL) OR "
+            "(status = 'NOTIFIED' AND queue_position IS NOT NULL "
+            "AND notified_at IS NOT NULL AND fulfilled_copy_id IS NULL) OR "
+            "(status = 'FULFILLED' AND fulfilled_copy_id IS NOT NULL) OR "
+            "status IN ('CANCELLED', 'EXPIRED')",
+            name="chk_reservation_state",
+        ),
         Index("uq_active_reservation_client_book", "client_id", "book_id", unique=True, postgresql_where=text("status IN ('WAITING', 'NOTIFIED')")),
+        Index("uq_active_reservation_book_queue", "book_id", "queue_position", unique=True, postgresql_where=text("status IN ('WAITING', 'NOTIFIED')")),
         Index("idx_reservations_book_status", "book_id", "status"),
         Index("idx_reservations_client", "client_id"),
     )
@@ -287,7 +365,17 @@ class PurchaseReservation(Base):
 
 class Notification(Base):
     __tablename__ = "notifications"
-    __table_args__ = (Index("idx_notifications_user_status", "user_id", "status"),)
+    __table_args__ = (
+        CheckConstraint(
+            "(status = 'PENDING' AND sent_at IS NULL AND read_at IS NULL) OR "
+            "(status = 'SENT' AND sent_at IS NOT NULL AND read_at IS NULL) OR "
+            "(status = 'READ' AND sent_at IS NOT NULL AND read_at IS NOT NULL "
+            "AND read_at >= sent_at) OR "
+            "(status = 'FAILED' AND read_at IS NULL)",
+            name="chk_notification_state",
+        ),
+        Index("idx_notifications_user_status", "user_id", "status"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("profiles.id", ondelete="RESTRICT"), nullable=False)

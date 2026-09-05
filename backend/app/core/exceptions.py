@@ -35,6 +35,21 @@ class RefreshTokenReuseError(ApplicationError):
         )
 
 
+class BookNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Livro não encontrado.", "book_not_found", 404)
+
+
+class DuplicateGenreError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Gênero já cadastrado.", "duplicate_genre", 409)
+
+
+class GenreNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Gênero não encontrado.", "genre_not_found", 404)
+
+
 class UserNotFoundError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Usuário não encontrado.", "user_not_found", 404)

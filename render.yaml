@@ -18,4 +18,4 @@ services:
       - key: COOKIE_SECURE
         value: true
       - key: COOKIE_SAMESITE
-        value: none
+        value: lax
