@@ -63,6 +63,15 @@ class FakeCatalogService:
             page_size=page_size,
         )
 
+    def search_books(self, *, title=None, author=None):
+        return [
+            CatalogBookResponse(
+                id=1,
+                title=title or "Dom Casmurro",
+                author=author or "Machado de Assis",
+            )
+        ]
+
     def set_genre_featured(self, *, genre_id, data_in):
         self.featured_set.append((genre_id, data_in))
         return SimpleNamespace(id=genre_id, name="Ficção", slug="ficcao")
@@ -103,6 +112,23 @@ def test_featured_books_dispensa_autenticacao():
     # O livro carrega os dois gêneros: é o ganho do vínculo muitos-para-muitos.
     assert body[0]["genres"] == ["Ficção", "Romance"]
     assert body[0]["offers"][0]["destination"] == "COMMERCIAL"
+
+
+def test_busca_por_autor_no_catalogo_dispensa_autenticacao():
+    _use_fake_service()
+
+    response = client.get("/api/v1/catalog/books?author=%20machado%20")
+
+    assert response.status_code == 200
+    assert response.json()[0]["author"] == "machado"
+
+
+def test_busca_no_catalogo_exige_titulo_ou_autor():
+    _use_fake_service()
+
+    response = client.get("/api/v1/catalog/books")
+
+    assert response.status_code == 422
 
 
 def test_featured_genres_dispensa_autenticacao():

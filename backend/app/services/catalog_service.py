@@ -56,6 +56,23 @@ class CatalogService:
         books = self.catalog_repository.find_featured_books(limit=FEATURED_BOOKS_LIMIT)
         return [self._to_response(book) for book in books]
 
+    def search_books(
+        self, *, title: str | None = None, author: str | None = None
+    ) -> list[CatalogBookResponse]:
+        if title is not None and author is None:
+            books = self.catalog_repository.search_by_title(title)
+        elif author is not None and title is None:
+            books = self.catalog_repository.search_by_author(author)
+        else:
+            books = self.catalog_repository.search_books(title=title, author=author)
+        return [self._to_response(book) for book in books]
+
+    def search_by_title(self, title: str) -> list[CatalogBookResponse]:
+        return self.search_books(title=title)
+
+    def search_by_author(self, author: str) -> list[CatalogBookResponse]:
+        return self.search_books(author=author)
+
     def list_featured_genres(self) -> list[Genre]:
         return self.genre_repository.find_featured()
 

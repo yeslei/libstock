@@ -44,6 +44,28 @@ class CatalogRepository:
         )
         return list(self.db.scalars(statement))
 
+    @staticmethod
+    def _escape_like(value: str) -> str:
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    def search_books(self, *, title: str | None = None, author: str | None = None) -> list[Book]:
+        statement = self._catalog_books()
+        if title is not None:
+            statement = statement.where(
+                Book.title.ilike(f"%{self._escape_like(title)}%", escape="\\")
+            )
+        if author is not None:
+            statement = statement.where(
+                Book.author.ilike(f"%{self._escape_like(author)}%", escape="\\")
+            )
+        return list(self.db.scalars(statement.order_by(Book.title.asc())))
+
+    def search_by_title(self, title: str) -> list[Book]:
+        return self.search_books(title=title)
+
+    def search_by_author(self, author: str) -> list[Book]:
+        return self.search_books(author=author)
+
     def find_books_by_genre(
         self,
         *,
