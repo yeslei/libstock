@@ -1,27 +1,26 @@
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.domain import Book, BookGenre, Copy, CopyStatus, Genre
+from app.models.domain import Book, BookGenre, Copy, Genre
 
 
 class CatalogRepository:
     """Leitura do catálogo público.
 
-    Só devolve livros ativos que tenham ao menos um exemplar disponível — um
-    livro sem exemplar disponível não tem o que oferecer na vitrine.
+    Devolve livros ativos com ao menos um exemplar ativo, mesmo que nenhum
+    esteja disponível: a US02 exige sinalizar "Esgotado" na vitrine em vez de
+    sumir com o título, e é esse caso que habilita a Reserva de Compra do
+    RF07. O que não entra é o livro sem nenhum exemplar, que nunca chegou a
+    fazer parte do acervo.
     """
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def _available_books(self) -> Select[tuple[Book]]:
-        has_available_copy = (
+    def _catalog_books(self) -> Select[tuple[Book]]:
+        has_active_copy = (
             select(Copy.id)
-            .where(
-                Copy.book_id == Book.id,
-                Copy.is_active.is_(True),
-                Copy.status == CopyStatus.AVAILABLE,
-            )
+            .where(Copy.book_id == Book.id, Copy.is_active.is_(True))
             .exists()
         )
         return (
@@ -30,12 +29,12 @@ class CatalogRepository:
                 selectinload(Book.genres).selectinload(BookGenre.genre),
                 selectinload(Book.copies),
             )
-            .where(Book.is_active.is_(True), has_available_copy)
+            .where(Book.is_active.is_(True), has_active_copy)
         )
 
     def find_featured_books(self, *, limit: int) -> list[Book]:
         statement = (
-            self._available_books()
+            self._catalog_books()
             .where(Book.is_featured.is_(True))
             # NULLS LAST: um destaque sem posição definida vai para o fim em
             # vez de encabeçar a vitrine, que é o que o Postgres faria por
@@ -52,7 +51,7 @@ class CatalogRepository:
         page: int,
         page_size: int,
     ) -> tuple[list[Book], int]:
-        filtered = self._available_books().where(
+        filtered = self._catalog_books().where(
             select(BookGenre.book_id)
             .where(BookGenre.book_id == Book.id, BookGenre.genre_id == genre_id)
             .exists()

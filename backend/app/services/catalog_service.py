@@ -144,30 +144,56 @@ class CatalogService:
 
     @staticmethod
     def _offers_for(book: Book) -> list[BookOffer]:
-        """Resume os exemplares disponíveis em uma oferta por destino.
+        """Resume os exemplares ativos em uma oferta por destino.
 
         O mesmo livro pode ter exemplares didáticos e comerciais ao mesmo
         tempo, então a vitrine mostra os dois selos. Para venda vale o menor
-        preço entre os exemplares disponíveis.
+        preço; um destino sem exemplar livre vira "Esgotado" em vez de
+        desaparecer (US02), e um exemplar de venda que está emprestado
+        habilita a Reserva de Compra (RF07).
         """
-        prices: dict[DestinationType, Decimal | None] = {}
+        disponiveis: dict[DestinationType, bool] = {}
+        emprestados: dict[DestinationType, bool] = {}
+        precos: dict[DestinationType, Decimal | None] = {}
+
         for copy in book.copies:
-            if not copy.is_active or copy.status != CopyStatus.AVAILABLE:
+            if not copy.is_active:
                 continue
-            if copy.destination not in prices:
-                prices[copy.destination] = copy.sale_price
-                continue
-            current = prices[copy.destination]
-            if copy.sale_price is not None and (
-                current is None or copy.sale_price < current
-            ):
-                prices[copy.destination] = copy.sale_price
+            destino = copy.destination
+            disponiveis.setdefault(destino, False)
+            emprestados.setdefault(destino, False)
+            precos.setdefault(destino, None)
+
+            if copy.status == CopyStatus.AVAILABLE:
+                disponiveis[destino] = True
+            elif copy.status in (CopyStatus.BORROWED, CopyStatus.RESERVED):
+                emprestados[destino] = True
+
+            # O preço vale mesmo com o exemplar indisponível: quem vê
+            # "Esgotado" ainda quer saber por quanto sai quando voltar.
+            if copy.sale_price is not None:
+                atual = precos[destino]
+                if atual is None or copy.sale_price < atual:
+                    precos[destino] = copy.sale_price
 
         # Venda antes de empréstimo: é a informação com preço, que domina o
         # card na vitrine.
-        order = (DestinationType.COMMERCIAL, DestinationType.DIDACTIC)
-        return [
-            BookOffer(destination=destination, price=prices[destination])
-            for destination in order
-            if destination in prices
-        ]
+        ordem = (DestinationType.COMMERCIAL, DestinationType.DIDACTIC)
+        ofertas = []
+        for destino in ordem:
+            if destino not in disponiveis:
+                continue
+            disponivel = disponiveis[destino]
+            ofertas.append(
+                BookOffer(
+                    destination=destino,
+                    available=disponivel,
+                    price=precos[destino],
+                    can_reserve=(
+                        destino == DestinationType.COMMERCIAL
+                        and not disponivel
+                        and emprestados[destino]
+                    ),
+                )
+            )
+        return ofertas

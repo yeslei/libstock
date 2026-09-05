@@ -42,6 +42,7 @@ class FakeCatalogService:
                 offers=[
                     BookOffer(
                         destination=DestinationType.COMMERCIAL,
+                        available=True,
                         price=Decimal("25.00"),
                     )
                 ],
@@ -155,6 +156,19 @@ def test_admin_com_papel_insuficiente_retorna_403():
     assert response.json()["code"] == "permission_denied"
 
 
+def test_gerente_tambem_administra_o_acervo():
+    """US04: a operação é restrita a "Administrador ou Gerente" — os dois."""
+    fake = _use_fake_service()
+    _authenticate_as("MANAGER")
+
+    response = client.patch(
+        "/api/v1/admin/genres/1/featured", json={"is_featured": True, "position": 1}
+    )
+
+    assert response.status_code == 200
+    assert fake.featured_set == [(1, FeaturedUpdate(is_featured=True, position=1))]
+
+
 def test_administrador_altera_destaque():
     fake = _use_fake_service()
     _authenticate_as("ADMINISTRATOR")
@@ -203,19 +217,45 @@ def test_ofertas_agregam_venda_e_emprestimo_do_mesmo_livro():
 
     offers = CatalogService._offers_for(book)
 
-    # Venda primeiro, e pelo menor preço entre os exemplares disponíveis.
+    # Venda primeiro, e pelo menor preço entre os exemplares.
     assert offers[0].destination == DestinationType.COMMERCIAL
     assert offers[0].price == Decimal("25.00")
+    assert offers[0].available is True
     assert offers[1].destination == DestinationType.DIDACTIC
-    assert offers[1].price is None
+    assert offers[1].available is True
 
 
-def test_ofertas_ignoram_exemplar_indisponivel_ou_inativo():
+def test_livro_sem_exemplar_livre_fica_esgotado_e_nao_some():
+    """US02: a vitrine sinaliza "Esgotado" em vez de omitir o título."""
+    book = SimpleNamespace(
+        copies=[_copy(DestinationType.COMMERCIAL, status=CopyStatus.SOLD, price=Decimal("30"))]
+    )
+
+    offers = CatalogService._offers_for(book)
+
+    assert len(offers) == 1
+    assert offers[0].available is False
+    # O preço continua exposto: quem vê "Esgotado" ainda quer saber o valor.
+    assert offers[0].price == Decimal("30")
+    # Vendido não volta para a prateleira, então não cabe reserva.
+    assert offers[0].can_reserve is False
+
+
+def test_exemplar_de_venda_emprestado_habilita_reserva_de_compra():
+    """RF07: exemplar destinado à venda que está emprestado admite reserva."""
     book = SimpleNamespace(
         copies=[
-            _copy(DestinationType.COMMERCIAL, status=CopyStatus.SOLD, price=Decimal("10")),
-            _copy(DestinationType.DIDACTIC, is_active=False),
+            _copy(DestinationType.COMMERCIAL, status=CopyStatus.BORROWED, price=Decimal("30"))
         ]
     )
+
+    offers = CatalogService._offers_for(book)
+
+    assert offers[0].available is False
+    assert offers[0].can_reserve is True
+
+
+def test_exemplar_inativo_nao_gera_oferta():
+    book = SimpleNamespace(copies=[_copy(DestinationType.DIDACTIC, is_active=False)])
 
     assert CatalogService._offers_for(book) == []

@@ -13,14 +13,17 @@ from app.services.catalog_service import CatalogService
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Administração do catálogo"])
 
-require_administrator = require_roles("ADMINISTRATOR")
+# US04 do SRS: operações de gestão do acervo são restritas a "Administrador
+# ou Gerente" — os dois compõem o mesmo nível de privilégio, e o SRS trata
+# "Gerente | Dono: Administrador" como um stakeholder só.
+require_management = require_roles("ADMINISTRATOR", "MANAGER")
 
 
 @router.post("/genres", response_model=GenreResponse, status_code=status.HTTP_201_CREATED)
 def create_genre(
     payload: GenreCreate,
     catalog_service: CatalogService = Depends(get_catalog_service),
-    _: User = Depends(require_administrator),
+    _: User = Depends(require_management),
 ) -> GenreResponse:
     return GenreResponse.model_validate(catalog_service.create_genre(payload))
 
@@ -30,7 +33,7 @@ def set_genre_featured(
     genre_id: int,
     payload: FeaturedUpdate,
     catalog_service: CatalogService = Depends(get_catalog_service),
-    _: User = Depends(require_administrator),
+    _: User = Depends(require_management),
 ) -> GenreResponse:
     genre = catalog_service.set_genre_featured(genre_id=genre_id, data_in=payload)
     return GenreResponse.model_validate(genre)
@@ -41,7 +44,7 @@ def set_book_featured(
     book_id: int,
     payload: FeaturedUpdate,
     catalog_service: CatalogService = Depends(get_catalog_service),
-    _: User = Depends(require_administrator),
+    _: User = Depends(require_management),
 ) -> CatalogBookResponse:
     book = catalog_service.set_book_featured(book_id=book_id, data_in=payload)
     return CatalogBookResponse(

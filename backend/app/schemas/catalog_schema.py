@@ -43,10 +43,17 @@ class BookOffer(BaseModel):
 
     Não é coluna: é agregação sobre `copies`. Um mesmo livro pode estar à
     venda e disponível para empréstimo ao mesmo tempo.
+
+    `available` falso é o "Esgotado" que a US02 exige sinalizar — o livro
+    continua no catálogo, apenas sem exemplar livre. `can_reserve` marca o
+    caso do RF07: exemplar de venda que está emprestado, e por isso admite
+    Reserva de Compra.
     """
 
     destination: DestinationType
+    available: bool
     price: Decimal | None = None
+    can_reserve: bool = False
 
 
 class CatalogBookResponse(BaseModel):
