@@ -156,17 +156,16 @@ def test_admin_com_papel_insuficiente_retorna_403():
     assert response.json()["code"] == "permission_denied"
 
 
-def test_gerente_tambem_administra_o_acervo():
-    """US04: a operação é restrita a "Administrador ou Gerente" — os dois."""
-    fake = _use_fake_service()
-    _authenticate_as("MANAGER")
+def test_estoquista_nao_administra_destaque():
+    """Estoquista cuida do acervo (US03), não da vitrine (US04)."""
+    _use_fake_service()
+    _authenticate_as("STOCK_KEEPER")
 
     response = client.patch(
         "/api/v1/admin/genres/1/featured", json={"is_featured": True, "position": 1}
     )
 
-    assert response.status_code == 200
-    assert fake.featured_set == [(1, FeaturedUpdate(is_featured=True, position=1))]
+    assert response.status_code == 403
 
 
 def test_administrador_altera_destaque():
@@ -259,3 +258,41 @@ def test_exemplar_inativo_nao_gera_oferta():
     book = SimpleNamespace(copies=[_copy(DestinationType.DIDACTIC, is_active=False)])
 
     assert CatalogService._offers_for(book) == []
+
+
+# ---- Cadastro de funcionário (RF06) --------------------------------------
+
+
+def test_cadastro_de_funcionario_exige_sessao():
+    response = client.post(
+        "/api/v1/employees/",
+        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
+              "accessLevel": "Vendedor"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_cadastro_de_funcionario_recusa_papel_comum():
+    """Definir nível de acesso é privativo do administrador (RF06)."""
+    _authenticate_as("SELLER")
+
+    response = client.post(
+        "/api/v1/employees/",
+        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
+              "accessLevel": "Vendedor"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_cadastro_de_funcionario_aceita_administrador():
+    _authenticate_as("ADMINISTRATOR")
+
+    response = client.post(
+        "/api/v1/employees/",
+        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
+              "accessLevel": "Vendedor"},
+    )
+
+    assert response.status_code == 201
