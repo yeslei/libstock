@@ -247,3 +247,62 @@ Uma regra só deve ser marcada como `IMPLEMENTED` quando houver:
 - autorização aplicada;
 - testes de sucesso e erro;
 - tratamento de concorrência, quando aplicável.
+
+## 15. Inativação de Usuário
+
+Status: `IMPLEMENTED`  
+Versão-alvo: v1  
+Endpoint: `PATCH /api/v1/users/{id}/inactivate`  
+Entidades: `users`, `user_sessions`
+
+### Ator autorizado
+
+- `ADMINISTRATOR`
+
+### Pré-condições
+
+- O executor deve estar autenticado com papel `ADMINISTRATOR`.
+- O usuário-alvo deve existir.
+- O usuário-alvo deve estar ativo (`is_active = true`).
+- O administrador não pode inativar a si mesmo.
+
+### Alteração de estado
+
+- `users.is_active` é definido como `false`.
+- `users.updated_at` é atualizado com o momento da operação.
+- Todas as sessões ativas do usuário-alvo são revogadas (`user_sessions.revoked_at`) na mesma transação.
+
+### Resultado de sucesso
+
+HTTP 200 com o estado atualizado do usuário (`id`, `name`, `email`, `is_active`, `updated_at`).
+
+### Erros possíveis
+
+| Código | HTTP | Descrição |
+|---|---|---|
+| `user_not_found` | 404 | Usuário-alvo não existe |
+| `user_already_inactive` | 409 | Usuário-alvo já está inativo |
+| `user_self_inactivation` | 422 | Administrador tentou inativar a si mesmo |
+| `permission_denied` | 403 | Executor não possui papel `ADMINISTRATOR` |
+| `invalid_token` | 401 | Token ausente ou inválido |
+
+### Efeito colateral de autenticação
+
+- Login (`POST /auth/login`) com usuário inativo retorna `invalid_credentials` (HTTP 401) sem vazar o motivo real.
+- Qualquer rota protegida acessada com token de usuário inativo retorna `user_inactive` (HTTP 403).
+
+### Atomicidade
+
+A revogação de sessões e a inativação do usuário ocorrem na mesma transação. Falha em qualquer etapa causa rollback completo.
+
+### Testes esperados
+
+- sucesso com mudança de status;
+- recurso inexistente (404);
+- já inativo (409);
+- auto-inativação (422);
+- sem autorização (401 e 403);
+- bloqueio de login com conta inativa;
+- bloqueio de rota protegida com token de conta inativa;
+- repository não controla transação;
+- atomicidade da operação (ordem: revoke → inactivate → commit).
