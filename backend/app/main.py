@@ -14,10 +14,18 @@ from app.core.exceptions import ApplicationError
 
 settings = get_settings()
 
+# Em produção a documentação interativa fica fora do ar: ela publica o
+# desenho inteiro da API — rotas administrativas, formato dos corpos e quais
+# papéis cada operação exige — para qualquer visitante.
+_documentacao_publica = settings.app_env != "production"
+
 app = FastAPI(
     title="LibStock API",
     version="0.1.0",
     description="API para gestão de acervos e circulação de livros.",
+    docs_url="/docs" if _documentacao_publica else None,
+    redoc_url="/redoc" if _documentacao_publica else None,
+    openapi_url="/openapi.json" if _documentacao_publica else None,
 )
 
 app.add_middleware(

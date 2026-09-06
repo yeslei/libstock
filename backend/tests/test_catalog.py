@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import GenreNotFoundError
+from app.core.exceptions import AuditActorRequiredError, GenreNotFoundError
 from app.dependencies.authentication import get_current_user
 from app.dependencies.services import get_catalog_service
 from app.main import app
@@ -36,6 +36,7 @@ class FakeCatalogService:
     def __init__(self) -> None:
         self.featured_set: list[tuple[int, FeaturedUpdate]] = []
         self.last_search: dict[str, object] | None = None
+        self.book_featured_set: list[tuple[int, FeaturedUpdate, int]] = []
 
     def list_featured_books(self) -> list[CatalogBookResponse]:
         return [
@@ -87,6 +88,13 @@ class FakeCatalogService:
     def set_genre_featured(self, *, genre_id, data_in):
         self.featured_set.append((genre_id, data_in))
         return SimpleNamespace(id=genre_id, name="Ficção", slug="ficcao")
+
+    def set_book_featured(self, *, book_id, data_in, actor_id):
+        self.book_featured_set.append((book_id, data_in, actor_id))
+        return SimpleNamespace(
+            id=book_id, title="Dom Casmurro", author="Machado de Assis",
+            cover_url=None, genres=[],
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -273,17 +281,16 @@ def test_admin_com_papel_insuficiente_retorna_403():
     assert response.json()["code"] == "permission_denied"
 
 
-def test_gerente_tambem_administra_o_acervo():
-    """US04: a operação é restrita a "Administrador ou Gerente" — os dois."""
-    fake = _use_fake_service()
-    _authenticate_as("MANAGER")
+def test_estoquista_nao_administra_destaque():
+    """Estoquista cuida do acervo (US03), não da vitrine (US04)."""
+    _use_fake_service()
+    _authenticate_as("STOCK_KEEPER")
 
     response = client.patch(
         "/api/v1/admin/genres/1/featured", json={"is_featured": True, "position": 1}
     )
 
-    assert response.status_code == 200
-    assert fake.featured_set == [(1, FeaturedUpdate(is_featured=True, position=1))]
+    assert response.status_code == 403
 
 
 def test_administrador_altera_destaque():
@@ -376,3 +383,132 @@ def test_exemplar_inativo_nao_gera_oferta():
     book = SimpleNamespace(copies=[_copy(DestinationType.DIDACTIC, is_active=False)])
 
     assert CatalogService._offers_for(book) == []
+
+
+# ---- Cadastro de funcionário (RF06) --------------------------------------
+
+
+def test_cadastro_de_funcionario_exige_sessao():
+    response = client.post(
+        "/api/v1/employees/",
+        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
+              "accessLevel": "Vendedor"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_cadastro_de_funcionario_recusa_papel_comum():
+    """Definir nível de acesso é privativo do administrador (RF06)."""
+    _authenticate_as("SELLER")
+
+    response = client.post(
+        "/api/v1/employees/",
+        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
+              "accessLevel": "Vendedor"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_cadastro_de_funcionario_aceita_administrador():
+    _authenticate_as("ADMINISTRATOR")
+
+    response = client.post(
+        "/api/v1/employees/",
+        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
+              "accessLevel": "Vendedor"},
+    )
+
+    assert response.status_code == 201
+
+
+# ---- Auditoria de inventário (RNF03) -------------------------------------
+
+
+class FakeCatalogRepository:
+    """Dublê que registra a ordem das chamadas.
+
+    A ordem importa: `books` é tabela auditada e o banco recusa a escrita se
+    o contexto do funcionário não vier antes dela.
+    """
+
+    def __init__(self, *, employee: bool = True) -> None:
+        self.employee = employee
+        self.chamadas: list[str] = []
+        self.book = SimpleNamespace(
+            id=7, title="Dom Casmurro", author="Machado de Assis", cover_url=None,
+            genres=[], is_featured=False, featured_position=None,
+        )
+
+    def is_employee(self, user_id):
+        self.chamadas.append(f"is_employee({user_id})")
+        return self.employee
+
+    def set_audit_actor(self, employee_id):
+        self.chamadas.append(f"set_audit_actor({employee_id})")
+
+    def find_book_by_id(self, book_id):
+        self.chamadas.append(f"find_book_by_id({book_id})")
+        return self.book
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self.commits = 0
+
+    def commit(self):
+        self.commits += 1
+
+    def refresh(self, _obj):
+        pass
+
+
+def _servico_com(repositorio) -> CatalogService:
+    return CatalogService(
+        db=FakeSession(),
+        catalog_repository=repositorio,
+        genre_repository=None,
+    )
+
+
+def test_destaque_de_livro_abre_o_contexto_de_auditoria_antes_de_escrever():
+    repositorio = FakeCatalogRepository()
+
+    livro = _servico_com(repositorio).set_book_featured(
+        book_id=7, data_in=FeaturedUpdate(is_featured=True, position=2), actor_id=42
+    )
+
+    assert livro.is_featured is True
+    assert livro.featured_position == 2
+    # Sem o set_audit_actor antes da escrita, o trigger de auditoria recusa
+    # o UPDATE e a rota devolve 500.
+    assert repositorio.chamadas == [
+        "is_employee(42)",
+        "set_audit_actor(42)",
+        "find_book_by_id(7)",
+    ]
+
+
+def test_destaque_de_livro_recusa_ator_sem_vinculo_de_funcionario():
+    repositorio = FakeCatalogRepository(employee=False)
+
+    with pytest.raises(AuditActorRequiredError):
+        _servico_com(repositorio).set_book_featured(
+            book_id=7, data_in=FeaturedUpdate(is_featured=True, position=1), actor_id=99
+        )
+
+    assert "set_audit_actor(99)" not in repositorio.chamadas
+
+
+def test_rota_de_destaque_repassa_o_usuario_autenticado():
+    fake = _use_fake_service()
+    _authenticate_as("ADMINISTRATOR")
+
+    response = client.patch(
+        "/api/v1/admin/books/7/featured", json={"is_featured": True, "position": 3}
+    )
+
+    assert response.status_code == 200
+    _, _, actor_id = fake.book_featured_set[0]
+    assert actor_id == 1  # id do usuário autenticado no dublê

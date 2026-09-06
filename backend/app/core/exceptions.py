@@ -40,6 +40,15 @@ class BookNotFoundError(ApplicationError):
         super().__init__("Livro não encontrado.", "book_not_found", 404)
 
 
+class AuditActorRequiredError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Operação de acervo exige um usuário vinculado a um funcionário.",
+            "audit_actor_required",
+            403,
+        )
+
+
 class DuplicateGenreError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Gênero já cadastrado.", "duplicate_genre", 409)

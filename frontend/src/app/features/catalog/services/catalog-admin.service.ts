@@ -12,9 +12,9 @@ export interface FeaturedUpdate {
 }
 
 /**
- * Operações de gestão do acervo (US04). O backend restringe a ADMINISTRATOR
- * e MANAGER; o token vai no header pelo `authInterceptor`, que já cobre todo
- * caminho iniciado em `/api/`.
+ * Operações de gestão do acervo (US04). O backend restringe a ADMINISTRATOR;
+ * o token vai no header pelo `authInterceptor`, que já cobre todo caminho
+ * iniciado em `/api/`.
  */
 @Injectable({ providedIn: 'root' })
 export class CatalogAdminService {

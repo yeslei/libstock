@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
+    AuditActorRequiredError,
     BookNotFoundError,
     DuplicateGenreError,
     GenreNotFoundError,
@@ -148,7 +149,23 @@ class CatalogService:
         self.db.refresh(genre)
         return genre
 
-    def set_book_featured(self, *, book_id: int, data_in: FeaturedUpdate) -> Book:
+    def set_book_featured(
+        self,
+        *,
+        book_id: int,
+        data_in: FeaturedUpdate,
+        actor_id: int,
+    ) -> Book:
+        """Altera o destaque de um livro.
+
+        `books` é tabela de inventário auditada (RNF03): o banco recusa a
+        escrita se a transação não declarar qual funcionário responde por
+        ela. Por isso a operação exige o ator, e não apenas o papel.
+        """
+        if not self.catalog_repository.is_employee(actor_id):
+            raise AuditActorRequiredError()
+        self.catalog_repository.set_audit_actor(actor_id)
+
         book = self.catalog_repository.find_book_by_id(book_id)
         if book is None:
             raise BookNotFoundError()

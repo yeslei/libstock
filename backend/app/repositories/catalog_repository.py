@@ -1,7 +1,7 @@
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, text
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.domain import Book, BookGenre, Copy, Genre
+from app.models.domain import Book, BookGenre, Copy, Employee, Genre
 
 
 class CatalogRepository:
@@ -115,6 +115,23 @@ class CatalogRepository:
             )
         )
         return items, total or 0
+
+    def is_employee(self, user_id: int) -> bool:
+        return self.db.scalar(select(Employee.id).where(Employee.id == user_id)) is not None
+
+    def set_audit_actor(self, employee_id: int) -> None:
+        """Abre o contexto que o trigger de auditoria de inventário exige.
+
+        Sem isto, qualquer UPDATE em `books` ou `copies` é recusado pelo
+        banco com "Inventory changes require SET LOCAL libstock.employee_id".
+        Vai por `set_config` porque `SET LOCAL` não aceita parâmetro
+        vinculado, e o `true` do terceiro argumento limita o efeito à
+        transação corrente.
+        """
+        self.db.execute(
+            text("SELECT set_config('libstock.employee_id', :valor, true)"),
+            {"valor": str(employee_id)},
+        )
 
     def find_book_by_id(self, book_id: int) -> Book | None:
         statement = (
