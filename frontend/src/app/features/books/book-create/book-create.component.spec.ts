@@ -19,6 +19,18 @@ describe('BookCreateComponent', () => {
     title: 'Python Fluente',
     author: 'Luciano Ramalho',
     genre: 'Tecnologia',
+    is_active: true,
+    initial_copy: {
+      id: 8,
+      book_id: 7,
+      barcode: 'EX-0001',
+      destination: 'DIDACTIC',
+      status: 'AVAILABLE',
+      condition: null,
+      sale_price: null,
+      acquired_at: null,
+      is_active: true,
+    },
   };
 
   beforeEach(async () => {
@@ -40,6 +52,11 @@ describe('BookCreateComponent', () => {
   }
 
   function submit(): void {
+    const isbn = fixture.componentInstance['form'].controls.isbn.value;
+    const barcode = fixture.componentInstance['form'].controls.barcode.value;
+    if (isbn && !barcode) {
+      input('book-barcode', 'EX-0001');
+    }
     const form = (fixture.nativeElement as HTMLElement).querySelector<HTMLFormElement>('form')!;
     form.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
@@ -98,6 +115,10 @@ describe('BookCreateComponent', () => {
       title: 'Python Fluente',
       author: 'Luciano Ramalho',
       genre: 'Tecnologia',
+      initial_copy: {
+        barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
+        sale_price: null, acquired_at: null,
+      },
     });
   });
 
@@ -108,6 +129,10 @@ describe('BookCreateComponent', () => {
     submit();
     expect(service.create).toHaveBeenCalledOnceWith({
       isbn: '9788575225530', title: null, author: null, genre: null,
+      initial_copy: {
+        barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
+        sale_price: null, acquired_at: null,
+      },
     });
   });
 
@@ -135,6 +160,7 @@ describe('BookCreateComponent', () => {
     expect(text).toContain(response.title);
     expect(text).toContain(response.author);
     expect(text).toContain(response.genre);
+    expect(text).toContain(response.initial_copy!.barcode);
   });
 
   [
@@ -157,6 +183,10 @@ describe('BookCreateComponent', () => {
     {
       name: 'ISBN duplicado',
       error: { status: 409, code: 'duplicate_isbn', detail: 'Este ISBN já está cadastrado.' },
+    },
+    {
+      name: 'código de barras duplicado',
+      error: { status: 409, code: 'duplicate_barcode', detail: 'Este código de barras já está cadastrado.' },
     },
     {
       name: 'indisponibilidade externa',
@@ -212,5 +242,41 @@ describe('BookCreateComponent', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector<HTMLInputElement>('#book-isbn')?.value).toBe('9788575225530');
     expect(root.querySelector<HTMLInputElement>('#book-title')?.value).toBe('Meu título');
+  });
+
+  it('exige os dados do exemplar inicial', () => {
+    input('book-isbn', '9788575225530');
+    const form = (fixture.nativeElement as HTMLElement).querySelector<HTMLFormElement>('form')!;
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+    expect(service.create).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Informe o código de barras');
+  });
+
+  it('exige preço para exemplar comercial e o envia no payload combinado', () => {
+    input('book-isbn', '9788575225530');
+    input('book-barcode', 'COM-1');
+    const root = fixture.nativeElement as HTMLElement;
+    const destination = root.querySelector<HTMLSelectElement>('#book-destination')!;
+    destination.value = 'COMMERCIAL';
+    destination.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const form = root.querySelector<HTMLFormElement>('form')!;
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+    expect(service.create).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Informe o preço');
+    service.create.and.returnValue(of(response));
+    input('book-sale-price', '49.9');
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+    expect(service.create.calls.mostRecent().args[0].initial_copy.sale_price).toBe(49.9);
+  });
+
+  it('orienta cadastro manual quando a integração retorna 503', () => {
+    service.create.and.returnValue(fail({ status: 503, code: 'google_books_rate_limited', detail: 'Serviço indisponível.' }));
+    input('book-isbn', '9788575225530');
+    submit();
+    expect(fixture.nativeElement.textContent).toContain('Preencha título e autor manualmente');
   });
 });

@@ -1,20 +1,27 @@
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-from app.dependencies.services import get_db
+from fastapi import APIRouter, Depends, status
+
+from app.dependencies.authentication import require_roles
+from app.dependencies.services import get_book_service
+from app.models.user import User
+from app.schemas.book_schema import BookCreate, BookResponse, BookSearchParams
 from app.services.book_service import BookService
-from app.schemas.book_schema import BookCreate, BookLookupResponse, BookResponse
 
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 
-@router.get("/lookup", response_model=BookLookupResponse)
-async def lookup_book(
-    isbn: str = Query(min_length=10, max_length=17),
-    db: Session = Depends(get_db),
-):
-    service = BookService(db)
-    return await service.lookup_google_books(isbn)
-
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
-def create_book(book_data: BookCreate, db: Session = Depends(get_db)):
-    service = BookService(db)
-    return service.create_book(book_data)
+async def create_book(
+    book_data: BookCreate,
+    current_user: User = Depends(
+        require_roles("STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+    ),
+    service: BookService = Depends(get_book_service),
+) -> BookResponse:
+    return await service.create_book(book_data, employee_id=current_user.id)
+
+
+@router.get("/", response_model=list[BookResponse])
+def search_books(
+    params: BookSearchParams = Depends(),
+    book_service: BookService = Depends(get_book_service),
+) -> list[BookResponse]:
+    return book_service.search_books(params.title)
