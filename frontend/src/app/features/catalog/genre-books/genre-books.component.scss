@@ -1,0 +1,59 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+.genre {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: $space-8 $space-4;
+}
+
+.genre__back {
+  display: inline-block;
+  margin-bottom: $space-4;
+  color: $primary;
+  font-size: $font-size-sm;
+  text-decoration: none;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.genre__title {
+  margin: 0 0 $space-2;
+  color: $text-primary;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.genre__count,
+.genre__state {
+  display: flex;
+  gap: $space-2;
+  align-items: center;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+.genre__list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  margin: $space-4 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.genre__item {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+  padding: $space-3;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+
+  span {
+    color: $text-muted;
+    font-size: $font-size-sm;
+  }
+}

@@ -30,6 +30,13 @@ export interface ApiError {
   /** Código interno estável — use para lógica condicional. */
   readonly code?: string;
   readonly status: number;
+  /** Erros estruturados do FastAPI/Pydantic (normalmente em respostas 422). */
+  readonly validationErrors?: readonly ApiValidationError[];
+}
+
+export interface ApiValidationError {
+  readonly field?: string;
+  readonly message: string;
 }
 
 /**
