@@ -71,7 +71,9 @@ class AuthService:
         user = self.user_repository.find_by_email(email.strip().lower())
         password_hash = user.password_hash if user else DUMMY_PASSWORD_HASH
         password_is_valid = verify_password(password, password_hash)
-        if user is None or not password_is_valid:
+        # Não vazar o motivo real ao cliente: conta inativa é tratada como
+        # credencial inválida para evitar enumeração de estado.
+        if user is None or not password_is_valid or not user.is_active:
             raise InvalidCredentialsError()
 
         return self._create_session(user)
