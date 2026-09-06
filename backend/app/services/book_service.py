@@ -1,3 +1,6 @@
+import logging
+import re
+
 import httpx
 from pydantic import ValidationError
 from sqlalchemy import text
@@ -7,19 +10,43 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import (
     ApplicationError,
     BookPersistenceError,
+    DuplicateBarcodeError,
     DuplicateIsbnError,
     EmployeeRecordRequiredError,
     GoogleBooksInvalidResponseError,
     GoogleBooksNotFoundError,
+    GoogleBooksRateLimitError,
     GoogleBooksUnavailableError,
 )
 from app.models.domain import Book
 from app.repositories.book_repository import BookRepository
-from app.schemas.book_schema import BookCreate
+from app.schemas.book_schema import BookCreate, BookResponse, CopyResponse
 
 
 GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
 GOOGLE_BOOKS_TIMEOUT_SECONDS = 5.0
+logger = logging.getLogger(__name__)
+
+UNIQUE_CONSTRAINT_ERRORS = {
+    "books_isbn_key": DuplicateIsbnError,
+    "copies_barcode_key": DuplicateBarcodeError,
+}
+
+
+def _unique_constraint_name(exc: IntegrityError) -> str | None:
+    constraint_name = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+    if constraint_name in UNIQUE_CONSTRAINT_ERRORS:
+        return constraint_name
+
+    message = str(exc.orig)
+    for known_name in UNIQUE_CONSTRAINT_ERRORS:
+        if re.search(
+            rf"(?:duplicate key[^\n]*violates\s+unique\s+constraint|unique\s+constraint\s+failed:)\s*[\"']?{re.escape(known_name)}[\"']?",
+            message,
+            flags=re.IGNORECASE,
+        ):
+            return known_name
+    return None
 
 
 class BookService:
@@ -42,7 +69,11 @@ class BookService:
                 response.raise_for_status()
         except httpx.TimeoutException as exc:
             raise GoogleBooksUnavailableError() from exc
-        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429:
+                raise GoogleBooksRateLimitError() from exc
+            raise GoogleBooksUnavailableError() from exc
+        except httpx.RequestError as exc:
             raise GoogleBooksUnavailableError() from exc
 
         try:
@@ -89,12 +120,14 @@ class BookService:
                 external_data["genre"] = genre
         return external_data
 
-    async def create_book(self, book_data: BookCreate, *, employee_id: int) -> Book:
+    async def create_book(self, book_data: BookCreate, *, employee_id: int) -> BookResponse:
         try:
             if not self.repository.employee_exists(employee_id):
                 raise EmployeeRecordRequiredError()
             if self.repository.find_by_isbn(book_data.isbn) is not None:
                 raise DuplicateIsbnError()
+            if self.repository.find_copy_by_barcode(book_data.initial_copy.barcode) is not None:
+                raise DuplicateBarcodeError()
 
             persisted_data = book_data
             if not book_data.title or not book_data.author:
@@ -120,21 +153,37 @@ class BookService:
                 {"employee_id": str(employee_id)},
             )
             book = self.repository.create_book(persisted_data)
+            initial_copy = self.repository.create_copy(book.id, persisted_data.initial_copy)
+            response = BookResponse(
+                id=book.id,
+                isbn=book.isbn,
+                title=book.title,
+                author=book.author,
+                genre=book.genre,
+                is_active=book.is_active,
+                initial_copy=CopyResponse.model_validate(initial_copy),
+            )
             self.db.commit()
-            self.db.refresh(book)
-            return book
+            return response
         except IntegrityError as exc:
             self.db.rollback()
-            raise DuplicateIsbnError() from exc
+            constraint = _unique_constraint_name(exc)
+            if constraint is not None:
+                raise UNIQUE_CONSTRAINT_ERRORS[constraint]() from exc
+            logger.exception("Falha de integridade inesperada ao cadastrar obra e exemplar")
+            raise BookPersistenceError() from exc
         except ApplicationError:
             self.db.rollback()
             raise
         except SQLAlchemyError as exc:
             self.db.rollback()
+            logger.exception("Falha de persistência ao cadastrar obra e exemplar")
             raise BookPersistenceError() from exc
         except Exception as exc:
             self.db.rollback()
+            logger.exception("Falha inesperada ao cadastrar obra e exemplar")
             raise BookPersistenceError() from exc
+
     def search_books(self, title: str) -> list[Book]:
         normalized = title.strip()
         if not normalized:

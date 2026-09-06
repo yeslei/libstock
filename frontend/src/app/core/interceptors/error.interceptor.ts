@@ -20,11 +20,14 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   permission_denied: 'Você não tem permissão para realizar esta ação.',
   user_not_found: 'Não encontramos esse usuário.',
   duplicate_isbn: 'Este ISBN já está cadastrado.',
+  duplicate_barcode: 'Este código de barras já está cadastrado.',
   employee_record_required:
     'Seu usuário não possui um cadastro de funcionário apto a realizar esta ação.',
   google_books_not_found: 'O ISBN não foi encontrado no Google Books.',
   google_books_unavailable:
     'Não foi possível consultar os dados externos. Tente novamente em instantes.',
+  google_books_rate_limited:
+    'O Google Books recebeu consultas demais. Tente novamente em instantes.',
   google_books_invalid_response:
     'O Google Books não retornou título e autor válidos para este ISBN.',
   book_persistence_error: 'Não foi possível cadastrar a obra. Tente novamente.',

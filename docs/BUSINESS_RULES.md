@@ -138,17 +138,22 @@ Separar explicitamente:
 
 #### Cadastro
 
-Status: `PENDING`.
+Regra aprovada e implementada:
 
-É necessário decidir se o cadastro:
-
-- aceita o valor armazenado sem validar checksum; ou
-- exige ISBN-10/ISBN-13 com checksum válido.
-
-A decisão deve ser aplicada de forma consistente no frontend, schema, service,
-banco e testes.
+- ISBN é obrigatório;
+- aceita ISBN-10 ou ISBN-13;
+- espaços e hífens são aceitos na entrada;
+- o valor é armazenado normalizado, sem espaços ou hífens;
+- o checksum é validado;
+- o backend é a autoridade final sobre normalização e validade.
 
 ## 9. Exemplares e estados
+
+Regra aprovada: toda obra nova deve ser persistida com um primeiro exemplar
+ativo na mesma transação. A obra, o exemplar e seus registros de auditoria só
+podem ser confirmados em conjunto; qualquer falha provoca rollback integral.
+O status do exemplar inicial não integra o payload: o backend sempre o persiste
+como `AVAILABLE` e força `is_active=true`.
 
 | Estado | Significado |
 |---|---|

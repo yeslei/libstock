@@ -45,6 +45,11 @@ class DuplicateIsbnError(ApplicationError):
         super().__init__("ISBN já cadastrado.", "duplicate_isbn", 409)
 
 
+class DuplicateBarcodeError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Código de barras já cadastrado.", "duplicate_barcode", 409)
+
+
 class EmployeeRecordRequiredError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
@@ -77,6 +82,15 @@ class GoogleBooksUnavailableError(ApplicationError):
         super().__init__(
             "Não foi possível consultar o Google Books.",
             "google_books_unavailable",
+            503,
+        )
+
+
+class GoogleBooksRateLimitError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O Google Books está temporariamente indisponível por excesso de consultas.",
+            "google_books_rate_limited",
             503,
         )
 
