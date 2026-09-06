@@ -165,3 +165,22 @@ class AcervoPersistenceError(ApplicationError):
             "acervo_persistence_error",
             500,
         )
+
+
+class UserInactiveError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Usuário inativo.", "user_inactive", 403)
+
+
+class UserAlreadyInactiveError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("O usuário já está inativo.", "user_already_inactive", 409)
+
+
+class UserSelfInactivationError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Um administrador não pode inativar a si mesmo.",
+            "user_self_inactivation",
+            422,
+        )
