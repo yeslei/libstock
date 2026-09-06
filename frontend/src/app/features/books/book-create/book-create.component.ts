@@ -35,6 +35,20 @@ const GENRE_ERRORS = {
   maxlength: 'O gênero pode ter no máximo 100 caracteres.',
   server: 'Confira o gênero informado.',
 };
+const BARCODE_ERRORS = {
+  required: 'Informe o código de barras do exemplar.',
+  maxlength: 'O código de barras pode ter no máximo 100 caracteres.',
+  server: 'Confira o código de barras informado.',
+};
+const CONDITION_ERRORS = {
+  maxlength: 'A condição pode ter no máximo 30 caracteres.',
+  server: 'Confira a condição informada.',
+};
+const PRICE_ERRORS = {
+  required: 'Informe o preço do exemplar comercial.',
+  min: 'O preço não pode ser negativo.',
+  server: 'Confira o preço informado.',
+};
 
 @Component({
   selector: 'app-book-create',
@@ -55,6 +69,11 @@ export class BookCreateComponent {
     title: ['', [Validators.maxLength(255)]],
     author: ['', [Validators.maxLength(255)]],
     genre: ['', [Validators.maxLength(100)]],
+    barcode: ['', [Validators.required, Validators.maxLength(100)]],
+    destination: ['DIDACTIC' as 'DIDACTIC' | 'COMMERCIAL', [Validators.required]],
+    condition: ['', [Validators.maxLength(30)]],
+    salePrice: this.fb.control<number | null>(null, [Validators.min(0)]),
+    acquiredAt: [''],
   });
   protected readonly state = signal<FormState>({ status: 'idle' });
   protected readonly submitted = signal(false);
@@ -83,6 +102,29 @@ export class BookCreateComponent {
 
   protected genreError(): string | null {
     return fieldError(this.form.controls.genre, GENRE_ERRORS, this.submitted());
+  }
+
+  protected barcodeError(): string | null {
+    return fieldError(this.form.controls.barcode, BARCODE_ERRORS, this.submitted());
+  }
+
+  protected conditionError(): string | null {
+    return fieldError(this.form.controls.condition, CONDITION_ERRORS, this.submitted());
+  }
+
+  protected priceError(): string | null {
+    return fieldError(this.form.controls.salePrice, PRICE_ERRORS, this.submitted());
+  }
+
+  protected destinationChanged(): void {
+    const price = this.form.controls.salePrice;
+    if (this.form.controls.destination.value === 'COMMERCIAL') {
+      price.addValidators(Validators.required);
+    } else {
+      price.removeValidators(Validators.required);
+      price.setValue(null);
+    }
+    price.updateValueAndValidity();
   }
 
   protected submit(): void {
@@ -121,6 +163,13 @@ export class BookCreateComponent {
       title: optional(value.title),
       author: optional(value.author),
       genre: optional(value.genre),
+      initial_copy: {
+        barcode: value.barcode.trim(),
+        destination: value.destination,
+        condition: optional(value.condition),
+        sale_price: value.destination === 'COMMERCIAL' ? value.salePrice : null,
+        acquired_at: optional(value.acquiredAt),
+      },
     };
   }
 
@@ -133,17 +182,23 @@ export class BookCreateComponent {
       this.focusFirstInvalid();
       return;
     }
-    this.state.set({ status: 'error', message: error.detail, code: error.code });
+    const message = error.status === 503
+      ? `${error.detail} Preencha título e autor manualmente para continuar o cadastro.`
+      : error.detail;
+    this.state.set({ status: 'error', message, code: error.code });
     if (error.code === 'duplicate_isbn' || error.code === 'google_books_not_found') {
       this.focus('book-isbn');
+    } else if (error.code === 'duplicate_barcode') {
+      this.focus('book-barcode');
     }
   }
 
   private applyValidationErrors(error: ApiError): boolean {
     let applied = false;
     for (const issue of error.validationErrors ?? []) {
-      if (issue.field && issue.field in this.form.controls) {
-        const control = this.form.controls[issue.field as keyof typeof this.form.controls];
+      const field = issue.field?.replace('initial_copy.', '').replace('sale_price', 'salePrice');
+      if (field && field in this.form.controls) {
+        const control = this.form.controls[field as keyof typeof this.form.controls];
         control.setErrors({ ...(control.errors ?? {}), server: true });
         control.markAsTouched();
         applied = true;
@@ -153,11 +208,12 @@ export class BookCreateComponent {
   }
 
   private focusFirstInvalid(): void {
-    const first = (['isbn', 'title', 'author', 'genre'] as const).find(
+    const first = (['isbn', 'title', 'author', 'genre', 'barcode', 'destination', 'condition', 'salePrice', 'acquiredAt'] as const).find(
       (field) => this.form.controls[field].invalid,
     );
     if (first) {
-      this.focus(`book-${first}`);
+      const ids: Partial<Record<typeof first, string>> = { salePrice: 'book-sale-price', acquiredAt: 'book-acquired-at' };
+      this.focus(ids[first] ?? `book-${first}`);
     }
   }
 

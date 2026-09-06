@@ -1,6 +1,10 @@
 import re
+from datetime import date
+from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.models.domain import CopyStatus, DestinationType
 
 
 def normalize_isbn(value: str) -> str:
@@ -35,11 +39,40 @@ def normalize_isbn(value: str) -> str:
     raise ValueError("ISBN deve possuir 10 ou 13 caracteres numéricos.")
 
 
+class InitialCopyCreate(BaseModel):
+    barcode: str = Field(min_length=1, max_length=100)
+    destination: DestinationType
+    condition: str | None = Field(default=None, max_length=30)
+    sale_price: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
+    acquired_at: date | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("barcode", "condition", mode="before")
+    @classmethod
+    def normalize_copy_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
+
+    @model_validator(mode="after")
+    def validate_initial_state(self) -> "InitialCopyCreate":
+        if self.destination == DestinationType.COMMERCIAL and self.sale_price is None:
+            raise ValueError("Informe o preço do exemplar comercial.")
+        if self.destination == DestinationType.DIDACTIC and self.sale_price is not None:
+            raise ValueError("Exemplar didático não pode possuir preço de venda.")
+        return self
+
+
 class BookCreate(BaseModel):
     isbn: str
     title: str | None = Field(default=None, max_length=255)
     author: str | None = Field(default=None, max_length=255)
     genre: str | None = Field(default=None, max_length=100)
+    initial_copy: InitialCopyCreate
+
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("isbn")
     @classmethod
@@ -54,8 +87,7 @@ class BookCreate(BaseModel):
             return stripped or None
         return value
 
-class BookResponse(BookCreate):
-    id: int
+
 class BookSearchParams(BaseModel):
     title: str = Field(min_length=1, pattern=r".*\S.*")
 
@@ -68,10 +100,27 @@ class BookSearchParams(BaseModel):
         return normalized
 
 
+class CopyResponse(BaseModel):
+    id: int
+    book_id: int
+    barcode: str
+    destination: DestinationType
+    status: CopyStatus
+    condition: str | None
+    sale_price: Decimal | None
+    acquired_at: date | None
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class BookResponse(BaseModel):
     id: int
+    isbn: str | None = None
     title: str
     author: str
+    genre: str | None = None
     is_active: bool
+    initial_copy: CopyResponse | None = None
 
     model_config = ConfigDict(from_attributes=True)

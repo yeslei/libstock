@@ -11,7 +11,7 @@
       <p class="eyebrow">Gestão do acervo</p>
       <h1 id="book-create-title">Cadastrar obra</h1>
       <p>
-        Informe o ISBN. Se título, autor ou gênero ficarem vazios, tentaremos completá-los com
+        Informe a obra e seu primeiro exemplar. Se título ou autor ficarem vazios, tentaremos completá-los com
         dados do Google Books.
       </p>
     </header>
@@ -26,9 +26,15 @@
         <h2>Dados cadastrados</h2>
         <dl>
           <div><dt>ISBN</dt><dd>{{ book.isbn }}</dd></div>
-          <div><dt>Título</dt><dd>{{ book.title ?? 'Não informado' }}</dd></div>
-          <div><dt>Autor</dt><dd>{{ book.author ?? 'Não informado' }}</dd></div>
+          <div><dt>Título</dt><dd>{{ book.title }}</dd></div>
+          <div><dt>Autor</dt><dd>{{ book.author }}</dd></div>
           <div><dt>Gênero</dt><dd>{{ book.genre ?? 'Não informado' }}</dd></div>
+          @if (book.initial_copy; as copy) {
+            <div><dt>Exemplar</dt><dd>{{ copy.barcode }}</dd></div>
+            <div><dt>Destinação</dt><dd>{{ copy.destination === 'COMMERCIAL' ? 'Comercial' : 'Didático' }}</dd></div>
+            <div><dt>Status</dt><dd>{{ copy.status }}</dd></div>
+            @if (copy.sale_price !== null) { <div><dt>Preço</dt><dd>{{ copy.sale_price }}</dd></div> }
+          }
         </dl>
       </div>
     }
@@ -58,6 +64,46 @@
           <p class="field__error" id="book-isbn-error" aria-live="polite">{{ message }}</p>
         }
       </div>
+
+      <fieldset class="copy-fields">
+        <legend>Exemplar inicial</legend>
+        <div class="field">
+          <label class="field__label" for="book-barcode">Código de barras <span aria-hidden="true">*</span></label>
+          <div class="field__control" [class.field__control--invalid]="barcodeError() !== null">
+            <input class="field__input" id="book-barcode" type="text" formControlName="barcode" maxlength="100" autocomplete="off" [attr.aria-invalid]="barcodeError() !== null" />
+          </div>
+          @if (barcodeError(); as message) { <p class="field__error" aria-live="polite">{{ message }}</p> }
+        </div>
+        <div class="field">
+          <label class="field__label" for="book-destination">Destinação <span aria-hidden="true">*</span></label>
+          <div class="field__control">
+            <select class="field__input" id="book-destination" formControlName="destination" (change)="destinationChanged()">
+              <option value="DIDACTIC">Didático / empréstimo</option>
+              <option value="COMMERCIAL">Comercial / venda</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field__label" for="book-condition">Condição <span class="optional">Opcional</span></label>
+          <div class="field__control" [class.field__control--invalid]="conditionError() !== null">
+            <input class="field__input" id="book-condition" type="text" formControlName="condition" maxlength="30" [attr.aria-invalid]="conditionError() !== null" />
+          </div>
+          @if (conditionError(); as message) { <p class="field__error" aria-live="polite">{{ message }}</p> }
+        </div>
+        @if (form.controls.destination.value === 'COMMERCIAL') {
+          <div class="field">
+            <label class="field__label" for="book-sale-price">Preço de venda <span aria-hidden="true">*</span></label>
+            <div class="field__control" [class.field__control--invalid]="priceError() !== null">
+              <input class="field__input" id="book-sale-price" type="number" min="0" step="0.01" formControlName="salePrice" [attr.aria-invalid]="priceError() !== null" />
+            </div>
+            @if (priceError(); as message) { <p class="field__error" aria-live="polite">{{ message }}</p> }
+          </div>
+        }
+        <div class="field">
+          <label class="field__label" for="book-acquired-at">Data de aquisição <span class="optional">Opcional</span></label>
+          <div class="field__control"><input class="field__input" id="book-acquired-at" type="date" formControlName="acquiredAt" /></div>
+        </div>
+      </fieldset>
 
       <div class="field">
         <label class="field__label" for="book-title">
