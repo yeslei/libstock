@@ -21,6 +21,15 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'obras/nova',
+    canActivate: [authGuard],
+    title: 'Cadastrar obra · LibStock',
+    loadComponent: () =>
+      import('./features/books/book-create/book-create.component').then(
+        (m) => m.BookCreateComponent,
+      ),
+  },
+  {
     path: 'painel',
     pathMatch: 'full',
     canActivate: [authGuard],

@@ -44,7 +44,7 @@
           <span class="opsbar__item">Registro de venda, empréstimo e devolução no card</span>
         }
         @if (canManageStock()) {
-          <span class="opsbar__item">Cadastro de obras</span>
+          <a class="opsbar__item" routerLink="/obras/nova">Cadastrar obra</a>
         }
         @if (canManageCatalog()) {
           <span class="opsbar__item">Gestão de destaques</span>
