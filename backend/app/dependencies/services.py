@@ -27,7 +27,7 @@ def get_user_service(db: Session = Depends(get_db)) -> UserService:
 
 
 def get_book_service(db: Session = Depends(get_db)) -> BookService:
-    return BookService(BookRepository(db))
+    return BookService(db=db, repository=BookRepository(db))
 
 
 def get_catalog_service(db: Session = Depends(get_db)) -> CatalogService:
