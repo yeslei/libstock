@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
+import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
@@ -27,6 +28,15 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/books/book-create/book-create.component').then(
         (m) => m.BookCreateComponent,
+      ),
+  },
+  {
+    path: 'obras/:id/exemplares/novo',
+    canActivate: [authGuard, roleGuard('SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR')],
+    title: 'Cadastrar exemplar · LibStock',
+    loadComponent: () =>
+      import('./features/copies/copy-create/copy-create.component').then(
+        (m) => m.CopyCreateComponent,
       ),
   },
   {
