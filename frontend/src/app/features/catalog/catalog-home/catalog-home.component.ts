@@ -45,6 +45,7 @@ export class CatalogHomeComponent {
   protected readonly canManageCatalog = computed(() => this.capabilities().has('manageCatalog'));
   protected readonly canServeCounter = computed(() => this.capabilities().has('counterService'));
   protected readonly canManageStock = computed(() => this.capabilities().has('manageStock'));
+  protected readonly canRegisterCopy = computed(() => this.capabilities().has('registerCopy'));
 
   /** Livros retirados do destaque nesta sessão, para sumirem sem recarregar. */
   private readonly unfeatured = signal<ReadonlySet<number>>(new Set());
