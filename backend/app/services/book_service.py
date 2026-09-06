@@ -23,9 +23,17 @@ GOOGLE_BOOKS_TIMEOUT_SECONDS = 5.0
 
 
 class BookService:
-    def __init__(self, *, db: Session, repository: BookRepository) -> None:
-        self.db = db
-        self.repository = repository
+    def __init__(
+        self,
+        book_repository: BookRepository | None = None,
+        *,
+        db: Session | None = None,
+        repository: BookRepository | None = None,
+    ) -> None:
+        self.repository = repository or book_repository
+        if self.repository is None:
+            raise TypeError("BookRepository é obrigatório.")
+        self.db = db or self.repository.db
 
     async def fetch_google_books_data(self, isbn: str) -> dict[str, str]:
         try:
@@ -127,3 +135,8 @@ class BookService:
         except Exception as exc:
             self.db.rollback()
             raise BookPersistenceError() from exc
+    def search_books(self, title: str) -> list[Book]:
+        normalized = title.strip()
+        if not normalized:
+            raise ValueError("O título da busca não pode estar vazio.")
+        return self.repository.search_by_title(normalized)

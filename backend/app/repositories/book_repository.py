@@ -21,3 +21,16 @@ class BookRepository:
         self.db.add(db_book)
         self.db.flush()
         return db_book
+
+    def search_by_title(self, title: str) -> list[Book]:
+        escaped_title = (
+            title.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        )
+        return (
+            self.db.query(Book)
+            .filter(
+                Book.title.ilike(f"%{escaped_title}%", escape="\\"),
+                Book.is_active.is_(True),
+            )
+            .all()
+        )

@@ -54,6 +54,15 @@ class EmployeeRecordRequiredError(ApplicationError):
         )
 
 
+class AuditActorRequiredError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Operação de acervo exige um usuário vinculado a um funcionário.",
+            "audit_actor_required",
+            403,
+        )
+
+
 class GoogleBooksNotFoundError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(

@@ -13,10 +13,9 @@ from app.services.catalog_service import CatalogService
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Administração do catálogo"])
 
-# US04 do SRS: operações de gestão do acervo são restritas a "Administrador
-# ou Gerente" — os dois compõem o mesmo nível de privilégio, e o SRS trata
-# "Gerente | Dono: Administrador" como um stakeholder só.
-require_management = require_roles("ADMINISTRATOR", "MANAGER")
+# US04 do SRS: gestão do acervo é restrita ao perfil "Gerente | Dono:
+# Administrador", que a migration 0007 consolidou no código ADMINISTRATOR.
+require_management = require_roles("ADMINISTRATOR")
 
 
 @router.post("/genres", response_model=GenreResponse, status_code=status.HTTP_201_CREATED)
@@ -44,9 +43,13 @@ def set_book_featured(
     book_id: int,
     payload: FeaturedUpdate,
     catalog_service: CatalogService = Depends(get_catalog_service),
-    _: User = Depends(require_management),
+    current_user: User = Depends(require_management),
 ) -> CatalogBookResponse:
-    book = catalog_service.set_book_featured(book_id=book_id, data_in=payload)
+    book = catalog_service.set_book_featured(
+        book_id=book_id,
+        data_in=payload,
+        actor_id=current_user.id,
+    )
     return CatalogBookResponse(
         id=book.id,
         title=book.title,

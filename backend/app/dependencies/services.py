@@ -26,13 +26,13 @@ def get_user_service(db: Session = Depends(get_db)) -> UserService:
     return UserService(UserRepository(db))
 
 
+def get_book_service(db: Session = Depends(get_db)) -> BookService:
+    return BookService(db=db, repository=BookRepository(db))
+
+
 def get_catalog_service(db: Session = Depends(get_db)) -> CatalogService:
     return CatalogService(
         db=db,
         catalog_repository=CatalogRepository(db),
         genre_repository=GenreRepository(db),
     )
-
-
-def get_book_service(db: Session = Depends(get_db)) -> BookService:
-    return BookService(db=db, repository=BookRepository(db))

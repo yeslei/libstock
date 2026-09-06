@@ -1,7 +1,7 @@
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, text
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.domain import Book, BookGenre, Copy, Genre
+from app.models.domain import Book, BookGenre, Copy, Employee, Genre
 
 
 class CatalogRepository:
@@ -44,6 +44,53 @@ class CatalogRepository:
         )
         return list(self.db.scalars(statement))
 
+    @staticmethod
+    def _escape_like(value: str) -> str:
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    def search_books(
+        self,
+        *,
+        title: str | None = None,
+        author: str | None = None,
+        isbn: str | None = None,
+        barcode: str | None = None,
+    ) -> list[Book]:
+        statement = self._catalog_books()
+        if title is not None:
+            statement = statement.where(
+                Book.title.ilike(f"%{self._escape_like(title)}%", escape="\\")
+            )
+        if author is not None:
+            statement = statement.where(
+                Book.author.ilike(f"%{self._escape_like(author)}%", escape="\\")
+            )
+        if isbn is not None:
+            statement = statement.where(Book.isbn == isbn)
+        if barcode is not None:
+            statement = statement.where(
+                select(Copy.id)
+                .where(
+                    Copy.book_id == Book.id,
+                    Copy.barcode == barcode,
+                    Copy.is_active.is_(True),
+                )
+                .exists()
+            )
+        return list(self.db.scalars(statement.order_by(Book.title.asc())))
+
+    def search_by_title(self, title: str) -> list[Book]:
+        return self.search_books(title=title)
+
+    def search_by_author(self, author: str) -> list[Book]:
+        return self.search_books(author=author)
+
+    def search_by_isbn(self, isbn: str) -> list[Book]:
+        return self.search_books(isbn=isbn)
+
+    def search_by_barcode(self, barcode: str) -> list[Book]:
+        return self.search_books(barcode=barcode)
+
     def find_books_by_genre(
         self,
         *,
@@ -68,6 +115,23 @@ class CatalogRepository:
             )
         )
         return items, total or 0
+
+    def is_employee(self, user_id: int) -> bool:
+        return self.db.scalar(select(Employee.id).where(Employee.id == user_id)) is not None
+
+    def set_audit_actor(self, employee_id: int) -> None:
+        """Abre o contexto que o trigger de auditoria de inventário exige.
+
+        Sem isto, qualquer UPDATE em `books` ou `copies` é recusado pelo
+        banco com "Inventory changes require SET LOCAL libstock.employee_id".
+        Vai por `set_config` porque `SET LOCAL` não aceita parâmetro
+        vinculado, e o `true` do terceiro argumento limita o efeito à
+        transação corrente.
+        """
+        self.db.execute(
+            text("SELECT set_config('libstock.employee_id', :valor, true)"),
+            {"valor": str(employee_id)},
+        )
 
     def find_book_by_id(self, book_id: int) -> Book | None:
         statement = (
