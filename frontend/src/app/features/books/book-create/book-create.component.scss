@@ -78,6 +78,20 @@
   display: grid;
   gap: $space-5;
 }
+.copy-fields {
+  display: grid;
+  gap: $space-5;
+  min-width: 0;
+  margin: 0;
+  padding: $space-5;
+  border: 1px solid rgba(175, 189, 182, 0.6);
+  border-radius: $radius-lg;
+}
+.copy-fields legend {
+  padding: 0 $space-2;
+  color: $primary;
+  font-weight: 700;
+}
 .optional {
   margin-left: $space-2;
   color: $text-muted;

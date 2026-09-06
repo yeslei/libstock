@@ -18,7 +18,7 @@ def test_search_books_success_and_response_serialization() -> None:
 
     assert response.status_code == 200
     assert response.json() == [
-        {"id": 1, "title": "Hobbit", "author": "Author", "is_active": True}
+        {"id": 1, "isbn": None, "title": "Hobbit", "author": "Author", "genre": None, "is_active": True, "initial_copy": None}
     ]
 
 
@@ -41,3 +41,9 @@ def test_search_books_is_public_without_authorization_header() -> None:
 
     assert "Authorization" not in response.request.headers
     assert response.status_code == 200
+
+
+def test_create_book_openapi_forbids_additional_properties() -> None:
+    schema = app.openapi()["components"]["schemas"]["BookCreate"]
+
+    assert schema["additionalProperties"] is False
