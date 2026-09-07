@@ -32,7 +32,8 @@ export const routes: Routes = [
   },
   {
     path: 'obras/:id/exemplares/novo',
-    canActivate: [authGuard, roleGuard('SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR')],
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar exemplar · LibStock',
     loadComponent: () =>
       import('./features/copies/copy-create/copy-create.component').then(
@@ -45,6 +46,16 @@ export const routes: Routes = [
     canActivate: [authGuard],
     title: 'Painel · LibStock',
     loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
+  },
+  {
+    path: 'gestao/funcionarios',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMINISTRATOR'] },
+    title: 'Cadastrar funcionário · LibStock',
+    loadComponent: () =>
+      import('./features/employees/create-employee/create-employee.component').then(
+        (m) => m.CreateEmployeeComponent,
+      ),
   },
   {
     path: '',
