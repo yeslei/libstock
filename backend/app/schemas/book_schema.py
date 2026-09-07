@@ -54,7 +54,6 @@ class BookCreate(BaseModel):
             return stripped or None
         return value
 
-class BookResponse(BookCreate):
 class BookCreateResponse(BookCreate):
     id: int
 
