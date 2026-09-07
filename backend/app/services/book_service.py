@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
     BookPersistenceError,
@@ -56,16 +57,21 @@ class BookService:
         *,
         db: Session | None = None,
         repository: BookRepository | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self.repository = repository or book_repository
         if self.repository is None:
             raise TypeError("BookRepository é obrigatório.")
         self.db = db or self.repository.db
+        self.settings = settings or get_settings()
 
     async def fetch_google_books_data(self, isbn: str) -> dict[str, str]:
         try:
             async with httpx.AsyncClient(timeout=GOOGLE_BOOKS_TIMEOUT_SECONDS) as client:
-                response = await client.get(GOOGLE_BOOKS_URL, params={"q": f"isbn:{isbn}"})
+                params = {"q": f"isbn:{isbn}"}
+                if self.settings.google_books_api_key:
+                    params["key"] = self.settings.google_books_api_key
+                response = await client.get(GOOGLE_BOOKS_URL, params=params)
                 response.raise_for_status()
         except httpx.TimeoutException as exc:
             raise GoogleBooksUnavailableError() from exc
