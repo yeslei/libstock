@@ -1,0 +1,497 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+$content-max: 1180px;
+
+:host {
+  display: block;
+  background-color: $bg-surface;
+}
+
+// ---------------------------------------------------------------- Botões ----
+// Variantes locais da vitrine. O mixin `button-primary` de _forms.scss é
+// desenhado para o botão de largura total dos formulários de auth, que não
+// serve para os CTAs em linha daqui.
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  min-height: $target-min;
+  padding: 0 $space-4;
+  border: 1px solid transparent;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+
+  @include motion(background-color, border-color, color);
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.btn--primary {
+  background-color: $primary;
+  color: #fff; // ~11:1 sobre o verde profundo
+
+  &:hover {
+    background-color: $primary-hover;
+  }
+}
+
+.btn--outline,
+.btn--ghost {
+  background-color: transparent;
+  color: $primary;
+}
+
+.btn--outline {
+  border-color: $border;
+
+  &:hover {
+    border-color: $primary;
+    background-color: $bg-subtle;
+  }
+}
+
+.btn--ghost:hover {
+  background-color: $bg-subtle;
+}
+
+.btn--lg {
+  min-height: $control-height;
+  padding: 0 $space-6;
+  font-size: $font-size-base;
+}
+
+// ---------------------------------------------------------------- Topbar ----
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(175, 189, 182, 0.5);
+  background-color: $bg-surface;
+}
+
+.topbar__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-3;
+  align-items: center;
+  max-width: $content-max;
+  margin: 0 auto;
+  padding: $space-3 $space-4;
+}
+
+.topbar__brand {
+  display: inline-flex;
+  align-items: center;
+
+  img {
+    height: 32px;
+    width: auto;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.topbar__nav {
+  display: none;
+  gap: $space-4;
+
+  @include from($bp-lg) {
+    display: flex;
+  }
+}
+
+.topbar__link {
+  color: $text-primary;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    color: $primary;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.topbar__actions {
+  display: flex;
+  gap: $space-2;
+  margin-left: auto;
+}
+
+// ---------------------------------------------------------------- Busca -----
+.search {
+  position: relative;
+  flex: 1 1 100%;
+  order: 3;
+  display: flex;
+  gap: $space-2;
+
+  @include from($bp-md) {
+    flex: 1 1 240px;
+    order: 0;
+    max-width: 420px;
+  }
+}
+
+.search__label {
+  @include visually-hidden;
+}
+
+.search__icon {
+  position: absolute;
+  top: 50%;
+  left: $space-3;
+  transform: translateY(-50%);
+  color: $text-muted;
+  font-size: 1.125rem;
+  pointer-events: none;
+}
+
+.search__input {
+  flex: 1;
+  width: 100%;
+  min-height: $target-min;
+  padding: 0 $space-3 0 $space-8;
+  border: 1px solid $border;
+  border-radius: 999px;
+  background-color: $bg-subtle;
+  color: $text-primary;
+  font-size: $font-size-base; // 16px evita o zoom automático do iOS
+  font-family: inherit;
+
+  &::placeholder {
+    color: $text-muted;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.75;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.search__criterion,
+.search__submit {
+  min-height: $target-min;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  background: $bg-surface;
+  color: $text-primary;
+  font: inherit;
+}
+
+.search__criterion { padding: 0 $space-2; }
+.search__submit {
+  padding: 0 $space-3;
+  background: $primary;
+  color: #fff;
+  cursor: pointer;
+}
+
+.search__hint {
+  @include visually-hidden;
+}
+
+// ------------------------------------------------------------------ Home ----
+.home {
+  max-width: $content-max;
+  margin: 0 auto;
+  padding: $space-6 $space-4 $space-10;
+}
+
+.hero {
+  display: grid;
+  gap: $space-6;
+  align-items: center;
+  padding: $space-8 $space-6;
+  border-radius: $radius-lg;
+  background-color: $bg-page;
+
+  @include from($bp-md) {
+    grid-template-columns: 1fr 1fr;
+    padding: $space-10;
+  }
+}
+
+.hero__title {
+  margin: 0 0 $space-3;
+  color: $text-primary;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+
+  @include from($bp-md) {
+    font-size: 2.5rem;
+  }
+}
+
+.hero__subtitle {
+  margin: 0 0 $space-6;
+  color: $text-secondary;
+  font-size: $font-size-base;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-3;
+}
+
+.hero__art {
+  min-height: 200px;
+  border-radius: $radius-md;
+  background-color: $bg-subtle;
+
+  @include from($bp-md) {
+    min-height: 280px;
+  }
+}
+
+// --------------------------------------------------------------- Seções -----
+.section {
+  margin-top: $space-10;
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: $space-4;
+}
+
+.section__title {
+  margin: 0;
+  color: $text-primary;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.state {
+  display: flex;
+  gap: $space-2;
+  align-items: center;
+  margin: 0;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+// ---------------------------------------------------------------- Chips -----
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: $target-min;
+  padding: 0 $space-4;
+  border: 1px solid $border;
+  border-radius: 999px;
+  color: $text-primary;
+  font-size: $font-size-sm;
+  text-decoration: none;
+
+  @include motion(background-color, border-color);
+
+  &:hover {
+    border-color: $primary;
+    background-color: $bg-subtle;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+// --------------------------------------------------------------- Cards ------
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-4;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @include from($bp-md) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @include from($bp-lg) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.card__cover {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: $radius-sm;
+  object-fit: cover;
+  background-color: $bg-subtle;
+}
+
+.card__cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $verde-acinzentado;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.card__title {
+  margin: 0;
+  color: $text-primary;
+  font-size: $font-size-sm;
+  font-weight: 600;
+}
+
+.card__author {
+  margin: 0;
+  color: $text-muted;
+  font-size: $font-size-xs;
+}
+
+.card__genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card__genre {
+  color: $text-muted;
+  font-size: $font-size-xs;
+
+  &:not(:last-child)::after {
+    content: ' ·';
+  }
+}
+
+.card__offers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  align-items: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  font-size: $font-size-xs;
+  font-weight: 600;
+}
+
+// O dourado tem contraste 2,6:1 sobre branco e nunca pode ser cor de texto
+// (IDVISUAL.md). Aqui ele é só a borda; o texto usa a terracota, que passa
+// no AA sobre o fundo claro.
+.badge--sale {
+  border: 1px solid $accent;
+  background-color: rgba(169, 150, 84, 0.14);
+  color: $warning;
+}
+
+.badge--loan {
+  border: 1px solid $secondary;
+  background-color: rgba(73, 107, 76, 0.12);
+  color: $verde-medio;
+}
+
+.card__price {
+  color: $text-primary;
+  font-size: $font-size-sm;
+  font-weight: 700;
+}
+
+.card__cta {
+  margin-top: auto;
+  width: 100%;
+}
+
+// ------------------------------------------------------- Barra operacional --
+// Visível apenas para papéis com função de balcão ou gestão.
+.opsbar {
+  border-top: 1px solid rgba(175, 189, 182, 0.5);
+  background-color: $bg-subtle;
+}
+
+.opsbar__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2 $space-4;
+  align-items: center;
+  max-width: $content-max;
+  margin: 0 auto;
+  padding: $space-2 $space-4;
+}
+
+.opsbar__label {
+  color: $verde-medio;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.opsbar__item {
+  color: $text-muted;
+  font-size: $font-size-xs;
+
+  &:not(:last-child)::after {
+    content: ' ·';
+  }
+}
+
+// Selo de esgotado: cinza neutro, sem competir com venda nem empréstimo.
+.badge--out {
+  border: 1px solid $border;
+  background-color: $bg-subtle;
+  color: $text-muted;
+}
+
+// Preço de item esgotado continua legível, mas riscado para não sugerir
+// compra imediata.
+.card__price--out {
+  color: $text-muted;
+  font-weight: 600;
+  text-decoration: line-through;
+}
+
+.card__cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.card__manage {
+  width: 100%;
+  font-size: $font-size-xs;
+}

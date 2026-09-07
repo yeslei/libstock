@@ -2,19 +2,30 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.controllers.admin_catalog_controller import router as admin_catalog_router
 from app.controllers.auth_controller import router as auth_router
-from app.controllers.user_controller import router as user_router
+from app.controllers.book_controller import router as book_router
+from app.controllers.catalog_controller import router as catalog_router
 from app.controllers.employee_controller import router as employee_router
+from app.controllers.user_controller import router as user_router
 from app.core.config import get_settings
 from app.core.exceptions import ApplicationError
 
 
 settings = get_settings()
 
+# Em produção a documentação interativa fica fora do ar: ela publica o
+# desenho inteiro da API — rotas administrativas, formato dos corpos e quais
+# papéis cada operação exige — para qualquer visitante.
+_documentacao_publica = settings.app_env != "production"
+
 app = FastAPI(
     title="LibStock API",
     version="0.1.0",
     description="API para gestão de acervos e circulação de livros.",
+    docs_url="/docs" if _documentacao_publica else None,
+    redoc_url="/redoc" if _documentacao_publica else None,
+    openapi_url="/openapi.json" if _documentacao_publica else None,
 )
 
 app.add_middleware(
@@ -47,3 +58,6 @@ def health_check() -> dict[str, str]:
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(employee_router)
+app.include_router(book_router)
+app.include_router(catalog_router)
+app.include_router(admin_catalog_router)

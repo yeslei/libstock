@@ -9,6 +9,7 @@ from app.core.database import get_db
 
 router = APIRouter(prefix="/api/v1/employees", tags=["Employees"])
 
+require_administrator = require_roles("ADMINISTRATOR")
 
 def get_employee_service(db: Session = Depends(get_db)) -> EmployeeService:
     return EmployeeService(db=db, employee_repository=EmployeeRepository(db))
@@ -18,7 +19,7 @@ def get_employee_service(db: Session = Depends(get_db)) -> EmployeeService:
 def create_employee(
     employee: EmployeeCreate,
     employee_service: EmployeeService = Depends(get_employee_service),
-    _current_user: User = Depends(require_roles("ADMINISTRATOR")),
+    _current_user: User = Depends(require_administrator),
 ) -> EmployeeResponse:
     result = employee_service.register(employee)
     return EmployeeResponse(
