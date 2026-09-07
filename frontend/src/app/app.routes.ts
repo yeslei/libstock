@@ -32,7 +32,8 @@ export const routes: Routes = [
   },
   {
     path: 'obras/:id/exemplares/novo',
-    canActivate: [authGuard, roleGuard('SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR')],
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar exemplar · LibStock',
     loadComponent: () =>
       import('./features/copies/copy-create/copy-create.component').then(
