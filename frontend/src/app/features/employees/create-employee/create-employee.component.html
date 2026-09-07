@@ -1,0 +1,127 @@
+<main class="employee-page">
+  <section class="employee-page__panel" aria-labelledby="employee-title">
+    <header class="employee-header">
+      <p class="employee-header__eyebrow">Gestão de funcionários</p>
+      <h1 class="employee-header__title" id="employee-title">Cadastrar funcionário</h1>
+    </header>
+
+    <div id="employee-form-feedback" tabindex="-1">
+      @if (formError; as message) {
+        <app-alert [message]="message" variant="error" />
+      }
+
+      @if (successMessage; as message) {
+        <app-alert [message]="message" variant="success" />
+      }
+    </div>
+
+    @if (createdEmployee(); as employee) {
+      <dl class="employee-summary" aria-label="Funcionário cadastrado">
+        <div>
+          <dt>Nome</dt>
+          <dd>{{ employee.name }}</dd>
+        </div>
+        <div>
+          <dt>E-mail</dt>
+          <dd>{{ employee.email }}</dd>
+        </div>
+        <div>
+          <dt>Papel confirmado</dt>
+          <dd>{{ employee.role_code }}</dd>
+        </div>
+      </dl>
+    }
+
+    <form class="employee-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label class="field__label" for="employee-name">Nome</label>
+        <div class="field__control" [class.field__control--invalid]="nameError() !== null">
+          <input
+            class="field__input"
+            id="employee-name"
+            type="text"
+            formControlName="name"
+            autocomplete="name"
+            autocapitalize="words"
+            maxlength="150"
+            [attr.aria-invalid]="nameError() !== null"
+            [attr.aria-describedby]="nameError() ? 'employee-name-error' : null"
+            (blur)="normalizeName()"
+          />
+        </div>
+        @if (nameError(); as message) {
+          <p class="field__error" id="employee-name-error" aria-live="polite">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="employee-email">E-mail</label>
+        <div class="field__control" [class.field__control--invalid]="emailError() !== null">
+          <input
+            class="field__input"
+            id="employee-email"
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            inputmode="email"
+            autocapitalize="none"
+            spellcheck="false"
+            [attr.aria-invalid]="emailError() !== null"
+            [attr.aria-describedby]="emailError() ? 'employee-email-error' : null"
+          />
+        </div>
+        @if (emailError(); as message) {
+          <p class="field__error" id="employee-email-error" aria-live="polite">{{ message }}</p>
+        }
+      </div>
+
+      <app-password-field
+        inputId="employee-password"
+        label="Senha"
+        autocomplete="new-password"
+        [control]="form.controls.password"
+        [errorMessage]="passwordError()"
+        [showRequirements]="true"
+      />
+
+      <div class="field">
+        <label class="field__label" for="employee-access-level">Nível de acesso</label>
+        <div class="field__control" [class.field__control--invalid]="accessLevelError() !== null">
+          <select
+            class="field__input field__select"
+            id="employee-access-level"
+            formControlName="accessLevel"
+            [attr.aria-invalid]="accessLevelError() !== null"
+            [attr.aria-describedby]="
+              accessLevelError()
+                ? 'employee-access-level-hint employee-access-level-error'
+                : 'employee-access-level-hint'
+            "
+          >
+            <option value="">Selecione um papel</option>
+            @for (option of accessLevels; track option.value) {
+              <option [value]="option.value">{{ option.label }} → {{ option.value }}</option>
+            }
+          </select>
+        </div>
+        <p class="field__hint" id="employee-access-level-hint">
+          O valor técnico enviado segue o contrato do backend.
+        </p>
+        @if (accessLevelError(); as message) {
+          <p class="field__error" id="employee-access-level-error" aria-live="polite">
+            {{ message }}
+          </p>
+        }
+      </div>
+
+      <button class="button" type="submit" [disabled]="isSubmitting" [attr.aria-busy]="isSubmitting">
+        @if (isSubmitting) {
+          <app-spinner />
+          <span>Cadastrando funcionário…</span>
+        } @else {
+          <span>Cadastrar funcionário</span>
+        }
+      </button>
+    </form>
+  </section>
+</main>

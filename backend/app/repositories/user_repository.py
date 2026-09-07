@@ -28,6 +28,10 @@ class UserRepository:
         )
         return self.db.scalar(statement)
 
+    def find_profile_by_user_id(self, user_id: int) -> Profile | None:
+        statement = select(Profile).where(Profile.id == user_id)
+        return self.db.scalar(statement)
+
     def create(
         self,
         *,

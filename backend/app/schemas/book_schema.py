@@ -87,6 +87,10 @@ class BookCreate(BaseModel):
             return stripped or None
         return value
 
+class BookCreateResponse(BookCreate):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 class BookSearchParams(BaseModel):
     title: str = Field(min_length=1, pattern=r".*\S.*")
