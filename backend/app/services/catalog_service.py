@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
+    AuditActorRequiredError,
     BookNotFoundError,
     DuplicateGenreError,
     GenreNotFoundError,
@@ -55,6 +56,35 @@ class CatalogService:
     def list_featured_books(self) -> list[CatalogBookResponse]:
         books = self.catalog_repository.find_featured_books(limit=FEATURED_BOOKS_LIMIT)
         return [self._to_response(book) for book in books]
+
+    def search_books(
+        self,
+        *,
+        title: str | None = None,
+        author: str | None = None,
+        isbn: str | None = None,
+        barcode: str | None = None,
+    ) -> list[CatalogBookResponse]:
+        criteria = [title, author, isbn, barcode]
+        if sum(value is not None for value in criteria) == 1 and title is not None:
+            books = self.catalog_repository.search_by_title(title)
+        elif sum(value is not None for value in criteria) == 1 and author is not None:
+            books = self.catalog_repository.search_by_author(author)
+        elif sum(value is not None for value in criteria) == 1 and isbn is not None:
+            books = self.catalog_repository.search_by_isbn(isbn)
+        elif sum(value is not None for value in criteria) == 1 and barcode is not None:
+            books = self.catalog_repository.search_by_barcode(barcode)
+        else:
+            books = self.catalog_repository.search_books(
+                title=title, author=author, isbn=isbn, barcode=barcode
+            )
+        return [self._to_response(book) for book in books]
+
+    def search_by_title(self, title: str) -> list[CatalogBookResponse]:
+        return self.search_books(title=title)
+
+    def search_by_author(self, author: str) -> list[CatalogBookResponse]:
+        return self.search_books(author=author)
 
     def list_featured_genres(self) -> list[Genre]:
         return self.genre_repository.find_featured()
@@ -119,7 +149,23 @@ class CatalogService:
         self.db.refresh(genre)
         return genre
 
-    def set_book_featured(self, *, book_id: int, data_in: FeaturedUpdate) -> Book:
+    def set_book_featured(
+        self,
+        *,
+        book_id: int,
+        data_in: FeaturedUpdate,
+        actor_id: int,
+    ) -> Book:
+        """Altera o destaque de um livro.
+
+        `books` é tabela de inventário auditada (RNF03): o banco recusa a
+        escrita se a transação não declarar qual funcionário responde por
+        ela. Por isso a operação exige o ator, e não apenas o papel.
+        """
+        if not self.catalog_repository.is_employee(actor_id):
+            raise AuditActorRequiredError()
+        self.catalog_repository.set_audit_actor(actor_id)
+
         book = self.catalog_repository.find_book_by_id(book_id)
         if book is None:
             raise BookNotFoundError()

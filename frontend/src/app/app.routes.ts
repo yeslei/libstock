@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
+import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
@@ -21,11 +22,40 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'obras/nova',
+    canActivate: [authGuard],
+    title: 'Cadastrar obra · LibStock',
+    loadComponent: () =>
+      import('./features/books/book-create/book-create.component').then(
+        (m) => m.BookCreateComponent,
+      ),
+  },
+  {
+    path: 'obras/:id/exemplares/novo',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
+    title: 'Cadastrar exemplar · LibStock',
+    loadComponent: () =>
+      import('./features/copies/copy-create/copy-create.component').then(
+        (m) => m.CopyCreateComponent,
+      ),
+  },
+  {
     path: 'painel',
     pathMatch: 'full',
     canActivate: [authGuard],
     title: 'Painel · LibStock',
     loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
+  },
+  {
+    path: 'gestao/funcionarios',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMINISTRATOR'] },
+    title: 'Cadastrar funcionário · LibStock',
+    loadComponent: () =>
+      import('./features/employees/create-employee/create-employee.component').then(
+        (m) => m.CreateEmployeeComponent,
+      ),
   },
   {
     path: '',

@@ -43,9 +43,13 @@ def set_book_featured(
     book_id: int,
     payload: FeaturedUpdate,
     catalog_service: CatalogService = Depends(get_catalog_service),
-    _: User = Depends(require_management),
+    current_user: User = Depends(require_management),
 ) -> CatalogBookResponse:
-    book = catalog_service.set_book_featured(book_id=book_id, data_in=payload)
+    book = catalog_service.set_book_featured(
+        book_id=book_id,
+        data_in=payload,
+        actor_id=current_user.id,
+    )
     return CatalogBookResponse(
         id=book.id,
         title=book.title,

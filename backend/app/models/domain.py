@@ -112,6 +112,7 @@ class Role(Base):
 
 class UserRole(Base):
     __tablename__ = "user_roles"
+    __table_args__ = (Index("ix_user_roles_role_id", "role_id"),)
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
@@ -166,6 +167,7 @@ class Book(Base):
         ),
         Index("idx_books_title", "title"),
         Index("idx_books_author", "author"),
+        Index("idx_books_featured", "featured_position"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -240,6 +242,23 @@ class BookGenre(Base):
     genre: Mapped[Genre] = relationship(back_populates="books")
 
 
+class DestinationTag(Base):
+    __tablename__ = "destination_tags"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    slug: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    copies: Mapped[list["Copy"]] = relationship(back_populates="destination_tag")
+
+
 class Copy(Base):
     __tablename__ = "copies"
     __table_args__ = (
@@ -255,12 +274,16 @@ class Copy(Base):
         Index("idx_copies_book", "book_id"),
         Index("idx_copies_book_status", "book_id", "status"),
         Index("idx_copies_destination_status", "destination", "status"),
+        Index("idx_copies_destination_tag", "destination_tag_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     book_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("books.id", ondelete="RESTRICT"), nullable=False)
     barcode: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     destination: Mapped[DestinationType] = mapped_column(SqlEnum(DestinationType, name="destination_type"), nullable=False)
+    destination_tag_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("destination_tags.id", ondelete="SET NULL"), nullable=True
+    )
     status: Mapped[CopyStatus] = mapped_column(SqlEnum(CopyStatus, name="copy_status"), nullable=False, server_default=CopyStatus.AVAILABLE.value)
     condition: Mapped[str | None] = mapped_column(String(30))
     sale_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
@@ -270,6 +293,7 @@ class Copy(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     book: Mapped[Book] = relationship(back_populates="copies")
+    destination_tag: Mapped[DestinationTag | None] = relationship(back_populates="copies")
 
 
 class Loan(Base):

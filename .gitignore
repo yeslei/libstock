@@ -28,3 +28,7 @@ Thumbs.db
 frontend/node_modules/
 frontend/dist/
 frontend/.angular/
+
+#docs
+docs/audits/
+tasks/

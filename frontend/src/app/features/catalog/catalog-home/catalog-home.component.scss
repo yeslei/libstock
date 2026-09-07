@@ -135,6 +135,8 @@ $content-max: 1180px;
   position: relative;
   flex: 1 1 100%;
   order: 3;
+  display: flex;
+  gap: $space-2;
 
   @include from($bp-md) {
     flex: 1 1 240px;
@@ -158,6 +160,7 @@ $content-max: 1180px;
 }
 
 .search__input {
+  flex: 1;
   width: 100%;
   min-height: $target-min;
   padding: 0 $space-3 0 $space-8;
@@ -180,6 +183,24 @@ $content-max: 1180px;
   &:focus-visible {
     @include focus-ring;
   }
+}
+
+.search__criterion,
+.search__submit {
+  min-height: $target-min;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  background: $bg-surface;
+  color: $text-primary;
+  font: inherit;
+}
+
+.search__criterion { padding: 0 $space-2; }
+.search__submit {
+  padding: 0 $space-3;
+  background: $primary;
+  color: #fff;
+  cursor: pointer;
 }
 
 .search__hint {

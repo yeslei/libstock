@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.domain import DestinationType
 
@@ -65,6 +65,23 @@ class CatalogBookResponse(BaseModel):
     offers: list[BookOffer] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CatalogSearchParams(BaseModel):
+    title: str | None = None
+    author: str | None = None
+    isbn: str | None = None
+    barcode: str | None = None
+
+    @model_validator(mode="after")
+    def normalize_and_validate(self) -> "CatalogSearchParams":
+        self.title = self.title.strip() if self.title is not None else None
+        self.author = self.author.strip() if self.author is not None else None
+        self.isbn = self.isbn.strip() if self.isbn is not None else None
+        self.barcode = self.barcode.strip() if self.barcode is not None else None
+        if not any((self.title, self.author, self.isbn, self.barcode)):
+            raise ValueError("Informe um critério para a busca.")
+        return self
 
 
 class PagedBooksResponse(BaseModel):

@@ -55,6 +55,7 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `POST` | `/api/v1/auth/logout` | Cookie | Revoga a sessão atual |
 | `POST` | `/api/v1/auth/logout-all` | Bearer | Revoga todas as sessões do usuário |
 | `GET` | `/api/v1/users/me` | Bearer | Retorna o usuário autenticado |
+| `POST` | `/api/v1/books/` | Bearer (`STOCK_KEEPER`, `MANAGER`, `ADMINISTRATOR`) | Cadastra uma obra e seu exemplar inicial ativo na mesma transação |
 
 ## Permissionamento
 

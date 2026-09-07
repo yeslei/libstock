@@ -1,7 +1,7 @@
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.core.exceptions import InvalidTokenError, PermissionDeniedError, UserNotFoundError
+from app.core.exceptions import InvalidTokenError, PermissionDeniedError, UserInactiveError, UserNotFoundError
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.services.user_service import UserService
@@ -20,9 +20,12 @@ def get_current_user(
         raise InvalidTokenError("Token de acesso não informado.")
     user_id = decode_access_token(credentials.credentials)
     try:
-        return user_service.get_by_id(user_id)
+        user = user_service.get_by_id(user_id)
     except UserNotFoundError as exc:
         raise InvalidTokenError() from exc
+    if not user.is_active:
+        raise UserInactiveError()
+    return user
 
 
 def require_roles(*allowed_role_codes: str):

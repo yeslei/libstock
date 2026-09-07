@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
@@ -26,6 +28,10 @@ class UserRepository:
         )
         return self.db.scalar(statement)
 
+    def find_profile_by_user_id(self, user_id: int) -> Profile | None:
+        statement = select(Profile).where(Profile.id == user_id)
+        return self.db.scalar(statement)
+
     def create(
         self,
         *,
@@ -46,4 +52,13 @@ class UserRepository:
         self.db.flush()
         self.db.add(Client(id=user.id))
         self.db.refresh(user)
+        return user
+
+    def inactivate(self, user_id: int) -> User | None:
+        user = self.db.get(User, user_id)
+        if user is None:
+            return None
+        user.is_active = False
+        user.updated_at = datetime.now(timezone.utc)
+        self.db.flush()
         return user
