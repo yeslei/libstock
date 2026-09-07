@@ -112,3 +112,22 @@ class GenreNotFoundError(ApplicationError):
 class UserNotFoundError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Usuário não encontrado.", "user_not_found", 404)
+
+
+class AcervoItemNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Item do acervo não encontrado.", "item_not_found", 404)
+
+
+class DestinationTagNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Tag de destinação não encontrada.", "destination_tag_not_found", 404)
+
+
+class AcervoPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível classificar o item do acervo.",
+            "acervo_persistence_error",
+            500,
+        )
