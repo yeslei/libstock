@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_env: str = "development"
+    google_books_api_key: str | None = None
     database_url: str = (
         "postgresql+psycopg://postgres:postgres@127.0.0.1:54322/postgres"
     )
