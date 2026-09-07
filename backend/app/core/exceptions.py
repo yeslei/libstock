@@ -11,6 +11,26 @@ class DuplicateEmailError(ApplicationError):
         super().__init__("E-mail já cadastrado.", "duplicate_email", 409)
 
 
+class DuplicateEmployeeCodeError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Código de funcionário já cadastrado.", "duplicate_employee_code", 409)
+
+
+class PersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Não foi possível concluir o cadastro.", "persistence_error", 500)
+
+
+class InactiveUserError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Usuário inativo.", "inactive_user", 403)
+
+
+class InvalidEmployeeRoleError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Nível de acesso inválido.", "invalid_employee_role", 422)
+
+
 class InvalidCredentialsError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("E-mail ou senha inválidos.", "invalid_credentials", 401)
@@ -45,6 +65,11 @@ class DuplicateIsbnError(ApplicationError):
         super().__init__("ISBN já cadastrado.", "duplicate_isbn", 409)
 
 
+class DuplicateBarcodeError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Código de barras já cadastrado.", "duplicate_barcode", 409)
+
+
 class EmployeeRecordRequiredError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
@@ -77,6 +102,15 @@ class GoogleBooksUnavailableError(ApplicationError):
         super().__init__(
             "Não foi possível consultar o Google Books.",
             "google_books_unavailable",
+            503,
+        )
+
+
+class GoogleBooksRateLimitError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O Google Books está temporariamente indisponível por excesso de consultas.",
+            "google_books_rate_limited",
             503,
         )
 

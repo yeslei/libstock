@@ -545,4 +545,3 @@ A V1 estará coerente com os papéis quando:
 * não exibir auditoria e notificações da V3;
 * registrar PF/PJ e propriedade do acervo como pendências enquanto o banco não oferecer contrato suficiente;
 * não simular persistência ou sucesso.
-

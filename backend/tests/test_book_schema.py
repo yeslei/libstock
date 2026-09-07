@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from pydantic import ValidationError
 
-from app.schemas.book_schema import BookResponse, BookSearchParams
+from app.schemas.book_schema import BookCreate, BookResponse, BookSearchParams
 
 
 class BookSearchParamsTests(unittest.TestCase):
@@ -29,6 +29,8 @@ class BookResponseTests(unittest.TestCase):
             title="O Hobbit",
             author="J. R. R. Tolkien",
             is_active=True,
+            isbn=None,
+            genre=None,
         )
 
         response = BookResponse.model_validate(book)
@@ -37,12 +39,78 @@ class BookResponseTests(unittest.TestCase):
             response.model_dump(),
             {
                 "id": 1,
+                "isbn": None,
                 "title": "O Hobbit",
                 "author": "J. R. R. Tolkien",
+                "genre": None,
                 "is_active": True,
+                "initial_copy": None,
             },
         )
 
+    def test_accepts_valid_book_payload(self) -> None:
+        book = BookCreate.model_validate(
+            {
+                "isbn": "9788575225530",
+                "title": "Python Fluente",
+                "author": "Luciano Ramalho",
+                "initial_copy": {
+                    "barcode": "EX-1",
+                    "destination": "DIDACTIC",
+                },
+            }
+        )
+
+        self.assertEqual(book.isbn, "9788575225530")
+
+    def test_rejects_state_fields_at_book_root(self) -> None:
+        for field, value in (("status", "INACTIVE"), ("is_active", True)):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                BookCreate.model_validate(
+                    {
+                        "isbn": "9788575225530",
+                        "initial_copy": {
+                            "barcode": "EX-1",
+                            "destination": "DIDACTIC",
+                        },
+                        field: value,
+                    }
+                )
+
+    def test_book_create_openapi_forbids_additional_properties(self) -> None:
+        schema = BookCreate.model_json_schema()
+
+        self.assertFalse(schema["additionalProperties"])
+
+    def test_commercial_initial_copy_requires_price(self) -> None:
+        with self.assertRaises(ValidationError):
+            BookCreate.model_validate(
+                {
+                    "isbn": "9788575225530",
+                    "title": "Python Fluente",
+                    "author": "Luciano Ramalho",
+                    "initial_copy": {
+                        "barcode": "COM-1",
+                        "destination": "COMMERCIAL",
+                    },
+                }
+            )
+
+    def test_initial_copy_rejects_state_fields_from_request(self) -> None:
+        for field, value in (("status", "INACTIVE"), ("is_active", True)):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                BookCreate.model_validate(
+                    {
+                        "isbn": "9788575225530",
+                        "title": "Python Fluente",
+                        "author": "Luciano Ramalho",
+                        "initial_copy": {
+                            "barcode": "EX-1",
+                            "destination": "DIDACTIC",
+                            field: value,
+                        },
+                    }
+                )
 
 if __name__ == "__main__":
     unittest.main()
