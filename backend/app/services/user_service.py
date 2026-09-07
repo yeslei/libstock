@@ -33,6 +33,7 @@ class UserService:
             raise InactiveUserError()
         return user
 
+
     def inactivate_user(self, target_id: int, *, actor_id: int) -> User:
         if target_id == actor_id:
             raise UserSelfInactivationError()
