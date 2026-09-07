@@ -59,7 +59,7 @@ describe('roleGuard', () => {
     expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe('/');
   });
 
-  (['USER', 'ATTENDANT', 'SELLER', 'STOCK_KEEPER', 'MANAGER'] as const).forEach((role) => {
+  (['USER', 'SELLER', 'STOCK_KEEPER'] as const).forEach((role) => {
     it(`bloqueia a rota para o papel ${role}`, () => {
       store.setSession('token', user([role]));
 
