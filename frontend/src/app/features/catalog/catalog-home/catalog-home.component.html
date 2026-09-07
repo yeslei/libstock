@@ -195,6 +195,9 @@
       }
     </div>
     <button class="btn btn--primary card__cta" type="button" [disabled]="actionDisabled(book)" (click)="startTransaction(book)">{{ actionLabel(book) }}</button>
+    @if (canRegisterCopy()) {
+      <a class="btn btn--outline card__manage" [routerLink]="['/obras', book.id, 'exemplares', 'novo']">Cadastrar exemplar</a>
+    }
     @if (featured && canManageCatalog()) {
       <button class="btn btn--outline card__manage" type="button" (click)="removeFromFeatured(book)">Remover destaque</button>
     }
