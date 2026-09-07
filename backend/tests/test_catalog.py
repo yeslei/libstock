@@ -7,6 +7,7 @@ exercitadas direto.
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -391,8 +392,8 @@ def test_exemplar_inativo_nao_gera_oferta():
 def test_cadastro_de_funcionario_exige_sessao():
     response = client.post(
         "/api/v1/employees/",
-        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
-              "accessLevel": "Vendedor"},
+        json={"name": "Ana", "email": "x@libstock.com.br", "password": "senha123",
+              "accessLevel": "SELLER"},
     )
 
     assert response.status_code == 401
@@ -405,7 +406,7 @@ def test_cadastro_de_funcionario_recusa_papel_comum():
     response = client.post(
         "/api/v1/employees/",
         json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
-              "accessLevel": "Vendedor"},
+              "accessLevel": "SELLER"},
     )
 
     assert response.status_code == 403
@@ -413,11 +414,12 @@ def test_cadastro_de_funcionario_recusa_papel_comum():
 
 def test_cadastro_de_funcionario_aceita_administrador():
     _authenticate_as("ADMINISTRATOR")
+    email = f"admin-{uuid4().hex}@libstock.com.br"
 
     response = client.post(
         "/api/v1/employees/",
-        json={"name": "X", "email": "x@libstock.com.br", "password": "senha123",
-              "accessLevel": "Vendedor"},
+        json={"name": "Ana", "email": email, "password": "senha123",
+              "accessLevel": "SELLER"},
     )
 
     assert response.status_code == 201

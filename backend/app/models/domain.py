@@ -112,6 +112,7 @@ class Role(Base):
 
 class UserRole(Base):
     __tablename__ = "user_roles"
+    __table_args__ = (Index("ix_user_roles_role_id", "role_id"),)
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
@@ -166,6 +167,7 @@ class Book(Base):
         ),
         Index("idx_books_title", "title"),
         Index("idx_books_author", "author"),
+        Index("idx_books_featured", "featured_position"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
