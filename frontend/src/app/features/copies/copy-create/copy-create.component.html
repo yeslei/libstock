@@ -1,0 +1,84 @@
+<header class="topbar">
+  <a routerLink="/" aria-label="LibStock — página inicial">
+    <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
+  </a>
+  <a class="topbar__back" routerLink="/">← Voltar ao catálogo</a>
+</header>
+
+<main class="page">
+  <section class="card" aria-labelledby="copy-create-title">
+    <header class="card__header">
+      <p class="eyebrow">Gestão do acervo</p>
+      <h1 id="copy-create-title">Cadastrar exemplar</h1>
+      <p>Informe os dados físicos e a destinação deste exemplar.</p>
+    </header>
+
+    @if (formError; as error) {
+      <app-alert [message]="error" variant="error" />
+    }
+
+    @if (createdCopy(); as copy) {
+      <div class="result">
+        <app-alert message="Exemplar cadastrado com sucesso." variant="success" />
+        <h2>Dados cadastrados</h2>
+        <dl>
+          <div><dt>Código</dt><dd>{{ copy.barcode }}</dd></div>
+          <div><dt>Destinação</dt><dd>{{ copy.destination === 'COMMERCIAL' ? 'Comercial' : 'Didática' }}</dd></div>
+          <div><dt>Condição</dt><dd>{{ copy.condition ?? 'Não informada' }}</dd></div>
+          <div><dt>Preço</dt><dd>{{ copy.salePrice ?? 'Não informado' }}</dd></div>
+          <div><dt>Aquisição</dt><dd>{{ copy.acquiredAt ?? 'Não informada' }}</dd></div>
+          <div><dt>Status</dt><dd>{{ copy.status }}</dd></div>
+        </dl>
+        <button class="button" type="button" (click)="registerAnother()">Cadastrar outro exemplar</button>
+      </div>
+    } @else if (state() !== 'invalidRoute') {
+      <form class="copy-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div class="field">
+          <label class="field__label" for="copy-barcode">Código de barras <span aria-hidden="true">*</span></label>
+          <div class="field__control" [class.field__control--invalid]="barcodeError() !== null">
+            <input class="field__input" id="copy-barcode" type="text" formControlName="barcode" maxlength="100" autocomplete="off" [attr.aria-invalid]="barcodeError() !== null" />
+          </div>
+          @if (barcodeError(); as error) { <p class="field__error" aria-live="polite">{{ error }}</p> }
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="copy-destination">Destinação <span aria-hidden="true">*</span></label>
+          <div class="field__control" [class.field__control--invalid]="destinationError() !== null">
+            <select class="field__input" id="copy-destination" formControlName="destination" [attr.aria-invalid]="destinationError() !== null">
+              <option value="" disabled>Selecione a destinação</option>
+              <option value="COMMERCIAL">Comercial</option>
+              <option value="DIDACTIC">Didática</option>
+            </select>
+          </div>
+          @if (destinationError(); as error) { <p class="field__error" aria-live="polite">{{ error }}</p> }
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="copy-condition">Condição <span class="optional">Opcional</span></label>
+          <div class="field__control" [class.field__control--invalid]="conditionError() !== null">
+            <input class="field__input" id="copy-condition" type="text" formControlName="condition" maxlength="30" [attr.aria-invalid]="conditionError() !== null" />
+          </div>
+          @if (conditionError(); as error) { <p class="field__error" aria-live="polite">{{ error }}</p> }
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="copy-salePrice">Preço de venda <span class="optional">Obrigatório para comercial</span></label>
+          <div class="field__control" [class.field__control--invalid]="salePriceError() !== null">
+            <input class="field__input" id="copy-salePrice" type="text" formControlName="salePrice" inputmode="decimal" placeholder="0,00" [attr.aria-invalid]="salePriceError() !== null" />
+          </div>
+          @if (salePriceError(); as error) { <p class="field__error" aria-live="polite">{{ error }}</p> }
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="copy-acquiredAt">Data de aquisição <span class="optional">Opcional</span></label>
+          <div class="field__control"><input class="field__input" id="copy-acquiredAt" type="date" formControlName="acquiredAt" /></div>
+        </div>
+
+        <p class="required-note"><span aria-hidden="true">*</span> Campo obrigatório</p>
+        <button class="button" type="submit" [disabled]="isSubmitting" [attr.aria-busy]="isSubmitting">
+          @if (isSubmitting) { <app-spinner /><span>Cadastrando…</span> } @else { <span>Cadastrar exemplar</span> }
+        </button>
+      </form>
+    }
+  </section>
+</main>
