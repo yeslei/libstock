@@ -1,0 +1,240 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+:host {
+  display: block;
+  min-height: 100vh;
+  background: $bg-surface;
+  color: $text-primary;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-4;
+  padding: $space-3 max($space-4, calc((100vw - 1180px) / 2));
+  border-bottom: 1px solid $border;
+}
+
+.topbar__brand {
+  display: inline-flex;
+
+  img {
+    width: auto;
+    height: 32px;
+  }
+}
+
+.topbar__nav {
+  display: flex;
+  gap: $space-4;
+
+  a {
+    color: $text-primary;
+    font-size: $font-size-sm;
+    font-weight: 600;
+    text-decoration: none;
+  }
+}
+
+.about {
+  width: min(100% - #{$space-8}, 1180px);
+  margin: 0 auto;
+  padding: $space-8 0 $space-10;
+}
+
+.about__intro {
+  max-width: 780px;
+  padding: $space-8 0;
+
+  h1 {
+    margin: $space-2 0 $space-3;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.08;
+  }
+
+  p:last-child {
+    margin: 0;
+    color: $text-secondary;
+    font-size: 1.125rem;
+    line-height: 1.65;
+  }
+}
+
+.eyebrow {
+  margin: 0;
+  color: $primary;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h2 {
+  margin: 0 0 $space-5;
+  font-size: 1.75rem;
+}
+
+.principles {
+  padding: $space-8 0;
+}
+
+.principles__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $space-4;
+
+  @include from($bp-md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  article {
+    padding: $space-5;
+    border: 1px solid $border;
+    border-radius: $radius-lg;
+    background: $bg-page;
+  }
+
+  h3 {
+    margin: $space-3 0 $space-2;
+  }
+
+  p {
+    margin: 0;
+    color: $text-secondary;
+    line-height: 1.6;
+  }
+}
+
+.step {
+  color: $primary;
+  font-size: $font-size-sm;
+  font-weight: 800;
+}
+
+.destinations {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $space-4;
+  align-items: stretch;
+  padding: $space-8 0;
+
+  @include from($bp-lg) {
+    grid-template-columns: 1.35fr 1fr 1fr;
+  }
+
+  > div:first-child {
+    padding-right: $space-5;
+
+    h2 {
+      margin-top: $space-2;
+    }
+
+    p:last-child {
+      color: $text-secondary;
+      line-height: 1.6;
+    }
+  }
+}
+
+.destination {
+  padding: $space-5;
+  border-radius: $radius-lg;
+
+  span {
+    font-size: $font-size-xs;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  h3 {
+    margin: $space-2 0;
+    font-size: 1.5rem;
+  }
+
+  p {
+    margin: 0;
+    line-height: 1.6;
+  }
+}
+
+.destination--didactic {
+  background: rgba(73, 107, 76, 0.12);
+  color: $verde-medio;
+}
+
+.destination--commercial {
+  background: rgba(169, 150, 84, 0.18);
+  color: $warning;
+}
+
+.flow {
+  margin-top: $space-8;
+  padding: $space-6;
+  border-radius: $radius-lg;
+  background: $primary;
+  color: #fff;
+
+  h2 {
+    margin-top: $space-2;
+  }
+
+  .eyebrow {
+    color: $accent;
+  }
+
+  ol {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: $space-3;
+    margin: 0 0 $space-6;
+    padding: 0;
+    list-style: none;
+
+    @include from($bp-md) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  li {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    padding: $space-4;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: $radius-md;
+  }
+
+  span {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: $font-size-sm;
+    line-height: 1.5;
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: $control-height;
+  padding: 0 $space-5;
+  border-radius: $radius-md;
+  background: #fff;
+  color: $primary;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.scope-note {
+  margin-top: $space-6;
+  padding: $space-4 $space-5;
+  border-left: 4px solid $accent;
+  background: $bg-page;
+
+  p {
+    margin: $space-1 0 0;
+    color: $text-secondary;
+    line-height: 1.55;
+  }
+}

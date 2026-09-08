@@ -7,10 +7,26 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    title: 'LibStock — Encontre livros, compartilhe histórias',
+    title: 'LibStock — Gestão de acervo',
     loadComponent: () =>
       import('./features/catalog/catalog-home/catalog-home.component').then(
         (m) => m.CatalogHomeComponent,
+      ),
+  },
+  {
+    path: 'explorar',
+    title: 'Explorar livros · LibStock',
+    loadComponent: () =>
+      import('./features/catalog/explore-books/explore-books.component').then(
+        (m) => m.ExploreBooksComponent,
+      ),
+  },
+  {
+    path: 'como-funciona',
+    title: 'Como funciona · LibStock',
+    loadComponent: () =>
+      import('./features/about/how-it-works/how-it-works.component').then(
+        (m) => m.HowItWorksComponent,
       ),
   },
   {

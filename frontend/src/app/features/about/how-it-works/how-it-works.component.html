@@ -1,0 +1,100 @@
+<header class="topbar">
+  <a class="topbar__brand" routerLink="/" aria-label="LibStock — página inicial">
+    <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
+  </a>
+  <nav class="topbar__nav" aria-label="Navegação principal">
+    <a routerLink="/">Início</a>
+    <a routerLink="/explorar">Explorar livros</a>
+  </nav>
+</header>
+
+<main class="about">
+  <header class="about__intro">
+    <p class="eyebrow">Operação do LibStock</p>
+    <h1>Como funciona</h1>
+    <p>
+      O LibStock reúne biblioteca e livraria no mesmo inventário, mantendo cada exemplar
+      identificado para empréstimo ou venda.
+    </p>
+  </header>
+
+  <section class="principles" aria-labelledby="principles-heading">
+    <h2 id="principles-heading">Princípios do sistema</h2>
+    <div class="principles__grid">
+      <article>
+        <span class="step">01</span>
+        <h3>Obra e exemplar são diferentes</h3>
+        <p>
+          A obra concentra título, autor, ISBN e gêneros. Cada exemplar físico possui código,
+          condição, estado e destinação próprios.
+        </p>
+      </article>
+      <article>
+        <span class="step">02</span>
+        <h3>Busca rápida e objetiva</h3>
+        <p>
+          A consulta aceita título, autor, ISBN ou código de barras para reduzir tempo de
+          atendimento e erros de digitação.
+        </p>
+      </article>
+      <article>
+        <span class="step">03</span>
+        <h3>Disponibilidade sem ambiguidade</h3>
+        <p>
+          Etiquetas visuais indicam Venda, Empréstimo ou Esgotado a partir dos exemplares ativos
+          da obra.
+        </p>
+      </article>
+      <article>
+        <span class="step">04</span>
+        <h3>Acesso conforme responsabilidade</h3>
+        <p>
+          Clientes, vendedores, estoquistas e administradores veem somente as operações
+          autorizadas para seus papéis.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="destinations" aria-labelledby="destinations-heading">
+    <div>
+      <p class="eyebrow">Integridade do inventário</p>
+      <h2 id="destinations-heading">Uma destinação para cada exemplar</h2>
+      <p>
+        Um mesmo título pode ter vários exemplares, inclusive com destinações diferentes. A regra
+        pertence ao exemplar físico, nunca à obra inteira.
+      </p>
+    </div>
+    <div class="destination destination--didactic">
+      <span>Didático</span>
+      <h3>Empréstimo</h3>
+      <p>Não possui preço de venda e não pode ser comercializado.</p>
+    </div>
+    <div class="destination destination--commercial">
+      <span>Comercial</span>
+      <h3>Venda</h3>
+      <p>Possui preço obrigatório e participa da disponibilidade comercial.</p>
+    </div>
+  </section>
+
+  <section class="flow" aria-labelledby="flow-heading">
+    <div>
+      <p class="eyebrow">Fluxo de consulta</p>
+      <h2 id="flow-heading">Da busca à decisão</h2>
+    </div>
+    <ol>
+      <li><strong>Localize</strong><span>Busque a obra usando o dado disponível no atendimento.</span></li>
+      <li><strong>Confira</strong><span>Leia as etiquetas de destinação e disponibilidade.</span></li>
+      <li><strong>Encaminhe</strong><span>Siga a operação autorizada para o seu perfil.</span></li>
+    </ol>
+    <a class="button" routerLink="/explorar">Explorar o acervo</a>
+  </section>
+
+  <aside class="scope-note" aria-label="Escopo atual">
+    <strong>Escopo atual</strong>
+    <p>
+      Venda, empréstimo, devolução, reserva e notificações fazem parte da evolução planejada. Essas
+      ações somente serão liberadas quando seus fluxos transacionais estiverem disponíveis.
+    </p>
+  </aside>
+</main>

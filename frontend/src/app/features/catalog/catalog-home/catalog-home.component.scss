@@ -61,12 +61,6 @@ $content-max: 1180px;
   background-color: $bg-subtle;
 }
 
-.btn--lg {
-  min-height: $control-height;
-  padding: 0 $space-6;
-  font-size: $font-size-base;
-}
-
 // ---------------------------------------------------------------- Topbar ----
 .topbar {
   position: sticky;
@@ -227,54 +221,6 @@ $content-max: 1180px;
   max-width: $content-max;
   margin: 0 auto;
   padding: $space-6 $space-4 $space-10;
-}
-
-.hero {
-  display: grid;
-  gap: $space-6;
-  align-items: center;
-  padding: $space-8 $space-6;
-  border-radius: $radius-lg;
-  background-color: $bg-page;
-
-  @include from($bp-md) {
-    grid-template-columns: 1fr 1fr;
-    padding: $space-10;
-  }
-}
-
-.hero__title {
-  margin: 0 0 $space-3;
-  color: $text-primary;
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1.2;
-
-  @include from($bp-md) {
-    font-size: 2.5rem;
-  }
-}
-
-.hero__subtitle {
-  margin: 0 0 $space-6;
-  color: $text-secondary;
-  font-size: $font-size-base;
-}
-
-.hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $space-3;
-}
-
-.hero__art {
-  min-height: 200px;
-  border-radius: $radius-md;
-  background-color: $bg-subtle;
-
-  @include from($bp-md) {
-    min-height: 280px;
-  }
 }
 
 // --------------------------------------------------------------- Seções -----

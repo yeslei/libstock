@@ -1,0 +1,118 @@
+<header class="topbar">
+  <a class="topbar__brand" routerLink="/" aria-label="LibStock — página inicial">
+    <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
+  </a>
+  <nav class="topbar__nav" aria-label="Navegação principal">
+    <a routerLink="/">Início</a>
+    <a routerLink="/como-funciona">Como funciona</a>
+  </nav>
+</header>
+
+<main class="explore">
+  <header class="explore__intro">
+    <p class="eyebrow">Consulta do acervo</p>
+    <h1>Explorar livros</h1>
+    <p>Localize uma obra por título, autor, ISBN ou código de barras e confira sua disponibilidade.</p>
+  </header>
+
+  <form class="search" role="search" (submit)="$event.preventDefault(); search()">
+    <label for="explore-criterion">Buscar por</label>
+    <select
+      id="explore-criterion"
+      [value]="searchCriterion()"
+      (change)="setSearchCriterion($any($event.target).value)"
+    >
+      <option value="title">Título</option>
+      <option value="author">Autor</option>
+      <option value="isbn">ISBN</option>
+      <option value="barcode">Código de barras</option>
+    </select>
+
+    <label class="visually-hidden" for="explore-search">Termo de busca</label>
+    <div class="search__field">
+      <span class="search__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+        </svg>
+      </span>
+      <input
+        id="explore-search"
+        type="search"
+        placeholder="Digite o termo de busca"
+        [value]="searchValue()"
+        (input)="setSearchValue($any($event.target).value)"
+      />
+    </div>
+    <button class="button button--primary" type="submit">Buscar</button>
+  </form>
+
+  @if (searchState(); as state) {
+    <section class="results" aria-labelledby="results-heading">
+      <div class="results__header">
+        <h2 id="results-heading">Resultado da busca</h2>
+        <button class="button button--secondary" type="button" (click)="clearSearch()">
+          Limpar busca
+        </button>
+      </div>
+
+      @switch (state.status) {
+        @case ('loading') {
+          <p class="state"><app-spinner /> <span>Buscando livros…</span></p>
+        }
+        @case ('error') {
+          <app-alert [message]="state.message" variant="error" />
+        }
+        @case ('loaded') {
+          @if (state.data.length === 0) {
+            <div class="empty-state">
+              <h3>Nenhuma obra encontrada</h3>
+              <p>Revise o termo ou tente outro critério de busca.</p>
+            </div>
+          } @else {
+            <ul class="grid">
+              @for (book of state.data; track book.id) {
+                <li class="book-card">
+                  @if (book.cover_url) {
+                    <img class="book-card__cover" [src]="book.cover_url" [alt]="'Capa de ' + book.title" />
+                  } @else {
+                    <div class="book-card__cover book-card__cover--empty" aria-hidden="true">
+                      {{ book.title.charAt(0) }}
+                    </div>
+                  }
+                  <div class="book-card__content">
+                    <h3>{{ book.title }}</h3>
+                    <p class="book-card__author">{{ book.author }}</p>
+                    @if (book.genres.length) {
+                      <p class="book-card__genres">{{ book.genres.join(' · ') }}</p>
+                    }
+                    <div class="book-card__offers" aria-label="Disponibilidade">
+                      @for (offer of book.offers; track offer.destination) {
+                        <span
+                          class="badge"
+                          [class.badge--sale]="offer.available && offer.destination === 'COMMERCIAL'"
+                          [class.badge--loan]="offer.available && offer.destination === 'DIDACTIC'"
+                          [class.badge--out]="!offer.available"
+                        >
+                          {{ offerLabel(offer) }}
+                        </span>
+                        @if (offerPrice(offer); as price) {
+                          <strong>{{ price }}</strong>
+                        }
+                      }
+                    </div>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        }
+      }
+    </section>
+  } @else {
+    <section class="empty-state empty-state--initial" aria-label="Orientação de busca">
+      <h2>Encontre o exemplar certo com rapidez</h2>
+      <p>Os resultados identificam claramente exemplares para venda, empréstimo ou esgotados.</p>
+    </section>
+  }
+</main>
