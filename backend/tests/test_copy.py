@@ -137,10 +137,10 @@ def test_endpoint_preserva_201_e_contrato_da_resposta():
 
 
 def test_roles_existentes_continuam_protegendo_endpoint():
-    dependency = require_roles("SELLER", "STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+    dependency = require_roles("STOCK_KEEPER", "ADMINISTRATOR")
 
     with pytest.raises(PermissionDeniedError):
-        dependency(SimpleNamespace(role_codes=["CLIENT"]))
+        dependency(SimpleNamespace(role_codes=["SELLER"]))
 
 
 def test_validacao_de_entrada_continua_rejeitando_destinacao_invalida():

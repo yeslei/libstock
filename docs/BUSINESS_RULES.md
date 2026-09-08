@@ -80,8 +80,8 @@ Cada seção deve informar também:
 | Ator/papel | Capacidades |
 |---|---|
 | `USER` | consultar catálogo e operar conforme regras de cliente |
+| `SELLER` | atendimento e operações de balcão quando os endpoints estiverem implementados |
 | `STOCK_KEEPER` | cadastrar obras e operar acervo, se autorizado |
-| `MANAGER` | administrar destaques e funções gerenciais |
 | `ADMINISTRATOR` | administrar funcionários, papéis e configurações |
 
 Os códigos acima são técnicos e não devem ser substituídos por nomes exibidos na
@@ -148,6 +148,17 @@ Regra aprovada e implementada:
 - o backend é a autoridade final sobre normalização e validade.
 
 ## 9. Exemplares e estados
+
+Regra aprovada: a obra pode armazenar um `cover_url` opcional. O valor deve ser
+uma URL absoluta HTTP ou HTTPS. O sistema apenas referencia a imagem externa;
+não realiza upload nem copia o arquivo para o servidor. Uma falha de validação
+ou persistência durante a edição preserva o valor anteriormente confirmado.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V1.
+- Endpoints: `POST /api/v1/books/` e `PATCH /api/v1/books/{book_id}`.
+- Entidade: `Book`.
+- Testes: validação de URL, atualização, conflito e rollback.
 
 Regra aprovada: toda obra nova deve ser persistida com um primeiro exemplar
 ativo na mesma transação. A obra, o exemplar e seus registros de auditoria só

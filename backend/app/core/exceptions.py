@@ -133,6 +133,15 @@ class BookPersistenceError(ApplicationError):
         )
 
 
+class BookUpdatePersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível atualizar a obra.",
+            "book_update_persistence_error",
+            500,
+        )
+
+
 class DuplicateGenreError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Gênero já cadastrado.", "duplicate_genre", 409)

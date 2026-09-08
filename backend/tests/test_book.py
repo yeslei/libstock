@@ -152,9 +152,10 @@ def test_create_book_sem_token_retorna_401():
     assert response.json()["code"] == "invalid_token"
 
 
-def test_create_book_com_role_insuficiente_retorna_403():
+@pytest.mark.parametrize("role", ["USER", "SELLER"])
+def test_create_book_com_role_insuficiente_retorna_403(role):
     _use_fake_service()
-    _authenticate_as("USER")
+    _authenticate_as(role)
 
     response = client.post("/api/v1/books/", json=_manual_payload())
 
@@ -162,7 +163,7 @@ def test_create_book_com_role_insuficiente_retorna_403():
     assert response.json()["code"] == "permission_denied"
 
 
-@pytest.mark.parametrize("role", ["STOCK_KEEPER", "MANAGER", "ADMINISTRATOR"])
+@pytest.mark.parametrize("role", ["STOCK_KEEPER", "ADMINISTRATOR"])
 def test_roles_autorizadas_cadastram_obra(role):
     fake = _use_fake_service()
     _authenticate_as(role, user_id=73)
@@ -176,6 +177,7 @@ def test_roles_autorizadas_cadastram_obra(role):
         "title": "Python Fluente",
         "author": "Luciano Ramalho",
         "genre": "Tecnologia",
+        "cover_url": None,
         "is_active": True,
         "initial_copy": {
             "id": 2,
@@ -220,7 +222,7 @@ def test_isbn_nao_encontrado_retorna_404_controlado():
 
 def test_isbn_duplicado_retorna_409_com_codigo_estavel():
     _use_fake_service(DuplicateIsbnError())
-    _authenticate_as("MANAGER")
+    _authenticate_as("STOCK_KEEPER")
 
     response = client.post("/api/v1/books/", json=_manual_payload())
 

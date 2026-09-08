@@ -11,6 +11,8 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
     BookPersistenceError,
+    BookNotFoundError,
+    BookUpdatePersistenceError,
     DuplicateBarcodeError,
     DuplicateIsbnError,
     EmployeeRecordRequiredError,
@@ -21,7 +23,13 @@ from app.core.exceptions import (
 )
 from app.models.domain import Book
 from app.repositories.book_repository import BookRepository
-from app.schemas.book_schema import BookCreate, BookResponse, CopyResponse
+from app.schemas.book_schema import (
+    BookCreate,
+    BookDetailResponse,
+    BookResponse,
+    BookUpdate,
+    CopyResponse,
+)
 
 
 GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
@@ -166,6 +174,7 @@ class BookService:
                 title=book.title,
                 author=book.author,
                 genre=book.genre,
+                cover_url=book.cover_url,
                 is_active=book.is_active,
                 initial_copy=CopyResponse.model_validate(initial_copy),
             )
@@ -195,3 +204,42 @@ class BookService:
         if not normalized:
             raise ValueError("O título da busca não pode estar vazio.")
         return self.repository.search_by_title(normalized)
+
+    def get_book(self, book_id: int) -> BookDetailResponse:
+        book = self.repository.get_with_copies(book_id)
+        if book is None:
+            raise BookNotFoundError()
+        return BookDetailResponse.model_validate(book)
+
+    def update_book(
+        self, book_id: int, changes: BookUpdate, *, employee_id: int
+    ) -> BookDetailResponse:
+        try:
+            if not self.repository.employee_exists(employee_id):
+                raise EmployeeRecordRequiredError()
+            book = self.repository.get_with_copies(book_id)
+            if book is None:
+                raise BookNotFoundError()
+            if changes.isbn is not None and self.repository.find_by_isbn_except(
+                changes.isbn, book_id
+            ) is not None:
+                raise DuplicateIsbnError()
+            self.db.execute(
+                text("SELECT set_config('libstock.employee_id', :employee_id, true)"),
+                {"employee_id": str(employee_id)},
+            )
+            updated = self.repository.update_book(book, changes)
+            response = BookDetailResponse.model_validate(updated)
+            self.db.commit()
+            return response
+        except IntegrityError as exc:
+            self.db.rollback()
+            if _unique_constraint_name(exc) == "books_isbn_key":
+                raise DuplicateIsbnError() from exc
+            raise BookUpdatePersistenceError() from exc
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise BookUpdatePersistenceError() from exc

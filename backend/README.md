@@ -60,7 +60,7 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `PATCH` | `/api/v1/users/{id}` | Bearer (`ADMINISTRATOR`) | Atualiza nome, e-mail e papel funcional |
 | `PATCH` | `/api/v1/users/{id}/inactivate` | Bearer (`ADMINISTRATOR`) | Inativa o usuário e revoga suas sessões |
 | `POST` | `/api/v1/employees/` | Bearer (`ADMINISTRATOR`) | Cadastra vendedor, estoquista ou administrador |
-| `POST` | `/api/v1/books/` | Bearer (`STOCK_KEEPER`, `MANAGER`, `ADMINISTRATOR`) | Cadastra uma obra e seu exemplar inicial ativo na mesma transação |
+| `POST` | `/api/v1/books/` | Bearer (`STOCK_KEEPER`, `ADMINISTRATOR`) | Cadastra uma obra e seu exemplar inicial ativo na mesma transação |
 
 ## Permissionamento
 
@@ -86,3 +86,10 @@ SQLAlchemy/psycopg e é a única API consumida pelo frontend. A CLI instalada na
 raiz serve apenas para executar o ambiente local; ela não é uma dependência do
 backend e não gerencia o esquema. Toda alteração estrutural deve ser criada em
 `backend/migrations` com Alembic.
+# Gestão operacional do acervo
+
+- `GET /api/v1/books/?title=...`: busca pública legada por título.
+- `GET /api/v1/books/{book_id}`: detalhes internos da obra e seus exemplares (`STOCK_KEEPER`, `ADMINISTRATOR`).
+- `PATCH /api/v1/books/{book_id}`: altera metadados e link da capa (`STOCK_KEEPER`, `ADMINISTRATOR`).
+- `POST /api/v1/books/`: cria obra com primeiro exemplar (`STOCK_KEEPER`, `ADMINISTRATOR`).
+- `POST /api/v1/copies/`: adiciona exemplar à obra (`STOCK_KEEPER`, `ADMINISTRATOR`).
