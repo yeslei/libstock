@@ -39,7 +39,8 @@ export const routes: Routes = [
   },
   {
     path: 'obras/nova',
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar obra · LibStock',
     loadComponent: () =>
       import('./features/books/book-create/book-create.component').then(
@@ -49,12 +50,30 @@ export const routes: Routes = [
   {
     path: 'obras/:id/exemplares/novo',
     canActivate: [authGuard, roleGuard],
-    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
+    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar exemplar · LibStock',
     loadComponent: () =>
       import('./features/copies/copy-create/copy-create.component').then(
         (m) => m.CopyCreateComponent,
       ),
+  },
+  {
+    path: 'gestao/acervo',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    title: 'Cadastrar exemplar · LibStock',
+    loadComponent: () =>
+      import('./features/stock/stock-management/stock-management.component').then(
+        (m) => m.StockManagementComponent,
+      ),
+  },
+  {
+    path: 'gestao/acervo/obras/:id/editar',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    title: 'Editar obra · LibStock',
+    loadComponent: () =>
+      import('./features/books/book-edit/book-edit.component').then((m) => m.BookEditComponent),
   },
   {
     path: 'painel',

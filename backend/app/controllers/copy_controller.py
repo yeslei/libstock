@@ -18,7 +18,7 @@ def create_copy(
     copy: CopyCreate,
     copy_service: CopyService = Depends(get_copy_service),
     current_user: User = Depends(
-        require_roles("SELLER", "STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+        require_roles("STOCK_KEEPER", "ADMINISTRATOR")
     ),
 ):
     return copy_service.create_new_copy(copy_data=copy, actor_id=current_user.id)

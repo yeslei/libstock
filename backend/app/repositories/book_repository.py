@@ -1,8 +1,8 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.domain import Book, Copy, CopyStatus, Employee
-from app.schemas.book_schema import BookCreate, InitialCopyCreate
+from app.schemas.book_schema import BookCreate, BookUpdate, InitialCopyCreate
 
 
 class BookRepository:
@@ -16,6 +16,14 @@ class BookRepository:
 
     def find_by_isbn(self, isbn: str) -> Book | None:
         return self.db.scalar(select(Book).where(Book.isbn == isbn))
+
+    def find_by_isbn_except(self, isbn: str, book_id: int) -> Book | None:
+        return self.db.scalar(select(Book).where(Book.isbn == isbn, Book.id != book_id))
+
+    def get_with_copies(self, book_id: int) -> Book | None:
+        return self.db.scalar(
+            select(Book).options(selectinload(Book.copies)).where(Book.id == book_id)
+        )
 
     def find_copy_by_barcode(self, barcode: str) -> Copy | None:
         return self.db.scalar(select(Copy).where(Copy.barcode == barcode))
@@ -36,6 +44,12 @@ class BookRepository:
         self.db.add(db_copy)
         self.db.flush()
         return db_copy
+
+    def update_book(self, book: Book, changes: BookUpdate) -> Book:
+        for field, value in changes.model_dump(exclude_unset=True).items():
+            setattr(book, field, value)
+        self.db.flush()
+        return book
 
     def search_by_title(self, title: str) -> list[Book]:
         escaped_title = (

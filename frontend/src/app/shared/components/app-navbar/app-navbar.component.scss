@@ -1,0 +1,28 @@
+@use 'variables' as *;
+
+.navbar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: $space-5;
+  min-height: 64px;
+  padding: $space-2 max($space-4, calc((100vw - 1180px) / 2));
+  border-bottom: 1px solid $border;
+  background: $bg-surface;
+  box-shadow: $shadow-sm;
+}
+
+.navbar__brand { display: inline-flex; flex: 0 0 auto; }
+.navbar__brand img { width: auto; height: 32px; }
+.navbar__links { display: flex; flex: 1; flex-wrap: wrap; gap: $space-2; }
+.navbar a { padding: $space-2 $space-3; border-radius: $radius-sm; color: $text-primary; font-weight: 600; text-decoration: none; }
+.navbar a:hover, .navbar__link--active { background: $bg-subtle; color: $primary; }
+.navbar__session { margin-left: auto; }
+
+@media (max-width: 767px) {
+  .navbar { position: static; flex-wrap: wrap; }
+  .navbar__links { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .navbar__links a { white-space: nowrap; }
+}

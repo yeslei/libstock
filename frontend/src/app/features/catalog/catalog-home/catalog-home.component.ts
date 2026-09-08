@@ -1,7 +1,7 @@
 import { AsyncPipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { catchError, map, of, startWith } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
@@ -31,21 +31,15 @@ export class CatalogHomeComponent {
   private readonly catalog = inject(CatalogService);
   private readonly catalogAdmin = inject(CatalogAdminService);
   private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly user = toSignal(this.auth.user$, { initialValue: null });
-
-  protected readonly isAuthenticated = computed(() => this.user() !== null);
 
   private readonly capabilities = computed<Set<CatalogCapability>>(() =>
     capabilitiesFor(this.user()?.role_codes ?? []),
   );
 
   protected readonly canManageCatalog = computed(() => this.capabilities().has('manageCatalog'));
-  protected readonly canServeCounter = computed(() => this.capabilities().has('counterService'));
-  protected readonly canManageStock = computed(() => this.capabilities().has('manageStock'));
-  protected readonly canRegisterCopy = computed(() => this.capabilities().has('registerCopy'));
 
   /** Livros retirados do destaque nesta sessão, para sumirem sem recarregar. */
   private readonly unfeatured = signal<ReadonlySet<number>>(new Set());
@@ -131,64 +125,6 @@ export class CatalogHomeComponent {
       style: 'currency',
       currency: 'BRL',
     }).format(Number(offer.price));
-  }
-
-  /** Oferta que comanda o botão do card: a disponível vence a esgotada. */
-  protected primaryOffer(book: CatalogBook): BookOffer | null {
-    return book.offers.find((offer) => offer.available) ?? book.offers[0] ?? null;
-  }
-
-  /**
-   * A disponibilidade manda antes do papel: não há venda nem empréstimo a
-   * registrar sem exemplar livre, por mais privilegiado que seja quem opera.
-   * Um exemplar vendido é estado final da máquina de estados de `Copy`.
-   */
-  protected actionLabel(book: CatalogBook): string {
-    const offer = this.primaryOffer(book);
-    if (offer === null) {
-      return 'Indisponível';
-    }
-
-    if (!offer.available) {
-      if (!offer.can_reserve) {
-        return 'Indisponível';
-      }
-      // RF07: o balcão pode registrar a reserva em nome do cliente (US01).
-      return this.canServeCounter() ? 'Registrar reserva' : 'Reservar compra';
-    }
-
-    if (this.canServeCounter()) {
-      return offer.destination === 'COMMERCIAL' ? 'Registrar venda' : 'Registrar empréstimo';
-    }
-    return offer.destination === 'COMMERCIAL' ? 'Comprar' : 'Pedir emprestado';
-  }
-
-  protected actionDisabled(book: CatalogBook): boolean {
-    const offer = this.primaryOffer(book);
-    if (offer === null) {
-      return true;
-    }
-    // Esgotado sem direito a reserva não tem ação possível — RF07 só cobre
-    // exemplar de venda que está emprestado, não o que já foi vendido.
-    return !offer.available && !offer.can_reserve;
-  }
-
-  // ---- Ações --------------------------------------------------------------
-
-  /**
-   * Ação transacional exige sessão. Sem ela, manda para o login preservando o
-   * destino — mesmo contrato de `redirectTo` que o `authGuard` usa.
-   */
-  protected startTransaction(book: CatalogBook): void {
-    if (!this.isAuthenticated()) {
-      void this.router.navigate(['/login'], {
-        queryParams: { redirectTo: this.router.url },
-      });
-      return;
-    }
-    // TODO(RF02/RF03/RF07): venda, empréstimo e reserva ainda não têm
-    // endpoint. O gate de sessão acima já é o comportamento definitivo.
-    console.info('Fluxo transacional pendente para o livro', book.id);
   }
 
   /** US04: gestor tira o título do destaque direto da vitrine. */

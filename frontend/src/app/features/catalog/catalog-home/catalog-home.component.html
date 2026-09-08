@@ -1,9 +1,6 @@
-<header class="topbar">
+<!-- A navegação global é renderizada pelo AppComponent. -->
+<div class="catalog-tools">
   <div class="topbar__inner">
-    <a class="topbar__brand" routerLink="/" aria-label="LibStock — página inicial">
-      <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
-    </a>
-
     <form class="search" role="search" (submit)="$event.preventDefault(); searchBooks()">
       <label class="search__label" for="catalog-search">Buscar no acervo</label>
       <select
@@ -38,40 +35,9 @@
       <p id="catalog-search-hint" class="search__hint">Escolha um critério e informe um termo.</p>
     </form>
 
-    <nav class="topbar__nav" aria-label="Navegação principal">
-      <a class="topbar__link" routerLink="/explorar">Explorar livros</a>
-      <a class="topbar__link" routerLink="/como-funciona">Como funciona</a>
-    </nav>
-
-    <div class="topbar__actions">
-      @if (isAuthenticated()) {
-        <a class="btn btn--primary" routerLink="/painel">Meu painel</a>
-      } @else {
-        <a class="btn btn--ghost" routerLink="/login">Entrar</a>
-        <a class="btn btn--primary" routerLink="/register">Cadastrar</a>
-      }
-    </div>
   </div>
 
-  @if (canServeCounter() || canManageStock() || canManageCatalog()) {
-    <!-- Barra operacional: só existe para quem tem função de balcão ou
-         gestão, conforme as histórias US01, US03 e US04 do SRS. -->
-    <div class="opsbar">
-      <div class="opsbar__inner">
-        <span class="opsbar__label">Modo operação</span>
-        @if (canServeCounter()) {
-          <span class="opsbar__item">Registro de venda, empréstimo e devolução no card</span>
-        }
-        @if (canManageStock()) {
-          <a class="opsbar__item" routerLink="/obras/nova">Cadastrar obra</a>
-        }
-        @if (canManageCatalog()) {
-          <span class="opsbar__item">Gestão de destaques</span>
-        }
-      </div>
-    </div>
-  }
-</header>
+</div>
 
 <main class="home">
   @if (searchState() === null) {
@@ -193,10 +159,6 @@
         @if (offerPrice(offer); as price) { <span class="card__price" [class.card__price--out]="!offer.available">{{ price }}</span> }
       }
     </div>
-    <button class="btn btn--primary card__cta" type="button" [disabled]="actionDisabled(book)" (click)="startTransaction(book)">{{ actionLabel(book) }}</button>
-    @if (canRegisterCopy()) {
-      <a class="btn btn--outline card__manage" [routerLink]="['/obras', book.id, 'exemplares', 'novo']">Cadastrar exemplar</a>
-    }
     @if (featured && canManageCatalog()) {
       <button class="btn btn--outline card__manage" type="button" (click)="removeFromFeatured(book)">Remover destaque</button>
     }

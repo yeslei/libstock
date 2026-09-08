@@ -1,0 +1,17 @@
+<header class="navbar">
+  <a class="navbar__brand" routerLink="/" aria-label="LibStock — página inicial">
+    <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
+  </a>
+  <nav class="navbar__links" aria-label="Navegação principal">
+    @for (item of items(); track item.route) {
+      <a [routerLink]="item.route" routerLinkActive="navbar__link--active" [routerLinkActiveOptions]="{ exact: item.route === '/' }">{{ item.label }}</a>
+    }
+  </nav>
+  <div class="navbar__session">
+    @if (user()) {
+      <a routerLink="/painel">Conta</a>
+    } @else {
+      <a routerLink="/login">Entrar</a>
+    }
+  </div>
+</header>

@@ -1,0 +1,22 @@
+<main class="edit">
+  <a routerLink="/gestao/acervo">← Voltar para a gestão do acervo</a>
+  <h1>Editar obra</h1>
+  @if (state() === 'loading') { <p><app-spinner /> Carregando obra…</p> }
+  @if (message(); as text) { <app-alert [message]="text" [variant]="state() === 'success' ? 'success' : 'error'" /> }
+  @if (book()) {
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <label for="edit-isbn">ISBN</label><input id="edit-isbn" formControlName="isbn" />
+      <label for="edit-title">Título</label><input id="edit-title" formControlName="title" />
+      <label for="edit-author">Autor</label><input id="edit-author" formControlName="author" />
+      <label for="edit-genre">Gênero</label><input id="edit-genre" formControlName="genre" />
+      <label for="edit-cover">Link da capa</label><input id="edit-cover" type="url" formControlName="coverUrl" placeholder="https://exemplo.com/capa.jpg" (input)="imageFailed.set(false)" />
+      @if (form.controls.coverUrl.value && form.controls.coverUrl.valid && !imageFailed()) {
+        <img class="cover" [src]="form.controls.coverUrl.value" alt="Prévia da capa" (error)="imageFailed.set(true)" />
+      } @else {
+        <div class="cover cover--empty" aria-label="Capa indisponível">Sem capa</div>
+      }
+      <button type="submit" [disabled]="state() === 'submitting'">{{ state() === 'submitting' ? 'Salvando…' : 'Salvar alterações' }}</button>
+    </form>
+    <a class="add-copy" [routerLink]="['/obras', book()!.id, 'exemplares', 'novo']">Adicionar exemplar</a>
+  }
+</main>
