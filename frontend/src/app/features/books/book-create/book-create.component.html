@@ -1,18 +1,10 @@
-<header class="topbar">
-  <a routerLink="/" aria-label="LibStock — página inicial">
-    <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
-  </a>
-  <a class="topbar__back" routerLink="/">← Voltar ao catálogo</a>
-</header>
-
 <main class="page">
   <section class="card" aria-labelledby="book-create-title">
     <header class="card__header">
       <p class="eyebrow">Gestão do acervo</p>
       <h1 id="book-create-title">Cadastrar obra</h1>
       <p>
-        Informe a obra e seu primeiro exemplar. Se título ou autor ficarem vazios, tentaremos completá-los com
-        dados do Google Books.
+        Informe o ISBN para preencher os dados da obra automaticamente e depois cadastre o primeiro exemplar.
       </p>
     </header>
 
@@ -62,6 +54,12 @@
         </p>
         @if (isbnError(); as message) {
           <p class="field__error" id="book-isbn-error" aria-live="polite">{{ message }}</p>
+        }
+        @if (metadataMessage(); as message) {
+          <p class="metadata-status" [class.metadata-status--error]="metadataState() === 'error'" aria-live="polite">
+            @if (metadataState() === 'loading') { <app-spinner /> }
+            <span>{{ message }}</span>
+          </p>
         }
       </div>
 
@@ -118,6 +116,7 @@
             maxlength="255"
             [attr.aria-invalid]="titleError() !== null"
             [attr.aria-describedby]="titleError() ? 'book-title-error' : null"
+            [attr.readonly]="metadataLocked() ? true : null"
           />
         </div>
         @if (titleError(); as message) {
@@ -138,6 +137,7 @@
             maxlength="255"
             [attr.aria-invalid]="authorError() !== null"
             [attr.aria-describedby]="authorError() ? 'book-author-error' : null"
+            [attr.readonly]="metadataLocked() ? true : null"
           />
         </div>
         @if (authorError(); as message) {
@@ -158,10 +158,36 @@
             maxlength="100"
             [attr.aria-invalid]="genreError() !== null"
             [attr.aria-describedby]="genreError() ? 'book-genre-error' : null"
+            [attr.readonly]="metadataLocked() ? true : null"
           />
         </div>
         @if (genreError(); as message) {
           <p class="field__error" id="book-genre-error" aria-live="polite">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="book-coverUrl">
+          Link da capa <span class="optional">Opcional</span>
+        </label>
+        <div class="field__control">
+          <input
+            class="field__input"
+            id="book-coverUrl"
+            type="url"
+            formControlName="coverUrl"
+            maxlength="2048"
+            placeholder="https://exemplo.com/capa.jpg"
+            (input)="imageFailed.set(false)"
+          />
+        </div>
+        @if (form.controls.coverUrl.invalid && form.controls.coverUrl.touched) {
+          <p class="field__error">Informe uma URL iniciada por http:// ou https://.</p>
+        }
+        @if (form.controls.coverUrl.value && form.controls.coverUrl.valid && !imageFailed()) {
+          <img class="cover-preview" [src]="form.controls.coverUrl.value" alt="Prévia da capa" (error)="imageFailed.set(true)" />
+        } @else if (form.controls.coverUrl.value && imageFailed()) {
+          <div class="cover-preview cover-preview--empty">Sem capa</div>
         }
       </div>
 

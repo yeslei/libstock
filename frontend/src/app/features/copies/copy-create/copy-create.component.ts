@@ -8,12 +8,14 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { ApiError } from '../../../core/models/auth.model';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { fieldError } from '../../../shared/validators/form-errors';
+import { BookDetail } from '../../books/models/book.model';
+import { BookService } from '../../books/services/book.service';
 import { CopyCreateRequest, CopyResponse, DestinationType } from '../models/copy.model';
 import { CopyService } from '../services/copy.service';
 
@@ -46,7 +48,7 @@ const salePriceValidator: ValidatorFn = (control): ValidationErrors | null => {
 @Component({
   selector: 'app-copy-create',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [ReactiveFormsModule, AlertComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './copy-create.component.html',
   styleUrl: './copy-create.component.scss',
@@ -55,6 +57,7 @@ export class CopyCreateComponent {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly copies = inject(CopyService);
+  private readonly books = inject(BookService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -69,6 +72,7 @@ export class CopyCreateComponent {
   protected readonly message = signal<string | null>(null);
   protected readonly submitted = signal(false);
   protected readonly createdCopy = signal<CopyResponse | null>(null);
+  protected readonly book = signal<BookDetail | null>(null);
   private readonly bookId = signal<number | null>(null);
 
   constructor() {
@@ -81,6 +85,7 @@ export class CopyCreateComponent {
         return;
       }
       this.bookId.set(id);
+      this.loadBook(id);
       if (this.state() === 'invalidRoute') {
         this.state.set('idle');
         this.message.set(null);
@@ -137,6 +142,7 @@ export class CopyCreateComponent {
         next: (copy) => {
           this.createdCopy.set(copy);
           this.state.set('success');
+          this.loadBook(copy.bookId);
         },
         error: (error: ApiError) => this.handleError(error),
       });
@@ -156,6 +162,13 @@ export class CopyCreateComponent {
     const validators = destination === 'COMMERCIAL' ? [Validators.required, salePriceValidator] : [];
     this.form.controls.salePrice.setValidators(validators);
     this.form.controls.salePrice.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private loadBook(bookId: number): void {
+    this.books.get(bookId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (book) => this.book.set(book),
+      error: () => this.book.set(null),
+    });
   }
 
   private payload(): CopyCreateRequest {

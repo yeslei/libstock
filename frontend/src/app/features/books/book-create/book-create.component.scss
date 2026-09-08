@@ -133,3 +133,31 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.cover-preview {
+  width: 112px;
+  margin-top: $space-2;
+  aspect-ratio: 2 / 3;
+  border-radius: $radius-sm;
+  object-fit: cover;
+  background: $bg-subtle;
+}
+
+.cover-preview--empty {
+  display: grid;
+  place-items: center;
+  color: $text-muted;
+}
+
+.metadata-status {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin: $space-2 0 0;
+  color: $verde-medio;
+  font-size: $font-size-sm;
+}
+
+.metadata-status--error {
+  color: $warning;
+}

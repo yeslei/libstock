@@ -18,7 +18,7 @@ def test_search_books_success_and_response_serialization() -> None:
 
     assert response.status_code == 200
     assert response.json() == [
-        {"id": 1, "isbn": None, "title": "Hobbit", "author": "Author", "genre": None, "is_active": True, "initial_copy": None}
+        {"id": 1, "isbn": None, "title": "Hobbit", "author": "Author", "genre": None, "cover_url": None, "is_active": True, "initial_copy": None}
     ]
 
 
