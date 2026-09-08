@@ -1,4 +1,4 @@
-export type EmployeeAccessLevel = 'ATTENDANT' | 'SELLER' | 'STOCK_KEEPER' | 'MANAGER';
+export type EmployeeAccessLevel = 'SELLER' | 'STOCK_KEEPER' | 'ADMINISTRATOR';
 
 export interface CreateEmployeeRequest {
   name: string;

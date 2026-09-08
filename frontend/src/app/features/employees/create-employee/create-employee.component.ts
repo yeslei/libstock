@@ -8,6 +8,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { Observable } from 'rxjs';
 
 import { ApiError, FormState } from '../../../core/models/auth.model';
 import {
@@ -15,6 +17,8 @@ import {
   EmployeeAccessLevel,
 } from '../../../core/models/employee.model';
 import { EmployeeService } from '../../../core/services/employee.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { User } from '../../../core/models/user.model';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import {
   PASSWORD_MAX_LENGTH,
@@ -25,27 +29,31 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
 import { emailFormat } from '../../../shared/validators/email.validator';
 import { fieldError } from '../../../shared/validators/form-errors';
 
+type UserAccessLevel = 'USER' | EmployeeAccessLevel;
+
 interface AccessLevelOption {
   readonly label: string;
-  readonly value: EmployeeAccessLevel;
+  readonly value: UserAccessLevel;
 }
 
 const ACCESS_LEVELS: readonly AccessLevelOption[] = [
-  { label: 'Atendente', value: 'ATTENDANT' },
+  { label: 'Cliente', value: 'USER' },
   { label: 'Vendedor', value: 'SELLER' },
   { label: 'Estoquista', value: 'STOCK_KEEPER' },
-  { label: 'Gerente', value: 'MANAGER' },
+  { label: 'Administrador', value: 'ADMINISTRATOR' },
 ];
 
+type CreatedUser = CreateEmployeeResponse | User;
+
 const NAME_ERRORS = {
-  required: 'Informe o nome do funcionário.',
+  required: 'Informe o nome do usuário.',
   blank: 'Informe um nome com pelo menos 2 caracteres.',
   minlength: 'O nome precisa ter pelo menos 2 caracteres.',
   maxlength: 'O nome pode ter no máximo 150 caracteres.',
 };
 
 const EMAIL_ERRORS = {
-  required: 'Informe o e-mail do funcionário.',
+  required: 'Informe o e-mail do usuário.',
   email: 'Digite um e-mail válido, no formato nome@dominio.com.',
 };
 
@@ -77,7 +85,7 @@ function toEmployeeErrorMessage(error: ApiError): string {
   }
 
   if (error.status === 403) {
-    return 'Você não tem permissão para cadastrar funcionários.';
+    return 'Você não tem permissão para cadastrar usuários.';
   }
 
   if (error.status === 409 && error.code === 'duplicate_email') {
@@ -85,14 +93,14 @@ function toEmployeeErrorMessage(error: ApiError): string {
   }
 
   if (error.status === 409 && error.code === 'duplicate_employee_code') {
-    return 'Não foi possível gerar um código único para o funcionário. Tente novamente.';
+    return 'Não foi possível gerar um código único para o usuário. Tente novamente.';
   }
 
   if (error.status === 422) {
     return error.detail || 'Confira os campos destacados e tente novamente.';
   }
 
-  return error.detail || 'Não foi possível cadastrar o funcionário. Tente novamente.';
+  return error.detail || 'Não foi possível cadastrar o usuário. Tente novamente.';
 }
 
 @Component({
@@ -106,13 +114,15 @@ function toEmployeeErrorMessage(error: ApiError): string {
 export class CreateEmployeeComponent {
   private readonly fb = inject(FormBuilder);
   private readonly employees = inject(EmployeeService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly accessLevels = ACCESS_LEVELS;
   protected readonly state = signal<FormState>({ status: 'idle' });
   protected readonly submitted = signal(false);
-  protected readonly createdEmployee = signal<CreateEmployeeResponse | null>(null);
+  protected readonly createdUser = signal<CreatedUser | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, nonBlank, Validators.minLength(2), Validators.maxLength(150)]],
@@ -158,8 +168,20 @@ export class CreateEmployeeComponent {
     return fieldError(this.form.controls.accessLevel, ACCESS_LEVEL_ERRORS, this.submitted());
   }
 
+  protected roleCode(user: CreatedUser): string {
+    return 'role_code' in user ? user.role_code : user.role_codes[0];
+  }
+
   protected normalizeName(): void {
     const control = this.form.controls.name;
+    const normalized = control.value.trim();
+    if (normalized !== control.value) {
+      control.setValue(normalized);
+    }
+  }
+
+  private normalizeEmail(): void {
+    const control = this.form.controls.email;
     const normalized = control.value.trim();
     if (normalized !== control.value) {
       control.setValue(normalized);
@@ -173,6 +195,7 @@ export class CreateEmployeeComponent {
 
     this.submitted.set(true);
     this.normalizeName();
+    this.normalizeEmail();
 
     if (this.form.invalid) {
       this.state.set({ status: 'idle' });
@@ -181,24 +204,26 @@ export class CreateEmployeeComponent {
     }
 
     this.state.set({ status: 'submitting' });
-    this.createdEmployee.set(null);
+    this.createdUser.set(null);
 
     const { name, email, password, accessLevel } = this.form.getRawValue();
 
-    this.employees
-      .create({
+    const request: Observable<CreatedUser> = accessLevel === 'USER'
+      ? this.auth.register({ name, email: email.trim(), password })
+      : this.employees.create({
         name,
         email: email.trim(),
         password,
         accessLevel: accessLevel as EmployeeAccessLevel,
-      })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      });
+
+    request.pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (employee) => {
-          this.createdEmployee.set(employee);
+        next: (user) => {
+          this.createdUser.set(user);
           this.state.set({
             status: 'success',
-            message: 'Funcionário cadastrado com sucesso.',
+            message: 'Usuário cadastrado com sucesso.',
           });
           this.form.reset();
           this.submitted.set(false);
@@ -212,6 +237,10 @@ export class CreateEmployeeComponent {
           this.focus('employee-form-feedback');
         },
       });
+  }
+
+  protected backToUserManagement(): void {
+    void this.router.navigate(['/gestao/usuarios']);
   }
 
   private focusFirstInvalid(): void {

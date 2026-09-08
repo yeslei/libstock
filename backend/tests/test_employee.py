@@ -23,7 +23,7 @@ VALID_PAYLOAD = {
     "name": "Ana Souza",
     "email": "ana@example.com",
     "password": "senhasegura",
-    "accessLevel": "MANAGER",
+    "accessLevel": "ADMINISTRATOR",
 }
 
 
@@ -33,7 +33,7 @@ def make_user(role_codes: list[str]) -> MagicMock:
     return user
 
 
-def make_created(role_code: str = "MANAGER") -> EmployeeCreated:
+def make_created(role_code: str = "ADMINISTRATOR") -> EmployeeCreated:
     return EmployeeCreated(id=42, name="Ana Souza", email="ana@example.com", role_code=role_code)
 
 
@@ -95,11 +95,11 @@ def test_portuguese_alias_is_rejected(admin_client, role):
     assert response.status_code == 422
 
 
-def test_administrator_role_is_rejected_in_payload(admin_client):
+def test_administrator_role_is_accepted_in_payload(admin_client):
     response = admin_client.post(
         "/api/v1/employees/", json={**VALID_PAYLOAD, "accessLevel": "ADMINISTRATOR"}
     )
-    assert response.status_code == 422
+    assert response.status_code == 201
 
 
 def test_response_returns_persisted_role_and_excludes_password(admin_client):
@@ -116,7 +116,7 @@ def test_response_returns_persisted_role_and_excludes_password(admin_client):
 
 def test_repository_persists_profile_before_employee():
     db = MagicMock()
-    db.scalar.return_value = SimpleNamespace(id=1, code="MANAGER")
+    db.scalar.return_value = SimpleNamespace(id=1, code="ADMINISTRATOR")
 
     def assign_user_id_after_user_flush():
         if db.flush.call_count == 1:
