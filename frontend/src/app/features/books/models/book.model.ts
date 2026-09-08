@@ -49,3 +49,10 @@ export interface BookUpdateRequest {
   readonly genre: string | null;
   readonly cover_url: string | null;
 }
+
+export interface BookMetadata {
+  readonly isbn: string;
+  readonly title: string;
+  readonly author: string;
+  readonly genre: string | null;
+}

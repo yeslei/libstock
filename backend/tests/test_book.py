@@ -233,10 +233,19 @@ def test_isbn_duplicado_retorna_409_com_codigo_estavel():
 # ---- Service ------------------------------------------------------------
 
 
-def _service():
+def _service(*, mock_external: bool = True):
     db = MagicMock()
     repository = FakeBookRepository()
-    return BookService(db=db, repository=repository), db, repository
+    service = BookService(db=db, repository=repository)
+    if mock_external:
+        service.fetch_google_books_data = AsyncMock(
+            return_value={
+                "title": "Python Fluente",
+                "author": "Luciano Ramalho",
+                "genre": "Tecnologia",
+            }
+        )
+    return service, db, repository
 
 
 @pytest.mark.anyio
@@ -270,15 +279,30 @@ async def test_dados_ausentes_sao_complementados_sem_mutar_entrada():
 
 
 @pytest.mark.anyio
-async def test_dados_manuais_nao_consultam_google_books():
+async def test_google_books_sobrescreve_metadados_manuais_inconsistentes():
     service, _db, repository = _service()
-    service.fetch_google_books_data = AsyncMock()
+    service.fetch_google_books_data = AsyncMock(
+        return_value={"title": "Título canônico", "author": "Autor canônico"}
+    )
     payload = BookCreate(**_manual_payload())
 
     await service.create_book(payload, employee_id=9)
 
-    service.fetch_google_books_data.assert_not_awaited()
-    assert repository.created_with == payload
+    service.fetch_google_books_data.assert_awaited_once_with("9788575225530")
+    assert repository.created_with.title == "Título canônico"
+    assert repository.created_with.author == "Autor canônico"
+
+
+@pytest.mark.anyio
+async def test_fallback_manual_e_aceito_quando_google_books_falha():
+    service, db, repository = _service()
+    service.fetch_google_books_data = AsyncMock(side_effect=GoogleBooksUnavailableError())
+
+    result = await service.create_book(BookCreate(**_manual_payload()), employee_id=9)
+
+    assert result.title == "Python Fluente"
+    assert repository.created_with.title == "Python Fluente"
+    db.commit.assert_called_once()
 
 
 @pytest.mark.anyio
@@ -397,7 +421,7 @@ async def test_google_books_sem_metadados_minimos_retorna_erro_controlado():
 
 @pytest.mark.anyio
 async def test_timeout_do_google_books_e_traduzido_sem_requisicao_real(monkeypatch):
-    service, _db, _repository = _service()
+    service, _db, _repository = _service(mock_external=False)
 
     class TimeoutClient:
         def __init__(self, *, timeout):
@@ -420,7 +444,7 @@ async def test_timeout_do_google_books_e_traduzido_sem_requisicao_real(monkeypat
 
 @pytest.mark.anyio
 async def test_google_books_429_tem_erro_publico_controlado(monkeypatch):
-    service, _db, _repository = _service()
+    service, _db, _repository = _service(mock_external=False)
 
     class RateLimitedClient:
         def __init__(self, *, timeout):
@@ -558,6 +582,9 @@ async def test_postgresql_aceita_obra_e_exemplar_e_rollback_nao_deixa_parcial(re
         assert db.scalar(select(Copy.id).where(Copy.barcode == barcode)) is None
 
         service = BookService(db=db, repository=BookRepository(db))
+        service.fetch_google_books_data = AsyncMock(
+            return_value={"title": "Clean Code", "author": "Robert C. Martin"}
+        )
         first = await service.create_book(
             BookCreate.model_validate(
                 {
@@ -618,6 +645,12 @@ async def test_postgresql_aceita_obra_e_exemplar_e_rollback_nao_deixa_parcial(re
 
         rollback_service = BookService(
             db=db, repository=ConstraintOnlyRepository(db)
+        )
+        rollback_service.fetch_google_books_data = AsyncMock(
+            return_value={
+                "title": "The Pragmatic Programmer",
+                "author": "Andrew Hunt, David Thomas",
+            }
         )
         with pytest.raises(DuplicateBarcodeError):
             await rollback_service.create_book(

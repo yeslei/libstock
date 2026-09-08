@@ -137,6 +137,13 @@ class BookUpdate(BaseModel):
             raise ValueError("Autor não pode ficar vazio.")
         return self
 
+
+class BookMetadataResponse(BaseModel):
+    isbn: str
+    title: str = Field(max_length=255)
+    author: str = Field(max_length=255)
+    genre: str | None = Field(default=None, max_length=100)
+
 class BookCreateResponse(BookCreate):
     id: int
 

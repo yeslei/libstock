@@ -89,6 +89,7 @@ backend e não gerencia o esquema. Toda alteração estrutural deve ser criada e
 # Gestão operacional do acervo
 
 - `GET /api/v1/books/?title=...`: busca pública legada por título.
+- `GET /api/v1/books/metadata/{isbn}`: consulta metadados canônicos no Google Books (`STOCK_KEEPER`, `ADMINISTRATOR`).
 - `GET /api/v1/books/{book_id}`: detalhes internos da obra e seus exemplares (`STOCK_KEEPER`, `ADMINISTRATOR`).
 - `PATCH /api/v1/books/{book_id}`: altera metadados e link da capa (`STOCK_KEEPER`, `ADMINISTRATOR`).
 - `POST /api/v1/books/`: cria obra com primeiro exemplar (`STOCK_KEEPER`, `ADMINISTRATOR`).

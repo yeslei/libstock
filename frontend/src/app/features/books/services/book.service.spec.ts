@@ -34,4 +34,11 @@ describe('BookService', () => {
     expect(request.request.body).toEqual(payload);
     request.flush(response, { status: 201, statusText: 'Created' });
   });
+
+  it('consulta metadados pelo ISBN normalizado', () => {
+    service.lookupMetadata('9788575225530').subscribe();
+    const request = http.expectOne(`${BOOKS_API}/metadata/9788575225530`);
+    expect(request.request.method).toBe('GET');
+    request.flush({ isbn: '9788575225530', title: 'Título', author: 'Autor', genre: null });
+  });
 });

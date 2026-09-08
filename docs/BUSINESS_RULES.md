@@ -160,6 +160,19 @@ ou persistência durante a edição preserva o valor anteriormente confirmado.
 - Entidade: `Book`.
 - Testes: validação de URL, atualização, conflito e rollback.
 
+Regra aprovada: durante o cadastro, um ISBN válido é consultado no Google Books.
+Quando a fonte externa responde com título e autor válidos, esses metadados são
+canônicos, preenchem o formulário em tempo de digitação e permanecem bloqueados.
+O backend consulta novamente a fonte ao persistir e sobrescreve valores enviados
+pelo cliente. O preenchimento manual só é aceito quando a consulta externa não
+produz metadados mínimos.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V1.
+- Endpoints: `GET /api/v1/books/metadata/{isbn}` e `POST /api/v1/books/`.
+- Entidades: `Book` e `Copy` inicial.
+- Testes: preenchimento assíncrono, bloqueio dos campos, autoridade do backend e fallback manual.
+
 Regra aprovada: toda obra nova deve ser persistida com um primeiro exemplar
 ativo na mesma transação. A obra, o exemplar e seus registros de auditoria só
 podem ser confirmados em conjunto; qualquer falha provoca rollback integral.

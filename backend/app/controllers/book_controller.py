@@ -6,6 +6,7 @@ from app.models.user import User
 from app.schemas.book_schema import (
     BookCreate,
     BookDetailResponse,
+    BookMetadataResponse,
     BookResponse,
     BookSearchParams,
     BookUpdate,
@@ -31,6 +32,15 @@ def search_books(
     book_service: BookService = Depends(get_book_service),
 ) -> list[BookResponse]:
     return book_service.search_books(params.title)
+
+
+@router.get("/metadata/{isbn}", response_model=BookMetadataResponse)
+async def lookup_book_metadata(
+    isbn: str,
+    current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
+    service: BookService = Depends(get_book_service),
+) -> BookMetadataResponse:
+    return await service.lookup_metadata(isbn)
 
 
 @router.get("/{book_id}", response_model=BookDetailResponse)

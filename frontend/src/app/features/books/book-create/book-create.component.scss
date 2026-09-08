@@ -148,3 +148,16 @@
   place-items: center;
   color: $text-muted;
 }
+
+.metadata-status {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin: $space-2 0 0;
+  color: $verde-medio;
+  font-size: $font-size-sm;
+}
+
+.metadata-status--error {
+  color: $warning;
+}

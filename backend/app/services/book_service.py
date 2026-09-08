@@ -26,9 +26,11 @@ from app.repositories.book_repository import BookRepository
 from app.schemas.book_schema import (
     BookCreate,
     BookDetailResponse,
+    BookMetadataResponse,
     BookResponse,
     BookUpdate,
     CopyResponse,
+    normalize_isbn,
 )
 
 
@@ -134,6 +136,21 @@ class BookService:
                 external_data["genre"] = genre
         return external_data
 
+    async def lookup_metadata(self, isbn: str) -> BookMetadataResponse:
+        normalized_isbn = normalize_isbn(isbn)
+        external_data = await self.fetch_google_books_data(normalized_isbn)
+        if not external_data.get("title") or not external_data.get("author"):
+            raise GoogleBooksInvalidResponseError()
+        try:
+            return BookMetadataResponse(
+                isbn=normalized_isbn,
+                title=external_data["title"],
+                author=external_data["author"],
+                genre=external_data.get("genre"),
+            )
+        except ValidationError as exc:
+            raise GoogleBooksInvalidResponseError() from exc
+
     async def create_book(self, book_data: BookCreate, *, employee_id: int) -> BookResponse:
         try:
             if not self.repository.employee_exists(employee_id):
@@ -144,16 +161,25 @@ class BookService:
                 raise DuplicateBarcodeError()
 
             persisted_data = book_data
-            if not book_data.title or not book_data.author:
-                external_data = await self.fetch_google_books_data(book_data.isbn)
+            try:
+                metadata = await self.lookup_metadata(book_data.isbn)
                 merged_data = book_data.model_dump()
-                for field_name in ("title", "author", "genre"):
-                    if not merged_data[field_name] and external_data.get(field_name):
-                        merged_data[field_name] = external_data[field_name]
+                merged_data["title"] = metadata.title
+                merged_data["author"] = metadata.author
+                if metadata.genre:
+                    merged_data["genre"] = metadata.genre
                 try:
                     persisted_data = BookCreate.model_validate(merged_data)
                 except ValidationError as exc:
                     raise GoogleBooksInvalidResponseError() from exc
+            except (
+                GoogleBooksNotFoundError,
+                GoogleBooksUnavailableError,
+                GoogleBooksRateLimitError,
+                GoogleBooksInvalidResponseError,
+            ):
+                if not book_data.title or not book_data.author:
+                    raise
 
             if not persisted_data.title or not persisted_data.author:
                 raise GoogleBooksInvalidResponseError()

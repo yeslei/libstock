@@ -8,12 +8,13 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { catchError, debounceTime, filter, map, of, switchMap, tap } from 'rxjs';
 
 import { ApiError, FormState } from '../../../core/models/auth.model';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { fieldError } from '../../../shared/validators/form-errors';
-import { BookCreateRequest, BookResponse } from '../models/book.model';
+import { BookCreateRequest, BookMetadata, BookResponse } from '../models/book.model';
 import { BookService } from '../services/book.service';
 import { compactIsbn, isbnValidator } from '../validators/isbn.validator';
 
@@ -79,6 +80,42 @@ export class BookCreateComponent {
   protected readonly submitted = signal(false);
   protected readonly createdBook = signal<BookResponse | null>(null);
   protected readonly imageFailed = signal(false);
+  protected readonly metadataState = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  protected readonly metadataMessage = signal<string | null>(null);
+  protected readonly metadataLocked = signal(false);
+
+  constructor() {
+    this.form.controls.isbn.valueChanges
+      .pipe(
+        tap(() => this.unlockMetadata()),
+        debounceTime(450),
+        filter(() => this.form.controls.isbn.valid),
+        map((isbn) => compactIsbn(isbn)),
+        tap(() => {
+          this.metadataState.set('loading');
+          this.metadataMessage.set('Consultando dados da obra…');
+        }),
+        switchMap((isbn) =>
+          this.books.lookupMetadata(isbn).pipe(
+            map((metadata) => ({ metadata, error: null as ApiError | null })),
+            catchError((error: ApiError) => of({ metadata: null as BookMetadata | null, error })),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(({ metadata, error }) => {
+        if (metadata) {
+          this.applyMetadata(metadata);
+          return;
+        }
+        this.metadataState.set('error');
+        this.metadataMessage.set(
+          error?.status === 404
+            ? 'ISBN não encontrado. Preencha título e autor manualmente.'
+            : 'Não foi possível consultar agora. Preencha título e autor manualmente.',
+        );
+      });
+  }
 
   protected get isSubmitting(): boolean {
     return this.state().status === 'submitting';
@@ -149,6 +186,7 @@ export class BookCreateComponent {
         next: (book) => {
           this.createdBook.set(book);
           this.state.set({ status: 'success', message: 'Obra cadastrada com sucesso.' });
+          this.unlockMetadata(false);
           this.form.reset();
           this.submitted.set(false);
         },
@@ -173,6 +211,28 @@ export class BookCreateComponent {
         acquired_at: optional(value.acquiredAt),
       },
     };
+  }
+
+  private applyMetadata(metadata: BookMetadata): void {
+    this.form.patchValue({ title: metadata.title, author: metadata.author, genre: metadata.genre ?? '' });
+    this.form.controls.title.disable();
+    this.form.controls.author.disable();
+    this.form.controls.genre.disable();
+    this.metadataLocked.set(true);
+    this.metadataState.set('loaded');
+    this.metadataMessage.set('Dados preenchidos pelo Google Books e bloqueados para evitar inconsistências.');
+  }
+
+  private unlockMetadata(clearLockedValues = true): void {
+    if (this.metadataLocked() && clearLockedValues) {
+      this.form.patchValue({ title: '', author: '', genre: '' }, { emitEvent: false });
+    }
+    this.form.controls.title.enable({ emitEvent: false });
+    this.form.controls.author.enable({ emitEvent: false });
+    this.form.controls.genre.enable({ emitEvent: false });
+    this.metadataLocked.set(false);
+    this.metadataState.set('idle');
+    this.metadataMessage.set(null);
   }
 
   private handleError(error: ApiError): void {

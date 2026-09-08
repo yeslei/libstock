@@ -83,6 +83,8 @@ class ManagementServiceStub:
     def update_book(self, _book_id, _changes, *, employee_id):
         assert employee_id == 7
         return {**self.detail, "title": "Atualizada"}
+    async def lookup_metadata(self, isbn):
+        return {"isbn": isbn, "title": "Título API", "author": "Autor API", "genre": "Tecnologia"}
 
 
 @pytest.mark.parametrize("method,path", [("get", "/api/v1/books/1"), ("patch", "/api/v1/books/1")])
@@ -109,3 +111,14 @@ def test_stock_keeper_can_read_and_update_book() -> None:
         app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["title"] == "Atualizada"
+
+
+def test_stock_keeper_can_lookup_metadata_without_route_conflict() -> None:
+    app.dependency_overrides[get_book_service] = ManagementServiceStub
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=7, role_codes=["STOCK_KEEPER"])
+    try:
+        response = TestClient(app).get("/api/v1/books/metadata/9788575225530")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["title"] == "Título API"
