@@ -2,7 +2,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.controllers.acervo_controller import router as acervo_router
 from app.controllers.admin_catalog_controller import router as admin_catalog_router
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.book_controller import router as book_router
@@ -65,4 +64,3 @@ app.include_router(copy_router)
 app.include_router(book_router)
 app.include_router(catalog_router)
 app.include_router(admin_catalog_router)
-app.include_router(acervo_router)

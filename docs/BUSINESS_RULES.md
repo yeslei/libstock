@@ -155,6 +155,14 @@ podem ser confirmados em conjunto; qualquer falha provoca rollback integral.
 O status do exemplar inicial não integra o payload: o backend sempre o persiste
 como `AVAILABLE` e força `is_active=true`.
 
+Regra aprovada: o exemplar possui uma única destinação, armazenada no campo
+obrigatório `copies.destination`. Os únicos valores permitidos são:
+
+- `DIDACTIC`: exemplar destinado a empréstimo e sem preço de venda;
+- `COMMERCIAL`: exemplar destinado a venda e com preço de venda obrigatório.
+
+Não existe classificação, tag ou campo de destinação secundário.
+
 | Estado | Significado |
 |---|---|
 | `AVAILABLE` | disponível para operação compatível |
@@ -198,27 +206,6 @@ Status: `PENDING`.
 ### Troca
 
 Status: `OUT_OF_SCOPE` até existir definição formal.
-
-### Classificação por Tag de Destinação (EAP-1.3.5)
-
-Status: `IMPLEMENTED`.
-
-- **Atores autorizados**: `STOCK_KEEPER`, `ADMINISTRATOR`.
-- **Pré-condições**:
-  - Item do acervo (`copies.id`) deve existir;
-  - Tag de destinação (`destination_tags.id` ou `slug`/`name`) deve existir;
-  - Usuário autenticado deve possuir vínculo funcional com `employees` (para auditoria de inventário).
-- **Alteração de estado**: Vínculo do campo `destination_tag_id` do exemplar.
-- **Entidades afetadas**: `copies` (coluna `destination_tag_id`), `destination_tags`.
-- **Resultado de sucesso**: HTTP 200 com os dados do item e sua tag associada.
-- **Erros possíveis**:
-  - 401: Token ausente ou inválido;
-  - 403: Papel não autorizado (`USER`, `SELLER`) ou usuário sem registro de funcionário;
-  - 404: Item do acervo não encontrado (`item_not_found`) ou Tag não encontrada (`destination_tag_not_found`);
-  - 422: Payload inválido (sem `tag_id` nem `tag_name`);
-  - 500: Erro de persistência no banco (`acervo_persistence_error`).
-- **Comportamento em concorrência**: Transação atômica (`commit` com `rollback` em exceção).
-- **Registro de auditoria**: Contexto `libstock.employee_id` configurado antes da alteração do registro de acervo.
 
 ## 11. Funcionários
 
