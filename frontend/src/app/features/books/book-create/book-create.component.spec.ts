@@ -19,6 +19,7 @@ describe('BookCreateComponent', () => {
     title: 'Python Fluente',
     author: 'Luciano Ramalho',
     genre: 'Tecnologia',
+    cover_url: null,
     is_active: true,
     initial_copy: {
       id: 8,
@@ -115,6 +116,7 @@ describe('BookCreateComponent', () => {
       title: 'Python Fluente',
       author: 'Luciano Ramalho',
       genre: 'Tecnologia',
+      cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
         sale_price: null, acquired_at: null,
@@ -128,7 +130,7 @@ describe('BookCreateComponent', () => {
     input('book-title', '   ');
     submit();
     expect(service.create).toHaveBeenCalledOnceWith({
-      isbn: '9788575225530', title: null, author: null, genre: null,
+      isbn: '9788575225530', title: null, author: null, genre: null, cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
         sale_price: null, acquired_at: null,

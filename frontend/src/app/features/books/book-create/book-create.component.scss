@@ -133,3 +133,18 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.cover-preview {
+  width: 112px;
+  margin-top: $space-2;
+  aspect-ratio: 2 / 3;
+  border-radius: $radius-sm;
+  object-fit: cover;
+  background: $bg-subtle;
+}
+
+.cover-preview--empty {
+  display: grid;
+  place-items: center;
+  color: $text-muted;
+}

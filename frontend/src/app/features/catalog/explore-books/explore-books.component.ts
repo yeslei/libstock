@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
 
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
@@ -10,7 +9,7 @@ import { CatalogSearchCriterion, CatalogService } from '../services/catalog.serv
 @Component({
   selector: 'app-explore-books',
   standalone: true,
-  imports: [RouterLink, AlertComponent, SpinnerComponent],
+  imports: [AlertComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './explore-books.component.html',
   styleUrl: './explore-books.component.scss',

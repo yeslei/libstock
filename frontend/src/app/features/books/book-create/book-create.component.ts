@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 
 import { ApiError, FormState } from '../../../core/models/auth.model';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
@@ -53,7 +52,7 @@ const PRICE_ERRORS = {
 @Component({
   selector: 'app-book-create',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [ReactiveFormsModule, AlertComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './book-create.component.html',
   styleUrl: './book-create.component.scss',
@@ -69,6 +68,7 @@ export class BookCreateComponent {
     title: ['', [Validators.maxLength(255)]],
     author: ['', [Validators.maxLength(255)]],
     genre: ['', [Validators.maxLength(100)]],
+    coverUrl: ['', [Validators.pattern(/^https?:\/\/.+/i)]],
     barcode: ['', [Validators.required, Validators.maxLength(100)]],
     destination: ['DIDACTIC' as 'DIDACTIC' | 'COMMERCIAL', [Validators.required]],
     condition: ['', [Validators.maxLength(30)]],
@@ -78,6 +78,7 @@ export class BookCreateComponent {
   protected readonly state = signal<FormState>({ status: 'idle' });
   protected readonly submitted = signal(false);
   protected readonly createdBook = signal<BookResponse | null>(null);
+  protected readonly imageFailed = signal(false);
 
   protected get isSubmitting(): boolean {
     return this.state().status === 'submitting';
@@ -163,6 +164,7 @@ export class BookCreateComponent {
       title: optional(value.title),
       author: optional(value.author),
       genre: optional(value.genre),
+      cover_url: optional(value.coverUrl),
       initial_copy: {
         barcode: value.barcode.trim(),
         destination: value.destination,
@@ -208,7 +210,7 @@ export class BookCreateComponent {
   }
 
   private focusFirstInvalid(): void {
-    const first = (['isbn', 'title', 'author', 'genre', 'barcode', 'destination', 'condition', 'salePrice', 'acquiredAt'] as const).find(
+    const first = (['isbn', 'title', 'author', 'genre', 'coverUrl', 'barcode', 'destination', 'condition', 'salePrice', 'acquiredAt'] as const).find(
       (field) => this.form.controls[field].invalid,
     );
     if (first) {

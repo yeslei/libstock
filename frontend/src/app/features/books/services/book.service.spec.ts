@@ -19,11 +19,11 @@ describe('BookService', () => {
 
   it('usa a URL relativa configurada e o endpoint correto', () => {
     const payload: BookCreateRequest = {
-      isbn: '9788575225530', title: null, author: null, genre: null,
+      isbn: '9788575225530', title: null, author: null, genre: null, cover_url: null,
       initial_copy: { barcode: 'EX-1', destination: 'DIDACTIC', condition: null, sale_price: null, acquired_at: null },
     };
     const response: BookResponse = {
-      id: 1, isbn: payload.isbn, title: 'Título', author: 'Autor', genre: null, is_active: true,
+      id: 1, isbn: payload.isbn, title: 'Título', author: 'Autor', genre: null, cover_url: null, is_active: true,
       initial_copy: { id: 2, book_id: 1, is_active: true, status: 'AVAILABLE', ...payload.initial_copy },
     };
 
