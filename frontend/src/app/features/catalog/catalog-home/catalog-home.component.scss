@@ -139,9 +139,9 @@ $content-max: 1180px;
   gap: $space-2;
 
   @include from($bp-md) {
-    flex: 1 1 240px;
+    flex: 1 1 360px;
     order: 0;
-    max-width: 420px;
+    max-width: 620px;
   }
 }
 
@@ -153,14 +153,26 @@ $content-max: 1180px;
   position: absolute;
   top: 50%;
   left: $space-3;
+  display: inline-flex;
+  width: 1.125rem;
+  height: 1.125rem;
   transform: translateY(-50%);
   color: $text-muted;
-  font-size: 1.125rem;
   pointer-events: none;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
 }
 
 .search__input {
-  flex: 1;
+  flex: 1 1 280px;
+  min-width: 0;
   width: 100%;
   min-height: $target-min;
   padding: 0 $space-3 0 $space-8;
