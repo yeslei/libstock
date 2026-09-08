@@ -1,0 +1,82 @@
+<main class="edit-page">
+  <section class="edit-panel" aria-labelledby="edit-title">
+    <header>
+      <p class="eyebrow">Gestão de usuários</p>
+      <h1 id="edit-title">Editar usuário</h1>
+    </header>
+
+    @if (error(); as message) {
+      <app-alert [message]="message" variant="error" />
+    }
+    @if (success(); as message) {
+      <app-alert [message]="message" variant="success" />
+    }
+
+    @if (loading()) {
+      <div class="loading" role="status"><app-spinner /> Carregando usuário…</div>
+    } @else if (loadedUser()) {
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div class="field">
+          <label class="field__label" for="user-name">Nome</label>
+          <div class="field__control" [class.field__control--invalid]="nameError()">
+            <input
+              class="field__input"
+              id="user-name"
+              type="text"
+              formControlName="name"
+              [attr.aria-invalid]="nameError() ? true : null"
+              [attr.aria-describedby]="nameError() ? 'user-name-error' : null"
+            />
+          </div>
+          @if (nameError(); as message) {
+            <span class="field__error" id="user-name-error">{{ message }}</span>
+          }
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="user-email">E-mail</label>
+          <div class="field__control" [class.field__control--invalid]="emailError()">
+            <input
+              class="field__input"
+              id="user-email"
+              type="email"
+              formControlName="email"
+              [attr.aria-invalid]="emailError() ? true : null"
+              [attr.aria-describedby]="emailError() ? 'user-email-error' : null"
+            />
+          </div>
+          @if (emailError(); as message) {
+            <span class="field__error" id="user-email-error">{{ message }}</span>
+          }
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="user-role">Cargo</label>
+          <div class="field__control">
+            <select class="field__input" id="user-role" formControlName="roleCode">
+              @for (role of roles; track role.value) {
+                <option [value]="role.value">{{ role.label }}</option>
+              }
+            </select>
+          </div>
+          <span class="field__hint">
+            @if (form.controls.roleCode.disabled) {
+              Você não pode remover o próprio acesso administrativo.
+            } @else {
+              Alterar o cargo modifica as permissões do usuário.
+            }
+          </span>
+        </div>
+
+        <div class="form-actions">
+          <button class="button button--secondary" type="button" (click)="back()">Voltar</button>
+          <button class="button" type="submit" [disabled]="saving()" [attr.aria-busy]="saving()">
+            @if (saving()) { <app-spinner /> Salvando… } @else { Salvar alterações }
+          </button>
+        </div>
+      </form>
+    } @else {
+      <button class="button button--secondary" type="button" (click)="back()">Voltar</button>
+    }
+  </section>
+</main>

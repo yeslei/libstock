@@ -1,0 +1,104 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+.users-page {
+  min-height: 100dvh;
+  padding: $space-6;
+  background: $bg-page;
+}
+
+.users-panel {
+  display: grid;
+  gap: $space-5;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: $space-6;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  background: $bg-surface;
+  box-shadow: $shadow-md;
+}
+
+.users-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $space-4;
+
+  h1 { color: $primary; }
+  p { color: $text-muted; }
+}
+
+.users-header__eyebrow {
+  color: $verde-medio !important;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.button,
+.actions button {
+  min-height: 44px;
+  padding: 0 $space-4;
+  border: 1px solid $primary;
+  border-radius: $radius-md;
+  background: $bg-surface;
+  color: $primary;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:focus-visible { @include focus-ring; }
+  &:disabled { cursor: not-allowed; opacity: 0.55; }
+}
+
+.button--primary { background: $primary; color: #fff; }
+
+.users-toolbar {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+
+  label { font-weight: 600; }
+  select {
+    min-height: 44px;
+    padding: 0 $space-4;
+    border: 1px solid $border;
+    border-radius: $radius-md;
+    background: $bg-surface;
+  }
+}
+
+.users-state {
+  display: flex;
+  justify-content: center;
+  gap: $space-2;
+  padding: $space-8;
+  color: $text-muted;
+}
+
+.delete-policy {
+  padding: $space-3;
+  border-left: 4px solid $warning;
+  background: $bg-subtle;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: $space-3; border-bottom: 1px solid $border; text-align: left; vertical-align: middle; }
+th { color: $text-muted; font-size: $font-size-xs; text-transform: uppercase; }
+td:first-child span { display: block; color: $text-muted; font-size: $font-size-sm; }
+
+.role-list, .actions { display: flex; flex-wrap: wrap; gap: $space-2; }
+.badge, .status { display: inline-block; padding: $space-1 $space-2; border-radius: 999px; background: $bg-subtle; font-size: $font-size-sm; font-weight: 600; }
+.status { color: $primary; }
+.status--inactive { color: $error; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: $bp-md) {
+  .users-page { padding: $space-3; }
+  .users-panel { padding: $space-4; }
+  .users-header { flex-direction: column; }
+  .users-toolbar { align-items: stretch; flex-direction: column; }
+}

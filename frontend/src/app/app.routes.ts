@@ -48,14 +48,32 @@ export const routes: Routes = [
     loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
   },
   {
+    path: 'gestao/usuarios',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMINISTRATOR'] },
+    title: 'Gestão de usuários · LibStock',
+    loadComponent: () =>
+      import('./features/users/user-management/user-management.component').then(
+        (m) => m.UserManagementComponent,
+      ),
+  },
+  {
     path: 'gestao/funcionarios',
     canActivate: [authGuard, roleGuard],
     data: { roles: ['ADMINISTRATOR'] },
-    title: 'Cadastrar funcionário · LibStock',
+    title: 'Cadastrar usuário · LibStock',
     loadComponent: () =>
       import('./features/employees/create-employee/create-employee.component').then(
         (m) => m.CreateEmployeeComponent,
       ),
+  },
+  {
+    path: 'gestao/usuarios/:id/editar',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMINISTRATOR'] },
+    title: 'Editar usuário · LibStock',
+    loadComponent: () =>
+      import('./features/users/user-edit/user-edit.component').then((m) => m.UserEditComponent),
   },
   {
     path: '',

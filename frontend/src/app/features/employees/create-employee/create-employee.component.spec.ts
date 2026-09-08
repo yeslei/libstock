@@ -36,14 +36,14 @@ describe('CreateEmployeeComponent', () => {
     return fixture.nativeElement.querySelector(`#${id}`) as HTMLSelectElement;
   }
 
-  function fillValidForm(): void {
+  function fillValidForm(role = 'SELLER'): void {
     input('employee-name').value = '  Maria Silva  ';
     input('employee-name').dispatchEvent(new Event('input'));
     input('employee-email').value = '  maria@exemplo.com  ';
     input('employee-email').dispatchEvent(new Event('input'));
     input('employee-password').value = 'senhasegura';
     input('employee-password').dispatchEvent(new Event('input'));
-    select('employee-access-level').value = 'SELLER';
+    select('employee-access-level').value = role;
     select('employee-access-level').dispatchEvent(new Event('change'));
     fixture.detectChanges();
   }
@@ -67,16 +67,28 @@ describe('CreateEmployeeComponent', () => {
   it('exibe as quatro opções canônicas de nível de acesso', () => {
     const values = Array.from(select('employee-access-level').options).map((option) => option.value);
 
-    expect(values).toContain('ATTENDANT');
+    expect(values).toContain('USER');
     expect(values).toContain('SELLER');
     expect(values).toContain('STOCK_KEEPER');
-    expect(values).toContain('MANAGER');
+    expect(values).toContain('ADMINISTRATOR');
   });
 
-  it('não oferece ADMINISTRATOR como papel cadastrável', () => {
+  it('não oferece papéis legados', () => {
     const values = Array.from(select('employee-access-level').options).map((option) => option.value);
 
-    expect(values).not.toContain('ADMINISTRATOR');
+    expect(values).not.toContain('ATTENDANT');
+  });
+
+  it('cria um cliente pelo cadastro de usuários quando o papel é USER', () => {
+    fillValidForm('USER');
+    submit();
+
+    const request = http.expectOne('/api/v1/auth/register');
+    expect(request.request.body).toEqual({
+      name: 'Maria Silva',
+      email: 'maria@exemplo.com',
+      password: 'senhasegura',
+    });
   });
 
   it('envia o payload normalizado no contrato esperado', () => {
@@ -136,7 +148,7 @@ describe('CreateEmployeeComponent', () => {
     );
     fixture.detectChanges();
 
-    expect(pageText()).toContain('Funcionário cadastrado com sucesso.');
+    expect(pageText()).toContain('Usuário cadastrado com sucesso.');
     expect(pageText()).toContain('Maria Silva');
     expect(pageText()).toContain('maria@exemplo.com');
     expect(pageText()).toContain('SELLER');
@@ -182,7 +194,7 @@ describe('CreateEmployeeComponent', () => {
     );
     fixture.detectChanges();
 
-    expect(pageText()).toContain('Você não tem permissão para cadastrar funcionários.');
+    expect(pageText()).toContain('Você não tem permissão para cadastrar usuários.');
   });
 
   it('apresenta 422 de forma legível', () => {
@@ -232,7 +244,7 @@ describe('CreateEmployeeComponent', () => {
     fixture.detectChanges();
 
     expect(input('employee-name').value).toBe('Maria Silva');
-    expect(input('employee-email').value).toBe('  maria@exemplo.com  ');
+    expect(input('employee-email').value).toBe('maria@exemplo.com');
     expect(input('employee-password').value).toBe('senhasegura');
     expect(select('employee-access-level').value).toBe('SELLER');
     expect(fixture.nativeElement.querySelector('button[type="submit"]').disabled).toBeFalse();
