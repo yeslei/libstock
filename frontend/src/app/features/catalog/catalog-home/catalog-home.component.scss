@@ -139,9 +139,9 @@ $content-max: 1180px;
   gap: $space-2;
 
   @include from($bp-md) {
-    flex: 1 1 240px;
+    flex: 1 1 360px;
     order: 0;
-    max-width: 420px;
+    max-width: 620px;
   }
 }
 
@@ -171,7 +171,8 @@ $content-max: 1180px;
 }
 
 .search__input {
-  flex: 1;
+  flex: 1 1 280px;
+  min-width: 0;
   width: 100%;
   min-height: $target-min;
   padding: 0 $space-3 0 $space-8;
