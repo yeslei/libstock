@@ -39,8 +39,8 @@
     </form>
 
     <nav class="topbar__nav" aria-label="Navegação principal">
-      <a class="topbar__link" routerLink="/">Explorar</a>
-      <a class="topbar__link" routerLink="/">Como funciona</a>
+      <a class="topbar__link" routerLink="/explorar">Explorar livros</a>
+      <a class="topbar__link" routerLink="/como-funciona">Como funciona</a>
     </nav>
 
     <div class="topbar__actions">
@@ -74,21 +74,6 @@
 </header>
 
 <main class="home">
-  <section class="hero">
-    <div class="hero__content">
-      <h1 class="hero__title">Encontre livros, compartilhe histórias, fortaleça a leitura.</h1>
-      <p class="hero__subtitle">
-        Consulte e gerencie o acervo da instituição em um só lugar.
-      </p>
-      <div class="hero__actions">
-        <a class="btn btn--primary btn--lg" routerLink="/">Explorar livros</a>
-        <a class="btn btn--outline btn--lg" routerLink="/">Como funciona</a>
-      </div>
-    </div>
-    <!-- Placeholder: não há arte definitiva em frontend/assets/ ainda. -->
-    <div class="hero__art" role="img" aria-label="Ilustração de leitura"></div>
-  </section>
-
   @if (searchState() === null) {
     <section class="section" aria-labelledby="genres-heading">
       <div class="section__head">

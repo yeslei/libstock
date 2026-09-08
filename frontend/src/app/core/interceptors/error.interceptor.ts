@@ -19,6 +19,10 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
     'Detectamos um uso indevido da sua sessão. Por segurança, entre novamente.',
   permission_denied: 'Você não tem permissão para realizar esta ação.',
   user_not_found: 'Não encontramos esse usuário.',
+  user_already_inactive: 'Este usuário já está inativo.',
+  user_self_inactivation: 'Você não pode inativar a própria conta.',
+  user_self_role_removal: 'Você não pode remover o próprio acesso administrativo.',
+  last_active_administrator: 'O último administrador ativo não pode perder o acesso.',
   duplicate_isbn: 'Este ISBN já está cadastrado.',
   duplicate_barcode: 'Este código de barras já está cadastrado.',
   employee_record_required:

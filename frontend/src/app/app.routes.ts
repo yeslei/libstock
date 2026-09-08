@@ -7,10 +7,26 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    title: 'LibStock — Encontre livros, compartilhe histórias',
+    title: 'LibStock — Gestão de acervo',
     loadComponent: () =>
       import('./features/catalog/catalog-home/catalog-home.component').then(
         (m) => m.CatalogHomeComponent,
+      ),
+  },
+  {
+    path: 'explorar',
+    title: 'Explorar livros · LibStock',
+    loadComponent: () =>
+      import('./features/catalog/explore-books/explore-books.component').then(
+        (m) => m.ExploreBooksComponent,
+      ),
+  },
+  {
+    path: 'como-funciona',
+    title: 'Como funciona · LibStock',
+    loadComponent: () =>
+      import('./features/about/how-it-works/how-it-works.component').then(
+        (m) => m.HowItWorksComponent,
       ),
   },
   {
@@ -48,14 +64,32 @@ export const routes: Routes = [
     loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
   },
   {
+    path: 'gestao/usuarios',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMINISTRATOR'] },
+    title: 'Gestão de usuários · LibStock',
+    loadComponent: () =>
+      import('./features/users/user-management/user-management.component').then(
+        (m) => m.UserManagementComponent,
+      ),
+  },
+  {
     path: 'gestao/funcionarios',
     canActivate: [authGuard, roleGuard],
     data: { roles: ['ADMINISTRATOR'] },
-    title: 'Cadastrar funcionário · LibStock',
+    title: 'Cadastrar usuário · LibStock',
     loadComponent: () =>
       import('./features/employees/create-employee/create-employee.component').then(
         (m) => m.CreateEmployeeComponent,
       ),
+  },
+  {
+    path: 'gestao/usuarios/:id/editar',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMINISTRATOR'] },
+    title: 'Editar usuário · LibStock',
+    loadComponent: () =>
+      import('./features/users/user-edit/user-edit.component').then((m) => m.UserEditComponent),
   },
   {
     path: '',

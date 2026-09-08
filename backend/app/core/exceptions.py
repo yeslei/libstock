@@ -165,3 +165,21 @@ class UserSelfInactivationError(ApplicationError):
             "user_self_inactivation",
             422,
         )
+
+
+class UserSelfRoleRemovalError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Um administrador não pode remover o próprio acesso administrativo.",
+            "user_self_role_removal",
+            422,
+        )
+
+
+class LastActiveAdministratorError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O último administrador ativo não pode perder o acesso.",
+            "last_active_administrator",
+            409,
+        )

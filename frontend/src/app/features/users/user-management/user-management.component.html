@@ -1,0 +1,105 @@
+<main class="users-page">
+  <section class="users-panel" aria-labelledby="users-title">
+    <header class="users-header">
+      <div>
+        <p class="users-header__eyebrow">Administração</p>
+        <h1 id="users-title">Gestão de usuários</h1>
+        <p>Consulte, edite e controle o acesso das contas do LibStock.</p>
+      </div>
+      <button class="button button--primary" type="button" (click)="registerUser()">
+        Cadastrar novo usuário
+      </button>
+    </header>
+
+    <div class="users-toolbar">
+      <label for="role-filter">Filtrar por cargo</label>
+      <select id="role-filter" (change)="filterByRole($event)" [value]="selectedRole()">
+        <option value="">Todos os cargos</option>
+        @for (role of roleOptions; track role.value) {
+          <option [value]="role.value">{{ role.label }}</option>
+        }
+      </select>
+    </div>
+    <p class="delete-policy" id="delete-policy">
+      A exclusão definitiva ainda não está disponível. Para bloquear o acesso, utilize “Inativar”.
+    </p>
+
+    @if (error(); as message) {
+      <app-alert [message]="message" variant="error" />
+    }
+    @if (success(); as message) {
+      <app-alert [message]="message" variant="success" />
+    }
+
+    @if (loading()) {
+      <div class="users-state" role="status" aria-live="polite">
+        <app-spinner />
+        <span>Carregando usuários…</span>
+      </div>
+    } @else if (users().length === 0) {
+      <p class="users-state">
+        {{ selectedRole() ? 'Nenhum usuário encontrado para este cargo.' : 'Nenhum usuário cadastrado.' }}
+      </p>
+    } @else {
+      <div class="table-scroll">
+        <table>
+          <caption class="sr-only">Usuários cadastrados no LibStock</caption>
+          <thead>
+            <tr>
+              <th scope="col">Usuário</th>
+              <th scope="col">Cargo</th>
+              <th scope="col">Status</th>
+              <th scope="col">Cadastro</th>
+              <th scope="col">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of users(); track user.id) {
+              <tr>
+                <td>
+                  <strong>{{ user.name }}</strong>
+                  <span>{{ user.email }}</span>
+                </td>
+                <td>
+                  <div class="role-list">
+                    @for (role of user.role_codes; track role) {
+                      <span class="badge">{{ roleLabel(role) }}</span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <span class="status" [class.status--inactive]="!user.is_active">
+                    {{ user.is_active ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </td>
+                <td>{{ user.created_at | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  <div class="actions">
+                    <button type="button" (click)="editUser(user.id)">Editar</button>
+                    <button
+                      type="button"
+                      (click)="inactivate(user)"
+                      [disabled]="!user.is_active || isCurrentUser(user.id) || inactivatingId() !== null"
+                      [title]="isCurrentUser(user.id) ? 'Você não pode inativar a própria conta.' : ''"
+                    >
+                      {{ inactivatingId() === user.id ? 'Inativando…' : 'Inativar' }}
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      title="Exclusão definitiva ainda não disponível. Utilize a inativação do usuário."
+                      aria-label="Excluir usuário — exclusão definitiva ainda não disponível"
+                      aria-describedby="delete-policy"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</main>

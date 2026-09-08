@@ -319,3 +319,35 @@ A revogação de sessões e a inativação do usuário ocorrem na mesma transaç
 - bloqueio de rota protegida com token de conta inativa;
 - repository não controla transação;
 - atomicidade da operação (ordem: revoke → inactivate → commit).
+
+## 16. Gestão administrativa de usuários
+
+Status: `IMPLEMENTED`
+Versão-alvo: v1
+Endpoints: `GET /api/v1/users`, `GET /api/v1/users/{id}` e `PATCH /api/v1/users/{id}`
+Entidades: `users`, `profiles`, `clients`, `employees`, `roles`, `user_roles`
+
+- Somente `ADMINISTRATOR` ativo pode listar, consultar e editar usuários.
+- A listagem inclui contas ativas e inativas e pode ser filtrada por um dos
+  quatro papéis oficiais: `USER`, `SELLER`, `STOCK_KEEPER` e `ADMINISTRATOR`.
+- O cadastro administrativo recebe exatamente um papel inicial.
+- A resposta administrativa nunca expõe senha, hash, tokens ou sessões.
+- Nome, e-mail e papel funcional podem ser alterados; a mudança de papel
+  mantém `user_roles` e o registro `clients` ou `employees` consistentes na
+  mesma transação.
+- Não é permitido remover o próprio papel administrativo.
+- Não é permitido remover nem inativar o último administrador ativo. A
+  verificação é serializada por lock transacional no papel `ADMINISTRATOR`.
+- E-mail permanece único e é armazenado normalizado em minúsculas.
+- A tela de cadastro existente em `/gestao/funcionarios` é reutilizada para os
+  quatro papéis oficiais; `USER` cria `Client`, e papéis internos criam
+  `Employee`.
+
+### Exclusão definitiva
+
+Status: `PENDING`
+
+A exclusão física de usuários não pertence ao contrato implementado. Até serem
+definidos os impactos sobre histórico, auditoria e referências de circulação,
+a interface exibe a ação desabilitada e orienta o administrador a usar a
+inativação. Não existe endpoint `DELETE` para usuários.
