@@ -132,7 +132,6 @@ $content-max: 1180px;
 
 // ---------------------------------------------------------------- Busca -----
 .search {
-  position: relative;
   flex: 1 1 100%;
   order: 3;
   display: flex;
@@ -143,6 +142,12 @@ $content-max: 1180px;
     order: 0;
     max-width: 620px;
   }
+}
+
+.search__field {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 0;
 }
 
 .search__label {
@@ -171,8 +176,6 @@ $content-max: 1180px;
 }
 
 .search__input {
-  flex: 1 1 280px;
-  min-width: 0;
   width: 100%;
   min-height: $target-min;
   padding: 0 $space-3 0 $space-8;

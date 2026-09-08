@@ -105,6 +105,11 @@ export class CatalogHomeComponent {
       });
   }
 
+  protected clearSearch(): void {
+    this.searchValue.set('');
+    this.searchState.set(null);
+  }
+
   protected isHidden(book: CatalogBook): boolean {
     return this.unfeatured().has(book.id);
   }
