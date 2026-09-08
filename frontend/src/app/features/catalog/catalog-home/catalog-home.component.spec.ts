@@ -42,4 +42,24 @@ describe('CatalogHomeComponent', () => {
     );
     expect(link?.textContent).toContain('Cadastrar exemplar');
   });
+
+  it('exibe apenas os resultados enquanto houver uma busca ativa', () => {
+    const root = fixture.nativeElement as HTMLElement;
+    const input = root.querySelector<HTMLInputElement>('#catalog-search')!;
+    input.value = 'obra';
+    input.dispatchEvent(new Event('input'));
+    root.querySelector<HTMLFormElement>('form.search')!.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(root.textContent).toContain('Resultado da busca');
+    expect(root.textContent).not.toContain('Categorias em destaque');
+    expect(root.textContent).not.toContain('Livros em destaque');
+
+    root.querySelector<HTMLButtonElement>('button.btn--outline')!.click();
+    fixture.detectChanges();
+
+    expect(root.textContent).toContain('Categorias em destaque');
+    expect(root.textContent).toContain('Livros em destaque');
+    expect(input.value).toBe('');
+  });
 });
