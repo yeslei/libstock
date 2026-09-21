@@ -192,3 +192,38 @@ class LastActiveAdministratorError(ApplicationError):
             "last_active_administrator",
             409,
         )
+
+class ClientNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Cliente não encontrado.",
+            "client_not_found",
+            404,
+        )
+
+
+class ClientPenaltyApplicationError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O cliente não possui pendência ativa para aplicação da penalidade.",
+            "client_penalty_application_error",
+            409,
+        )
+
+
+class ClientPenaltyRemovalError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O cliente ainda possui pendência ativa e não pode ser desbloqueado.",
+            "client_penalty_removal_error",
+            409,
+        )
+
+
+class ClientPenaltyPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível atualizar a situação de penalização do cliente.",
+            "client_penalty_persistence_error",
+            500,
+        )

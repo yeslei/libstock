@@ -11,6 +11,8 @@ from app.services.auth_service import AuthService
 from app.services.book_service import BookService
 from app.services.catalog_service import CatalogService
 from app.services.user_service import UserService
+from app.repositories.client_pendency_repository import ClientPendencyRepository
+from app.services.client_pendency_service import ClientPendencyService
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
@@ -41,3 +43,11 @@ def get_catalog_service(db: Session = Depends(get_db)) -> CatalogService:
         genre_repository=GenreRepository(db),
     )
 
+
+def get_client_pendency_service(
+    db: Session = Depends(get_db),
+) -> ClientPendencyService:
+    return ClientPendencyService(
+        db=db,
+        repository=ClientPendencyRepository(db),
+    )

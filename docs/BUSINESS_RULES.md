@@ -266,7 +266,6 @@ O registro deve conter:
 - obrigatoriedade de título e autor;
 - checksum no cadastro de ISBN;
 - ator de cada operação de circulação;
-- penalidades de clientes;
 - política de reservas;
 - confirmação e cancelamento de vendas;
 - criação de funcionário e usuário na mesma transação;
@@ -371,7 +370,85 @@ Entidades: `users`, `profiles`, `clients`, `employees`, `roles`, `user_roles`
 
 Status: `PENDING`
 
-A exclusão física de usuários não pertence ao contrato implementado. Até serem
-definidos os impactos sobre histórico, auditoria e referências de circulação,
-a interface exibe a ação desabilitada e orienta o administrador a usar a
-inativação. Não existe endpoint `DELETE` para usuários.
+A exclusão física de usuários não pertence ao contrato implementado. Até serem definidos os impactos sobre histórico, auditoria e referências de circulação, a interface exibe a ação desabilitada e orienta o administrador a usar a inativação. Não existe endpoint `DELETE` para usuários.
+
+## 17. Controle de pendências e penalização de clientes
+
+Status: `IMPLEMENTED`
+Versão: V2
+
+Endpoints:
+- `GET /api/v1/clients/{id}/pendencies`
+- `PATCH /api/v1/clients/{id}/penalty`
+
+Entidades:
+- `clients`
+- `loans`
+- `copies`
+- `books`
+- `audit_logs`
+
+### Pendência
+
+Um cliente possui pendência quando possui pelo menos um empréstimo que satisfaça simultaneamente:
+
+- `status = OPEN`;
+- `returned_at IS NULL`;
+- `due_date < now()`.
+
+A pendência é derivada do estado do empréstimo e não é armazenada em uma tabela própria.
+
+### Penalização
+
+Quando existe pelo menos uma pendência:
+
+- `clients.is_penalized = true`.
+
+Quando não existe mais nenhuma pendência:
+
+- `clients.is_penalized = false`.
+
+A penalização é sincronizada automaticamente pelo backend nas consultas de pendências e nas operações relevantes que utilizarem o serviço de sincronização. O empréstimo, devolução e reserva ainda não estão integrados. Esses três podem consumir o synchronize_penalty().
+
+### Aplicação e remoção manual
+
+`SELLER` e `ADMINISTRATOR` podem solicitar aplicação ou remoção manual da
+penalização.
+
+A aplicação manual exige pelo menos uma pendência ativa.
+
+A remoção manual somente é aceita quando não existem pendências ativas.
+
+O motivo é obrigatório para ambas as operações.
+
+### Histórico
+
+Toda mudança efetiva de penalização gera um registro imutável em `audit_logs`
+contendo:
+
+- ação;
+- estado anterior;
+- novo estado;
+- motivo;
+- responsável;
+- data/hora.
+
+Ações automáticas utilizam `actor_type = SYSTEM` e não possuem
+`employee_id`.
+
+Ações realizadas por funcionários utilizam `actor_type = EMPLOYEE` e
+registram o `employee_id`.
+
+### Atomicidade
+
+A alteração de `clients.is_penalized` e seu histórico devem ocorrer na mesma transação.
+
+### Concorrência
+
+A sincronização utiliza lock transacional sobre o cliente para serializar alterações concorrentes da sua situação de penalização.
+
+### Integração com circulação
+
+Operações de circulação que dependam da aptidão do cliente devem reavaliar as pendências antes de prosseguir.
+
+Os serviços de consulta e sincronização de penalização estão preparados para essa integração. Os fluxos transacionais de empréstimo, devolução e reserva ainda dependem da implementação de seus respectivos services e endpoints.
