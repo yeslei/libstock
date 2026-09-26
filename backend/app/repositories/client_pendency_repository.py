@@ -3,6 +3,16 @@ from sqlalchemy.orm import Session
 
 from app.models.domain import AuditLog, Book, Client, Copy, Employee, Loan, LoanStatus
 
+from app.models.domain import (
+    AuditLog,
+    Book,
+    Client,
+    Copy,
+    Employee,
+    Loan,
+    LoanStatus,
+)
+from app.models.user import User
 
 class ClientPendencyRepository:
     def __init__(self, db: Session) -> None:
@@ -81,3 +91,8 @@ class ClientPendencyRepository:
 
         self.db.add(audit_log)
         self.db.flush()
+
+    def find_user_active(self, client_id: int) -> bool | None:
+        return self.db.scalar(
+            select(User.is_active).where(User.id == client_id)
+        )

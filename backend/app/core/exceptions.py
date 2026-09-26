@@ -202,6 +202,24 @@ class ClientNotFoundError(ApplicationError):
         )
 
 
+class ClientInactiveError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Cliente inativo.",
+            "client_inactive",
+            403,
+        )
+
+
+class ClientHasPendingError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Cliente possui pendência ativa e não pode realizar a operação.",
+            "client_has_pending",
+            409,
+        )
+
+
 class ClientPenaltyApplicationError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(

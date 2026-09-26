@@ -10,6 +10,7 @@ from app.dependencies.services import get_client_pendency_service
 from app.main import app
 from app.schemas.client_pendency_schema import (
     ClientPendencyResponse,
+    ClientValidationResponse,
     OverdueLoanResponse,
 )
 
@@ -31,6 +32,7 @@ class FakePendencyService:
     def __init__(self):
         self.get_pendencies_mock = MagicMock()
         self.change_penalty_mock = MagicMock()
+        self.validate_client_mock = MagicMock()
 
     def get_pendencies(self, client_id: int):
         return self.get_pendencies_mock(client_id)
@@ -49,6 +51,9 @@ class FakePendencyService:
             reason=reason,
             actor_id=actor_id,
         )
+
+    def validate_client_for_operation(self, client_id: int):
+        return self.validate_client_mock(client_id)
 
 
 def make_response(
@@ -542,3 +547,192 @@ def test_repository_nao_controla_transacao():
 
     db.commit.assert_not_called()
     db.rollback.assert_not_called()
+
+# Testes da validação da situação do cliente
+
+def test_cliente_ativo_sem_pendencia_eh_aprovado():
+    db = MagicMock()
+    repository = MagicMock()
+
+    client = MagicMock()
+    client.id = 42
+    client.is_penalized = False
+
+    repository.find_client_for_update.return_value = client
+    repository.find_user_active.return_value = True
+    repository.list_overdue_loans.return_value = []
+
+    from app.services.client_pendency_service import ClientPendencyService
+
+    service = ClientPendencyService(
+        db=db,
+        repository=repository,
+    )
+
+    result = service.validate_client_for_operation(42)
+
+    assert result.client_id == 42
+    assert result.valid is True
+
+
+def test_cliente_inativo_eh_bloqueado():
+    db = MagicMock()
+    repository = MagicMock()
+
+    client = MagicMock()
+    client.id = 42
+    client.is_penalized = False
+
+    repository.find_client_for_update.return_value = client
+    repository.find_user_active.return_value = False
+
+    from app.services.client_pendency_service import ClientPendencyService
+    from app.core.exceptions import ClientInactiveError
+
+    service = ClientPendencyService(
+        db=db,
+        repository=repository,
+    )
+
+    with pytest.raises(ClientInactiveError):
+        service.validate_client_for_operation(42)
+
+    repository.list_overdue_loans.assert_not_called()
+    db.rollback.assert_called_once()
+
+
+def test_cliente_com_pendencia_eh_bloqueado():
+    db = MagicMock()
+    repository = MagicMock()
+
+    client = MagicMock()
+    client.id = 42
+    client.is_penalized = False
+
+    repository.find_client_for_update.return_value = client
+    repository.find_user_active.return_value = True
+    repository.list_overdue_loans.return_value = [
+        {
+            "loan_id": 7,
+            "copy_id": 15,
+            "book_id": 3,
+            "book_title": "Livro",
+            "loan_date": "2026-09-10T14:00:00Z",
+            "due_date": "2026-09-17T14:00:00Z",
+        }
+    ]
+
+    from app.services.client_pendency_service import ClientPendencyService
+    from app.core.exceptions import ClientHasPendingError
+
+    service = ClientPendencyService(
+        db=db,
+        repository=repository,
+    )
+
+    with pytest.raises(ClientHasPendingError):
+        service.validate_client_for_operation(42)
+
+    repository.list_overdue_loans.assert_called_once_with(42)
+    db.rollback.assert_called_once()
+
+
+def test_cliente_inexistente_eh_rejeitado():
+    db = MagicMock()
+    repository = MagicMock()
+
+    repository.find_client_for_update.return_value = None
+
+    from app.services.client_pendency_service import ClientPendencyService
+    from app.core.exceptions import ClientNotFoundError
+
+    service = ClientPendencyService(
+        db=db,
+        repository=repository,
+    )
+
+    with pytest.raises(ClientNotFoundError):
+        service.validate_client_for_operation(42)
+
+    repository.find_user_active.assert_not_called()
+    db.rollback.assert_called_once()
+
+def test_validacao_cliente_ativo_sem_pendencia_retorna_200():
+    service = FakePendencyService()
+    service.validate_client_mock.return_value = ClientValidationResponse(
+        client_id=42,
+        valid=True,
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: FakeUser(
+        user_id=10,
+        roles=["SELLER"],
+    )
+    app.dependency_overrides[get_client_pendency_service] = lambda: service
+
+    client = TestClient(app)
+
+    response = client.get("/api/v1/clients/42/validation")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "client_id": 42,
+        "valid": True,
+    }
+
+    service.validate_client_mock.assert_called_once_with(42)
+
+
+def test_validacao_cliente_inativo_retorna_403():
+    service = FakePendencyService()
+
+    from app.core.exceptions import ClientInactiveError
+
+    service.validate_client_mock.side_effect = ClientInactiveError()
+
+    app.dependency_overrides[get_current_user] = lambda: FakeUser(
+        user_id=10,
+        roles=["SELLER"],
+    )
+    app.dependency_overrides[get_client_pendency_service] = lambda: service
+
+    client = TestClient(app)
+
+    response = client.get("/api/v1/clients/42/validation")
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "client_inactive"
+
+
+def test_validacao_cliente_com_pendencia_retorna_409():
+    service = FakePendencyService()
+
+    from app.core.exceptions import ClientHasPendingError
+
+    service.validate_client_mock.side_effect = ClientHasPendingError()
+
+    app.dependency_overrides[get_current_user] = lambda: FakeUser(
+        user_id=10,
+        roles=["SELLER"],
+    )
+    app.dependency_overrides[get_client_pendency_service] = lambda: service
+
+    client = TestClient(app)
+
+    response = client.get("/api/v1/clients/42/validation")
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "client_has_pending"
+
+
+def test_user_nao_autorizado_nao_pode_validar_cliente():
+    app.dependency_overrides[get_current_user] = lambda: FakeUser(
+        user_id=20,
+        roles=["USER"],
+    )
+
+    client = TestClient(app)
+
+    response = client.get("/api/v1/clients/42/validation")
+
+    assert response.status_code == 403

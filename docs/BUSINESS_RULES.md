@@ -211,9 +211,55 @@ Cada operação deve documentar:
 - comportamento em concorrência;
 - registro de auditoria.
 
+(#29) Validação da situação do cliente
+
+Status: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `GET /api/v1/clients/{client_id}/validation`.
+
+Atores autorizados: `SELLER` e `ADMINISTRATOR`.
+
+Pré-condições:
+- o cliente deve existir;
+- o usuário associado ao cliente deve estar ativo;
+- o cliente não pode possuir empréstimo em aberto com devolução não registrada e
+  data de vencimento ultrapassada.
+
+Resultado de sucesso:
+- HTTP 200;
+- retorna `client_id` e `valid = true`.
+
+Erros possíveis:
+
+| Código | HTTP | Descrição |
+|---|---:|---|
+| `client_not_found` | 404 | Cliente não encontrado |
+| `client_inactive` | 403 | Cliente inativo |
+| `client_has_pending` | 409 | Cliente possui pendência ativa |
+| `invalid_token` | 401 | Usuário não autenticado |
+
+Concorrência:
+- a consulta do cliente utiliza bloqueio transacional (`FOR UPDATE`);
+- qualquer sincronização da penalização permanece na mesma transação.
+
+Auditoria:
+- caso a validação provoque alteração automática de `is_penalized`, a mudança é
+  registrada no histórico de auditoria pelo mecanismo de controle de pendências.
+
 ### Empréstimo
 
 Status: `PENDING`.
+
+Pré-condições previstas:
+- cliente existente;
+- cliente ativo;
+- cliente sem pendências de empréstimos;
+- exemplar disponível e compatível com a operação.
+
+A validação da situação do cliente é realizada pelo fluxo
+`GET /api/v1/clients/{client_id}/validation`.
 
 ### Devolução
 
