@@ -29,3 +29,24 @@ class CopyRepository:
         self.db.flush()
         self.db.refresh(db_copy)
         return db_copy
+
+    def create_copies(self, copies_data: list[CopyCreate]) -> list[Copy]:
+        db_copies = [
+            Copy(
+                book_id=copy_data.book_id,
+                barcode=copy_data.barcode,
+                destination=copy_data.destination,
+                condition=copy_data.condition,
+                sale_price=copy_data.sale_price,
+                acquired_at=copy_data.acquired_at,
+            )
+            for copy_data in copies_data
+        ]
+
+        self.db.add_all(db_copies)
+        self.db.flush()
+
+        for db_copy in db_copies:
+            self.db.refresh(db_copy)
+
+        return db_copies
