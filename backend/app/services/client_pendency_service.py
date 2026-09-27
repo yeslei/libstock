@@ -164,9 +164,11 @@ class ClientPendencyService:
         )
 
     def validate_client_for_operation(
-        self,
-        client_id: int,
-    ) -> ClientValidationResponse:
+            self,
+                        client_id: int,
+                        *,
+                        commit: bool = True,
+                    ) -> ClientValidationResponse:
         try:
             client = self._get_client(client_id)
 
@@ -189,7 +191,7 @@ class ClientPendencyService:
                 employee_id=None,
             )
 
-            if changed:
+            if changed and commit:
                 self.db.commit()
 
             if has_pending:
