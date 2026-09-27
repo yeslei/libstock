@@ -198,6 +198,25 @@ Não existe classificação, tag ou campo de destinação secundário.
 As transições permitidas devem ser documentadas antes da implementação dos
 services de circulação.
 
+Regra aprovada: uma mesma obra pode possuir quantidades distintas de exemplares
+para diferentes destinações de acervo dentro do mesmo cadastro. A quantidade é
+representada pelos próprios registros individuais de `Copy`, e não por um campo
+de quantidade na entidade.
+
+A operação em lote permite cadastrar vários exemplares da mesma obra em uma
+única transação, com destinações distintas entre os exemplares.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V2.
+- Endpoint: `POST /api/v1/copies/batch`.
+- Entidades: `Book`, `Copy`.
+- Ator autorizado: `STOCK_KEEPER` ou `ADMINISTRATOR`.
+- Cada exemplar deve possuir seu próprio `barcode`.
+- A criação do lote é atômica: falha em qualquer exemplar provoca rollback
+  integral da operação.
+- Testes: lote com múltiplos exemplares, destinações distintas, lote vazio,
+  obras diferentes no mesmo lote, erro de persistência e rollback.
+
 ## 10. Operações transacionais
 
 Cada operação deve documentar:
