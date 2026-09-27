@@ -34,7 +34,6 @@ Não substitui a documentação técnica da API nem as migrations.
 
 ### Planejado, mas não disponível
 
-- empréstimos;
 - devoluções;
 - reservas;
 - vendas;
@@ -269,16 +268,83 @@ Auditoria:
 
 ### Empréstimo
 
-Status: `PENDING`.
+Status: `IMPLEMENTED`.
 
-Pré-condições previstas:
-- cliente existente;
-- cliente ativo;
-- cliente sem pendências de empréstimos;
-- exemplar disponível e compatível com a operação.
+Versão-alvo: V2.
 
-A validação da situação do cliente é realizada pelo fluxo
+Endpoint: `POST /api/v1/loans/`.
+
+Entidades:
+- `clients`;
+- `copies`;
+- `loans`;
+- `employees`.
+
+Atores autorizados:
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+#### Pré-condições
+
+- o cliente deve existir;
+- o usuário associado ao cliente deve estar ativo;
+- o cliente não pode possuir pendências de empréstimos em atraso;
+- o exemplar deve existir;
+- o exemplar deve estar ativo;
+- o exemplar deve possuir status `AVAILABLE`.
+
+#### Registro
+
+O empréstimo deve ser vinculado:
+- ao cliente;
+- ao exemplar;
+- ao funcionário responsável pela operação.
+
+O novo empréstimo é criado com:
+- `status = OPEN`;
+- `returned_at = NULL`.
+
+O `employee_id` é obtido a partir do usuário autenticado.
+
+#### Concorrência e integridade
+
+- o cliente é validado antes do registro;
+- o exemplar é bloqueado transacionalmente durante a operação;
+- um mesmo exemplar não pode possuir mais de um empréstimo com status `OPEN`;
+- a validação do cliente e o registro do empréstimo participam da mesma transação;
+- falha na operação provoca rollback;
+- conflitos de integridade resultam em erro explícito.
+
+#### Validação do cliente
+
+A operação utiliza a validação da situação do cliente implementada em
 `GET /api/v1/clients/{client_id}/validation`.
+
+Além da validação disponibilizada pelo endpoint de consulta, o backend
+revalida o cliente durante o registro do empréstimo.
+
+#### Erros possíveis
+
+| Código | HTTP | Descrição |
+|---|---:|---|
+| `client_not_found` | 404 | Cliente não encontrado |
+| `client_inactive` | 403 | Cliente inativo |
+| `client_has_pending` | 409 | Cliente possui pendência |
+| — | 404 | Exemplar não encontrado ou inativo |
+| — | 409 | Exemplar indisponível |
+| — | 409 | Conflito ao registrar empréstimo |
+
+#### Testes
+
+- registro com cliente válido e exemplar disponível;
+- cliente inativo;
+- cliente com pendência;
+- exemplar inexistente ou inativo;
+- exemplar indisponível;
+- erro de integridade;
+- erro de banco e rollback;
+- autorização por papel;
+- integração do endpoint.
 
 ### Devolução
 
