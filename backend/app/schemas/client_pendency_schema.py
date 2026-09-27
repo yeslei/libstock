@@ -36,3 +36,7 @@ class PenaltyUpdateRequest(BaseModel):
             raise ValueError("O motivo deve possuir pelo menos 3 caracteres.")
 
         return normalized
+
+class ClientValidationResponse(BaseModel):
+    client_id: int
+    valid: bool

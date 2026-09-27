@@ -7,10 +7,19 @@ from app.core.exceptions import (
     ClientPenaltyPersistenceError,
     ClientPenaltyRemovalError,
     EmployeeRecordRequiredError,
+    ClientHasPendingError,
+    ClientInactiveError,
 )
 from app.repositories.client_pendency_repository import ClientPendencyRepository
 from app.schemas.client_pendency_schema import (
     ClientPendencyResponse,
+    OverdueLoanResponse,
+    PenaltyAction,
+)
+
+from app.schemas.client_pendency_schema import (
+    ClientPendencyResponse,
+    ClientValidationResponse,
     OverdueLoanResponse,
     PenaltyAction,
 )
@@ -153,6 +162,54 @@ class ClientPendencyService:
             actor_type=actor_type,
             employee_id=employee_id,
         )
+
+    def validate_client_for_operation(
+        self,
+        client_id: int,
+    ) -> ClientValidationResponse:
+        try:
+            client = self._get_client(client_id)
+
+            user_is_active = self.repository.find_user_active(client_id)
+
+            if user_is_active is None:
+                raise ClientNotFoundError()
+
+            if not user_is_active:
+                raise ClientInactiveError()
+
+            overdue_loans = self.repository.list_overdue_loans(client_id)
+            has_pending = bool(overdue_loans)
+
+            changed = self._synchronize_penalty(
+                client=client,
+                has_pending=has_pending,
+                reason=self._automatic_reason(has_pending),
+                actor_type="SYSTEM",
+                employee_id=None,
+            )
+
+            if changed:
+                self.db.commit()
+
+            if has_pending:
+                raise ClientHasPendingError()
+
+            return ClientValidationResponse(
+                client_id=client.id,
+                valid=True,
+            )
+
+        except (
+            ClientNotFoundError,
+            ClientInactiveError,
+            ClientHasPendingError,
+        ):
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise ClientPenaltyPersistenceError() from exc
 
     def _synchronize_penalty(
         self,

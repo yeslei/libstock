@@ -5,6 +5,7 @@ from app.dependencies.services import get_client_pendency_service
 from app.models.user import User
 from app.schemas.client_pendency_schema import (
     ClientPendencyResponse,
+    ClientValidationResponse,
     PenaltyUpdateRequest,
 )
 from app.services.client_pendency_service import ClientPendencyService
@@ -20,6 +21,18 @@ require_pendency_reader = require_roles(
     "ADMINISTRATOR",
 )
 
+@router.get(
+    "/{client_id}/validation",
+    response_model=ClientValidationResponse,
+)
+def validate_client(
+    client_id: int = Path(gt=0),
+    _current_user: User = Depends(require_pendency_reader),
+    client_pendency_service: ClientPendencyService = Depends(
+        get_client_pendency_service
+    ),
+) -> ClientValidationResponse:
+    return client_pendency_service.validate_client_for_operation(client_id)
 
 @router.get(
     "/{client_id}/pendencies",
