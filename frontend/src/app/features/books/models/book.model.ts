@@ -35,3 +35,15 @@ export interface BookResponse {
   readonly is_active: boolean;
   readonly initial_copy: CopyResponse | null;
 }
+
+export interface BookUpdateRequest {
+  readonly title?: string | null;
+  readonly author?: string | null;
+  readonly genre?: string | null;
+  readonly isbn?: string | null;
+  readonly publication_year?: number | null;
+  readonly publisher?: string | null;
+  readonly edition?: string | null;
+  readonly cover_url?: string | null;
+  readonly is_active?: boolean;
+}

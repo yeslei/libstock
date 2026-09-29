@@ -96,3 +96,38 @@ class TestAcervoRepositoryIntegration:
         assert self.repository.is_employee(1) is True
         assert self.repository.is_employee(999) is False
 
+    def test_find_book_by_id(self):
+        book = self.repository.find_book_by_id(1)
+        assert book is not None
+        assert book.id == 1
+        assert book.title == "Livro Teste"
+
+        nonexistent = self.repository.find_book_by_id(999)
+        assert nonexistent is None
+
+    def test_find_book_by_isbn(self):
+        book = self.repository.find_book_by_id(1)
+        book.isbn = "9788575225530"
+        self.db.commit()
+
+        found = self.repository.find_book_by_isbn("9788575225530")
+        assert found is not None
+        assert found.id == 1
+
+        not_found = self.repository.find_book_by_isbn("0000000000")
+        assert not_found is None
+
+    def test_update_book(self):
+        book = self.repository.find_book_by_id(1)
+        updated = self.repository.update_book(
+            book,
+            {"title": "Título Atualizado", "genre": "Suspense", "publication_year": 2024},
+        )
+        self.db.commit()
+
+        reloaded = self.repository.find_book_by_id(1)
+        assert reloaded is not None
+        assert reloaded.title == "Título Atualizado"
+        assert reloaded.genre == "Suspense"
+        assert reloaded.publication_year == 2024
+

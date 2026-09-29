@@ -3,11 +3,17 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.exceptions import AcervoItemNotFoundError, DestinationTagNotFoundError
+from app.core.exceptions import (
+    AcervoItemNotFoundError,
+    BookNotFoundError,
+    DestinationTagNotFoundError,
+    DuplicateIsbnError,
+)
 from app.dependencies.authentication import get_current_user
 from app.dependencies.services import get_acervo_service
 from app.main import app
 from app.schemas.acervo_schema import ClassifyItemInput
+from app.schemas.book_schema import BookUpdate
 
 client = TestClient(app)
 
@@ -16,6 +22,7 @@ class FakeAcervoService:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
         self.calls: list[tuple[int, ClassifyItemInput, int]] = []
+        self.update_calls: list[tuple[int, BookUpdate, int | None]] = []
 
     def classify_item(self, item_id: int, payload: ClassifyItemInput, *, actor_id: int):
         self.calls.append((item_id, payload, actor_id))
@@ -55,6 +62,20 @@ class FakeAcervoService:
             status="AVAILABLE",
             destination="DIDACTIC",
             destination_tag=None,
+        )
+
+    def update_book(self, book_id: int, payload: BookUpdate, *, actor_id: int | None = None):
+        self.update_calls.append((book_id, payload, actor_id))
+        if self.error:
+            raise self.error
+        return SimpleNamespace(
+            id=book_id,
+            isbn=payload.isbn or "9788575225530",
+            title=payload.title or "Título Atualizado",
+            author=payload.author or "Autor Atualizado",
+            genre=payload.genre or "Ficção",
+            is_active=payload.is_active if payload.is_active is not None else True,
+            initial_copy=None,
         )
 
 
@@ -200,4 +221,109 @@ def test_get_acervo_item():
 
     assert response.status_code == 200
     assert response.json()["id"] == 5
+
+
+# ---- Atualização de Obra do Acervo (EAP-1.3.3 / Issue #18) ----
+
+
+def test_update_acervo_book_sem_token_retorna_401():
+    _use_fake_service()
+    response = client.patch("/api/v1/acervo/1", json={"title": "Novo Título"})
+    assert response.status_code == 401
+    assert response.json()["code"] == "invalid_token"
+
+
+def test_update_acervo_book_role_insuficiente_retorna_403():
+    _use_fake_service()
+    _authenticate_as("USER")
+    response = client.patch("/api/v1/acervo/1", json={"title": "Novo Título"})
+    assert response.status_code == 403
+    assert response.json()["code"] == "permission_denied"
+
+
+@pytest.mark.parametrize("role", ["STOCK_KEEPER", "ADMINISTRATOR", "MANAGER"])
+def test_update_acervo_book_sucesso_prefixo_api(role):
+    fake = _use_fake_service()
+    _authenticate_as(role, user_id=10)
+
+    response = client.patch("/api/v1/acervo/42", json={"title": "Clean Architecture", "genre": "Tecnologia"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == 42
+    assert data["title"] == "Clean Architecture"
+    assert data["genre"] == "Tecnologia"
+    assert len(fake.update_calls) == 1
+    assert fake.update_calls[0][0] == 42
+    assert fake.update_calls[0][1].title == "Clean Architecture"
+    assert fake.update_calls[0][2] == 10
+
+
+def test_update_acervo_book_sucesso_rota_direta():
+    fake = _use_fake_service()
+    _authenticate_as("STOCK_KEEPER", user_id=10)
+
+    response = client.patch("/acervo/42", json={"title": "Clean Code"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == 42
+    assert data["title"] == "Clean Code"
+    assert len(fake.update_calls) == 1
+
+
+def test_update_acervo_book_inexistente_retorna_404():
+    _use_fake_service(BookNotFoundError())
+    _authenticate_as("STOCK_KEEPER")
+
+    response = client.patch("/api/v1/acervo/999", json={"title": "Título"})
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "book_not_found"
+
+
+def test_update_acervo_book_isbn_duplicado_retorna_409():
+    _use_fake_service(DuplicateIsbnError())
+    _authenticate_as("STOCK_KEEPER")
+
+    response = client.patch("/api/v1/acervo/1", json={"isbn": "978-85-7522-553-0"})
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "duplicate_isbn"
+
+
+def test_update_acervo_book_titulo_vazio_retorna_422():
+    _use_fake_service()
+    _authenticate_as("STOCK_KEEPER")
+
+    response = client.patch("/api/v1/acervo/1", json={"title": "   "})
+
+    assert response.status_code == 422
+
+
+def test_update_acervo_book_isbn_invalido_retorna_422():
+    _use_fake_service()
+    _authenticate_as("STOCK_KEEPER")
+
+    response = client.patch("/api/v1/acervo/1", json={"isbn": "isbn-invalido"})
+
+    assert response.status_code == 422
+
+
+def test_update_acervo_book_ano_invalido_retorna_422():
+    _use_fake_service()
+    _authenticate_as("STOCK_KEEPER")
+
+    response = client.patch("/api/v1/acervo/1", json={"publication_year": 999})
+
+    assert response.status_code == 422
+
+
+def test_update_acervo_book_campo_extra_retorna_422():
+    _use_fake_service()
+    _authenticate_as("STOCK_KEEPER")
+
+    response = client.patch("/api/v1/acervo/1", json={"extra_field": "invalido"})
+
+    assert response.status_code == 422
 

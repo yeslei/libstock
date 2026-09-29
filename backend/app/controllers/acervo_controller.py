@@ -8,11 +8,13 @@ from app.schemas.acervo_schema import (
     ClassifyItemInput,
     DestinationTagResponse,
 )
+from app.schemas.book_schema import BookResponse, BookUpdate
 from app.services.acervo_service import AcervoService
 
 router = APIRouter(prefix="/api/v1/acervo", tags=["Gestão do Acervo"])
+direct_router = APIRouter(prefix="/acervo", tags=["Gestão do Acervo"])
 
-require_acervo_access = require_roles("STOCK_KEEPER", "ADMINISTRATOR")
+require_acervo_access = require_roles("STOCK_KEEPER", "ADMINISTRATOR", "MANAGER")
 
 
 @router.get("/tags", response_model=list[DestinationTagResponse])
@@ -58,4 +60,17 @@ def update_item_destination(
     """Atualiza a classificação de destinação de um item do acervo."""
     item = service.classify_item(item_id, payload, actor_id=current_user.id)
     return AcervoItemResponse.model_validate(item)
+
+
+@router.patch("/{id}", response_model=BookResponse, status_code=status.HTTP_200_OK)
+@direct_router.patch("/{id}", response_model=BookResponse, status_code=status.HTTP_200_OK)
+def update_acervo_book(
+    id: int,
+    payload: BookUpdate,
+    service: AcervoService = Depends(get_acervo_service),
+    current_user: User = Depends(require_acervo_access),
+) -> BookResponse:
+    """Atualiza os dados de uma obra existente no acervo."""
+    book = service.update_book(id, payload, actor_id=current_user.id)
+    return BookResponse.model_validate(book)
 

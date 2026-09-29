@@ -92,6 +92,47 @@ class BookCreateResponse(BookCreate):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class BookUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=255)
+    author: str | None = Field(default=None, max_length=255)
+    genre: str | None = Field(default=None, max_length=100)
+    isbn: str | None = None
+    publication_year: int | None = Field(default=None, ge=1000, le=2100)
+    publisher: str | None = Field(default=None, max_length=150)
+    edition: str | None = Field(default=None, max_length=50)
+    cover_url: str | None = Field(default=None)
+    is_active: bool | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("title", "author", mode="before")
+    @classmethod
+    def validate_mandatory_text(cls, value: object) -> object:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                raise ValueError("O campo não pode ficar em branco.")
+            return stripped
+        return value
+
+    @field_validator("genre", "publisher", "edition", "cover_url", mode="before")
+    @classmethod
+    def normalize_optional_fields(cls, value: object) -> object:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
+
+    @field_validator("isbn")
+    @classmethod
+    def validate_isbn_if_present(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_isbn(value)
+
 class BookSearchParams(BaseModel):
     title: str = Field(min_length=1, pattern=r".*\S.*")
 

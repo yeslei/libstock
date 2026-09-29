@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
     ApplicationError,
+    BookNotFoundError,
     BookPersistenceError,
     DuplicateBarcodeError,
     DuplicateIsbnError,
@@ -20,7 +21,7 @@ from app.core.exceptions import (
 )
 from app.models.domain import Book
 from app.repositories.book_repository import BookRepository
-from app.schemas.book_schema import BookCreate, BookResponse, CopyResponse
+from app.schemas.book_schema import BookCreate, BookResponse, BookUpdate, CopyResponse
 
 
 GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
@@ -189,3 +190,45 @@ class BookService:
         if not normalized:
             raise ValueError("O título da busca não pode estar vazio.")
         return self.repository.search_by_title(normalized)
+
+    def update_book(
+        self,
+        book_id: int,
+        payload: BookUpdate,
+        *,
+        employee_id: int | None = None,
+    ) -> Book:
+        try:
+            book = self.repository.find_by_id(book_id)
+            if book is None:
+                raise BookNotFoundError()
+
+            update_data = payload.model_dump(exclude_unset=True)
+            if not update_data:
+                return book
+
+            if "isbn" in update_data and update_data["isbn"] is not None:
+                new_isbn = update_data["isbn"]
+                existing = self.repository.find_by_isbn(new_isbn)
+                if existing is not None and existing.id != book.id:
+                    raise DuplicateIsbnError()
+
+            if employee_id is not None and self.repository.employee_exists(employee_id):
+                self.db.execute(
+                    text("SELECT set_config('libstock.employee_id', :employee_id, true)"),
+                    {"employee_id": str(employee_id)},
+                )
+
+            updated_book = self.repository.update_book(book, update_data)
+            self.db.commit()
+            self.db.refresh(updated_book)
+            return updated_book
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise BookPersistenceError() from exc
+        except Exception as exc:
+            self.db.rollback()
+            raise BookPersistenceError() from exc

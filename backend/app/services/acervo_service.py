@@ -6,11 +6,15 @@ from app.core.exceptions import (
     AcervoPersistenceError,
     ApplicationError,
     AuditActorRequiredError,
+    BookNotFoundError,
+    BookPersistenceError,
     DestinationTagNotFoundError,
+    DuplicateIsbnError,
 )
-from app.models.domain import Copy, DestinationTag
+from app.models.domain import Book, Copy, DestinationTag
 from app.repositories.acervo_repository import AcervoRepository
 from app.schemas.acervo_schema import ClassifyItemInput
+from app.schemas.book_schema import BookUpdate
 
 
 class AcervoService:
@@ -71,4 +75,43 @@ class AcervoService:
         if item is None:
             raise AcervoItemNotFoundError()
         return item
+
+    def update_book(
+        self,
+        book_id: int,
+        payload: BookUpdate,
+        *,
+        actor_id: int | None = None,
+    ) -> Book:
+        try:
+            book = self.repository.find_book_by_id(book_id)
+            if book is None:
+                raise BookNotFoundError()
+
+            update_data = payload.model_dump(exclude_unset=True)
+            if not update_data:
+                return book
+
+            if "isbn" in update_data and update_data["isbn"] is not None:
+                new_isbn = update_data["isbn"]
+                existing = self.repository.find_book_by_isbn(new_isbn)
+                if existing is not None and existing.id != book.id:
+                    raise DuplicateIsbnError()
+
+            if actor_id is not None and self.repository.is_employee(actor_id):
+                self.repository.set_audit_actor(actor_id)
+
+            updated_book = self.repository.update_book(book, update_data)
+            self.db.commit()
+            self.db.refresh(updated_book)
+            return updated_book
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise BookPersistenceError() from exc
+        except Exception as exc:
+            self.db.rollback()
+            raise BookPersistenceError() from exc
 

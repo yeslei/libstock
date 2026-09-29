@@ -1,7 +1,7 @@
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.domain import Copy, DestinationTag, Employee
+from app.models.domain import Book, Copy, DestinationTag, Employee
 
 
 class AcervoRepository:
@@ -17,6 +17,18 @@ class AcervoRepository:
             .where(Copy.id == item_id)
         )
         return self.db.scalar(statement)
+
+    def find_book_by_id(self, book_id: int) -> Book | None:
+        return self.db.get(Book, book_id)
+
+    def find_book_by_isbn(self, isbn: str) -> Book | None:
+        return self.db.scalar(select(Book).where(Book.isbn == isbn))
+
+    def update_book(self, book: Book, data: dict[str, object]) -> Book:
+        for key, value in data.items():
+            setattr(book, key, value)
+        self.db.flush()
+        return book
 
     def find_tag_by_id(self, tag_id: int) -> DestinationTag | None:
         return self.db.get(DestinationTag, tag_id)

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.book_schema import BookUpdate
+
 
 class DestinationTagResponse(BaseModel):
     id: int
