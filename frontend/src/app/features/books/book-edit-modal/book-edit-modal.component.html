@@ -1,0 +1,134 @@
+<div class="modal-backdrop" (click)="close()" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-container" (click)="$event.stopPropagation()">
+    <header class="modal-header">
+      <h2 id="modal-title">Editar Obra do Acervo</h2>
+      <button type="button" class="btn-close" (click)="close()" [disabled]="isSubmitting" aria-label="Fechar">
+        &times;
+      </button>
+    </header>
+
+    @if (toast(); as t) {
+      <div class="toast" [class.toast-success]="t.type === 'success'" [class.toast-error]="t.type === 'error'" role="alert">
+        {{ t.text }}
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="book-title">Título <span class="required">*</span></label>
+          <input
+            id="book-title"
+            type="text"
+            formControlName="title"
+            class="form-control"
+            [class.is-invalid]="submitted() && form.controls.title.invalid"
+          />
+          @if (submitted() && form.controls.title.errors?.['required']) {
+            <span class="field-error">O título é obrigatório.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="book-author">Autor <span class="required">*</span></label>
+          <input
+            id="book-author"
+            type="text"
+            formControlName="author"
+            class="form-control"
+            [class.is-invalid]="submitted() && form.controls.author.invalid"
+          />
+          @if (submitted() && form.controls.author.errors?.['required']) {
+            <span class="field-error">O autor é obrigatório.</span>
+          }
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="book-isbn">ISBN</label>
+            <input
+              id="book-isbn"
+              type="text"
+              formControlName="isbn"
+              class="form-control"
+              [class.is-invalid]="submitted() && form.controls.isbn.invalid"
+            />
+            @if (submitted() && form.controls.isbn.errors?.['isbn']) {
+              <span class="field-error">ISBN inválido (informe 10 ou 13 dígitos válidos).</span>
+            }
+          </div>
+
+          <div class="form-group col">
+            <label for="book-genre">Gênero</label>
+            <input
+              id="book-genre"
+              type="text"
+              formControlName="genre"
+              class="form-control"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="book-year">Ano de Publicação</label>
+            <input
+              id="book-year"
+              type="number"
+              formControlName="publicationYear"
+              class="form-control"
+              [class.is-invalid]="submitted() && form.controls.publicationYear.invalid"
+            />
+            @if (submitted() && (form.controls.publicationYear.errors?.['min'] || form.controls.publicationYear.errors?.['max'])) {
+              <span class="field-error">Ano deve estar entre 1000 e 2100.</span>
+            }
+          </div>
+
+          <div class="form-group col">
+            <label for="book-publisher">Editora</label>
+            <input
+              id="book-publisher"
+              type="text"
+              formControlName="publisher"
+              class="form-control"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="book-cover">URL da Capa</label>
+          <input
+            id="book-cover"
+            type="url"
+            formControlName="coverUrl"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-check">
+          <input
+            id="book-active"
+            type="checkbox"
+            formControlName="isActive"
+            class="form-check-input"
+          />
+          <label for="book-active" class="form-check-label">Obra ativa no catálogo</label>
+        </div>
+      </div>
+
+      <footer class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="isSubmitting">
+          Cancelar
+        </button>
+        <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
+          @if (isSubmitting) {
+            <app-spinner></app-spinner>
+            <span>Salvando...</span>
+          } @else {
+            <span>Salvar Alterações</span>
+          }
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>
