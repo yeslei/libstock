@@ -43,6 +43,7 @@ class BookResponseTests(unittest.TestCase):
                 "title": "O Hobbit",
                 "author": "J. R. R. Tolkien",
                 "genre": None,
+                "cover_url": None,
                 "is_active": True,
                 "initial_copy": None,
             },

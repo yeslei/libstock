@@ -1,9 +1,6 @@
-<header class="topbar">
+<!-- A navegação global é renderizada pelo AppComponent. -->
+<div class="catalog-tools">
   <div class="topbar__inner">
-    <a class="topbar__brand" routerLink="/" aria-label="LibStock — página inicial">
-      <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
-    </a>
-
     <form class="search" role="search" (submit)="$event.preventDefault(); searchBooks()">
       <label class="search__label" for="catalog-search">Buscar no acervo</label>
       <select
@@ -17,109 +14,70 @@
         <option value="isbn">ISBN</option>
         <option value="barcode">Código de barras</option>
       </select>
-      <span class="search__icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false">
-          <circle cx="11" cy="11" r="6.5" />
-          <path d="m16 16 4 4" />
-        </svg>
-      </span>
-      <input
-        id="catalog-search"
-        class="search__input"
-        type="search"
-        placeholder="Digite o termo de busca..."
-        [value]="searchValue()"
-        (input)="setSearchValue($any($event.target).value)"
-        aria-describedby="catalog-search-hint"
-      />
+      <div class="search__field">
+        <span class="search__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m16 16 4 4" />
+          </svg>
+        </span>
+        <input
+          id="catalog-search"
+          class="search__input"
+          type="search"
+          placeholder="Digite o termo de busca..."
+          [value]="searchValue()"
+          (input)="setSearchValue($any($event.target).value)"
+          aria-describedby="catalog-search-hint"
+        />
+      </div>
       <button class="search__submit" type="submit">Buscar</button>
       <p id="catalog-search-hint" class="search__hint">Escolha um critério e informe um termo.</p>
     </form>
 
-    <nav class="topbar__nav" aria-label="Navegação principal">
-      <a class="topbar__link" routerLink="/">Explorar</a>
-      <a class="topbar__link" routerLink="/">Como funciona</a>
-    </nav>
-
-    <div class="topbar__actions">
-      @if (isAuthenticated()) {
-        <a class="btn btn--primary" routerLink="/painel">Meu painel</a>
-      } @else {
-        <a class="btn btn--ghost" routerLink="/login">Entrar</a>
-        <a class="btn btn--primary" routerLink="/register">Cadastrar</a>
-      }
-    </div>
   </div>
 
-  @if (canServeCounter() || canManageStock() || canManageCatalog()) {
-    <!-- Barra operacional: só existe para quem tem função de balcão ou
-         gestão, conforme as histórias US01, US03 e US04 do SRS. -->
-    <div class="opsbar">
-      <div class="opsbar__inner">
-        <span class="opsbar__label">Modo operação</span>
-        @if (canServeCounter()) {
-          <span class="opsbar__item">Registro de venda, empréstimo e devolução no card</span>
-        }
-        @if (canManageStock()) {
-          <a class="opsbar__item" routerLink="/obras/nova">Cadastrar obra</a>
-        }
-        @if (canManageCatalog()) {
-          <span class="opsbar__item">Gestão de destaques</span>
-        }
-      </div>
-    </div>
-  }
-</header>
+</div>
 
 <main class="home">
-  <section class="hero">
-    <div class="hero__content">
-      <h1 class="hero__title">Encontre livros, compartilhe histórias, fortaleça a leitura.</h1>
-      <p class="hero__subtitle">
-        Consulte e gerencie o acervo da instituição em um só lugar.
-      </p>
-      <div class="hero__actions">
-        <a class="btn btn--primary btn--lg" routerLink="/">Explorar livros</a>
-        <a class="btn btn--outline btn--lg" routerLink="/">Como funciona</a>
+  @if (searchState() === null) {
+    <section class="section" aria-labelledby="genres-heading">
+      <div class="section__head">
+        <h2 class="section__title" id="genres-heading">Categorias em destaque</h2>
       </div>
-    </div>
-    <!-- Placeholder: não há arte definitiva em frontend/assets/ ainda. -->
-    <div class="hero__art" role="img" aria-label="Ilustração de leitura"></div>
-  </section>
 
-  <section class="section" aria-labelledby="genres-heading">
-    <div class="section__head">
-      <h2 class="section__title" id="genres-heading">Categorias em destaque</h2>
-    </div>
-
-    @if (genres$ | async; as state) {
-      @switch (state.status) {
-        @case ('loading') {
-          <p class="state state--loading"><app-spinner /> <span>Carregando categorias…</span></p>
-        }
-        @case ('error') {
-          <app-alert [message]="state.message" variant="error" />
-        }
-        @case ('loaded') {
-          @if (state.data.length === 0) {
-            <p class="state">Nenhuma categoria em destaque no momento.</p>
-          } @else {
-            <ul class="chips">
-              @for (genre of state.data; track genre.id) {
-                <li>
-                  <a class="chip" [routerLink]="['/generos', genre.slug]">{{ genre.name }}</a>
-                </li>
-              }
-            </ul>
+      @if (genres$ | async; as state) {
+        @switch (state.status) {
+          @case ('loading') {
+            <p class="state state--loading"><app-spinner /> <span>Carregando categorias…</span></p>
+          }
+          @case ('error') {
+            <app-alert [message]="state.message" variant="error" />
+          }
+          @case ('loaded') {
+            @if (state.data.length === 0) {
+              <p class="state">Nenhuma categoria em destaque no momento.</p>
+            } @else {
+              <ul class="chips">
+                @for (genre of state.data; track genre.id) {
+                  <li>
+                    <a class="chip" [routerLink]="['/generos', genre.slug]">{{ genre.name }}</a>
+                  </li>
+                }
+              </ul>
+            }
           }
         }
       }
-    }
-  </section>
+    </section>
+  }
 
   @if (searchState(); as state) {
     <section class="section" aria-labelledby="search-results-heading">
-      <div class="section__head"><h2 class="section__title" id="search-results-heading">Resultado da busca</h2></div>
+      <div class="section__head">
+        <h2 class="section__title" id="search-results-heading">Resultado da busca</h2>
+        <button class="btn btn--outline" type="button" (click)="clearSearch()">Limpar busca</button>
+      </div>
       @switch (state.status) {
         @case ('loading') { <p class="state state--loading"><app-spinner /> <span>Buscando livros…</span></p> }
         @case ('error') { <app-alert [message]="state.message" variant="error" /> }
@@ -141,42 +99,44 @@
     </section>
   }
 
-  <section class="section" aria-labelledby="books-heading">
-    <div class="section__head">
-      <h2 class="section__title" id="books-heading">Livros em destaque</h2>
-    </div>
+  @if (searchState() === null) {
+    <section class="section" aria-labelledby="books-heading">
+      <div class="section__head">
+        <h2 class="section__title" id="books-heading">Livros em destaque</h2>
+      </div>
 
-    @if (featuredError(); as erro) {
-      <app-alert [message]="erro" variant="error" />
-    }
+      @if (featuredError(); as erro) {
+        <app-alert [message]="erro" variant="error" />
+      }
 
-    @if (books$ | async; as state) {
-      @switch (state.status) {
-        @case ('loading') {
-          <p class="state state--loading"><app-spinner /> <span>Carregando livros…</span></p>
-        }
-        @case ('error') {
-          <app-alert [message]="state.message" variant="error" />
-        }
-        @case ('loaded') {
-          @if (state.data.length === 0) {
-            <p class="state">Nenhum livro em destaque ainda. Volte em breve.</p>
-          } @else {
-            <ul class="grid">
-              @for (book of state.data; track book.id) {
-                @if (!isHidden(book)) {
-                  <ng-container
-                    [ngTemplateOutlet]="bookCard"
-                    [ngTemplateOutletContext]="{ $implicit: book, featured: true }"
-                  />
+      @if (books$ | async; as state) {
+        @switch (state.status) {
+          @case ('loading') {
+            <p class="state state--loading"><app-spinner /> <span>Carregando livros…</span></p>
+          }
+          @case ('error') {
+            <app-alert [message]="state.message" variant="error" />
+          }
+          @case ('loaded') {
+            @if (state.data.length === 0) {
+              <p class="state">Nenhum livro em destaque ainda. Volte em breve.</p>
+            } @else {
+              <ul class="grid">
+                @for (book of state.data; track book.id) {
+                  @if (!isHidden(book)) {
+                    <ng-container
+                      [ngTemplateOutlet]="bookCard"
+                      [ngTemplateOutletContext]="{ $implicit: book, featured: true }"
+                    />
+                  }
                 }
-              }
-            </ul>
+              </ul>
+            }
           }
         }
       }
-    }
-  </section>
+    </section>
+  }
 </main>
 
 <ng-template #bookCard let-book let-featured="featured">
@@ -199,10 +159,6 @@
         @if (offerPrice(offer); as price) { <span class="card__price" [class.card__price--out]="!offer.available">{{ price }}</span> }
       }
     </div>
-    <button class="btn btn--primary card__cta" type="button" [disabled]="actionDisabled(book)" (click)="startTransaction(book)">{{ actionLabel(book) }}</button>
-    @if (canRegisterCopy()) {
-      <a class="btn btn--outline card__manage" [routerLink]="['/obras', book.id, 'exemplares', 'novo']">Cadastrar exemplar</a>
-    }
     @if (featured && canManageCatalog()) {
       <button class="btn btn--outline card__manage" type="button" (click)="removeFromFeatured(book)">Remover destaque</button>
     }

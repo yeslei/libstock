@@ -25,3 +25,14 @@ export interface User {
   readonly role_codes: RoleCode[];
   readonly created_at: string;
 }
+
+export interface AdminUser extends User {
+  readonly is_active: boolean;
+  readonly updated_at: string;
+}
+
+export interface UpdateUserRequest {
+  readonly name: string;
+  readonly email: string;
+  readonly role_code: RoleCode;
+}

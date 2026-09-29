@@ -34,7 +34,6 @@ Não substitui a documentação técnica da API nem as migrations.
 
 ### Planejado, mas não disponível
 
-- empréstimos;
 - devoluções;
 - reservas;
 - vendas;
@@ -80,8 +79,8 @@ Cada seção deve informar também:
 | Ator/papel | Capacidades |
 |---|---|
 | `USER` | consultar catálogo e operar conforme regras de cliente |
+| `SELLER` | atendimento e operações de balcão quando os endpoints estiverem implementados |
 | `STOCK_KEEPER` | cadastrar obras e operar acervo, se autorizado |
-| `MANAGER` | administrar destaques e funções gerenciais |
 | `ADMINISTRATOR` | administrar funcionários, papéis e configurações |
 
 Os códigos acima são técnicos e não devem ser substituídos por nomes exibidos na
@@ -149,6 +148,30 @@ Regra aprovada e implementada:
 
 ## 9. Exemplares e estados
 
+Regra aprovada: a obra pode armazenar um `cover_url` opcional. O valor deve ser
+uma URL absoluta HTTP ou HTTPS. O sistema apenas referencia a imagem externa;
+não realiza upload nem copia o arquivo para o servidor. Uma falha de validação
+ou persistência durante a edição preserva o valor anteriormente confirmado.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V1.
+- Endpoints: `POST /api/v1/books/` e `PATCH /api/v1/books/{book_id}`.
+- Entidade: `Book`.
+- Testes: validação de URL, atualização, conflito e rollback.
+
+Regra aprovada: durante o cadastro, um ISBN válido é consultado no Google Books.
+Quando a fonte externa responde com título e autor válidos, esses metadados são
+canônicos, preenchem o formulário em tempo de digitação e permanecem bloqueados.
+O backend consulta novamente a fonte ao persistir e sobrescreve valores enviados
+pelo cliente. O preenchimento manual só é aceito quando a consulta externa não
+produz metadados mínimos.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V1.
+- Endpoints: `GET /api/v1/books/metadata/{isbn}` e `POST /api/v1/books/`.
+- Entidades: `Book` e `Copy` inicial.
+- Testes: preenchimento assíncrono, bloqueio dos campos, autoridade do backend e fallback manual.
+
 Regra aprovada: toda obra nova deve ser persistida com um primeiro exemplar
 ativo na mesma transação. A obra, o exemplar e seus registros de auditoria só
 podem ser confirmados em conjunto; qualquer falha provoca rollback integral.
@@ -174,6 +197,25 @@ Não existe classificação, tag ou campo de destinação secundário.
 As transições permitidas devem ser documentadas antes da implementação dos
 services de circulação.
 
+Regra aprovada: uma mesma obra pode possuir quantidades distintas de exemplares
+para diferentes destinações de acervo dentro do mesmo cadastro. A quantidade é
+representada pelos próprios registros individuais de `Copy`, e não por um campo
+de quantidade na entidade.
+
+A operação em lote permite cadastrar vários exemplares da mesma obra em uma
+única transação, com destinações distintas entre os exemplares.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V2.
+- Endpoint: `POST /api/v1/copies/batch`.
+- Entidades: `Book`, `Copy`.
+- Ator autorizado: `STOCK_KEEPER` ou `ADMINISTRATOR`.
+- Cada exemplar deve possuir seu próprio `barcode`.
+- A criação do lote é atômica: falha em qualquer exemplar provoca rollback
+  integral da operação.
+- Testes: lote com múltiplos exemplares, destinações distintas, lote vazio,
+  obras diferentes no mesmo lote, erro de persistência e rollback.
+
 ## 10. Operações transacionais
 
 Cada operação deve documentar:
@@ -187,9 +229,122 @@ Cada operação deve documentar:
 - comportamento em concorrência;
 - registro de auditoria.
 
+(#29) Validação da situação do cliente
+
+Status: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `GET /api/v1/clients/{client_id}/validation`.
+
+Atores autorizados: `SELLER` e `ADMINISTRATOR`.
+
+Pré-condições:
+- o cliente deve existir;
+- o usuário associado ao cliente deve estar ativo;
+- o cliente não pode possuir empréstimo em aberto com devolução não registrada e
+  data de vencimento ultrapassada.
+
+Resultado de sucesso:
+- HTTP 200;
+- retorna `client_id` e `valid = true`.
+
+Erros possíveis:
+
+| Código | HTTP | Descrição |
+|---|---:|---|
+| `client_not_found` | 404 | Cliente não encontrado |
+| `client_inactive` | 403 | Cliente inativo |
+| `client_has_pending` | 409 | Cliente possui pendência ativa |
+| `invalid_token` | 401 | Usuário não autenticado |
+
+Concorrência:
+- a consulta do cliente utiliza bloqueio transacional (`FOR UPDATE`);
+- qualquer sincronização da penalização permanece na mesma transação.
+
+Auditoria:
+- caso a validação provoque alteração automática de `is_penalized`, a mudança é
+  registrada no histórico de auditoria pelo mecanismo de controle de pendências.
+
 ### Empréstimo
 
-Status: `PENDING`.
+Status: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `POST /api/v1/loans/`.
+
+Entidades:
+- `clients`;
+- `copies`;
+- `loans`;
+- `employees`.
+
+Atores autorizados:
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+#### Pré-condições
+
+- o cliente deve existir;
+- o usuário associado ao cliente deve estar ativo;
+- o cliente não pode possuir pendências de empréstimos em atraso;
+- o exemplar deve existir;
+- o exemplar deve estar ativo;
+- o exemplar deve possuir status `AVAILABLE`.
+
+#### Registro
+
+O empréstimo deve ser vinculado:
+- ao cliente;
+- ao exemplar;
+- ao funcionário responsável pela operação.
+
+O novo empréstimo é criado com:
+- `status = OPEN`;
+- `returned_at = NULL`.
+
+O `employee_id` é obtido a partir do usuário autenticado.
+
+#### Concorrência e integridade
+
+- o cliente é validado antes do registro;
+- o exemplar é bloqueado transacionalmente durante a operação;
+- um mesmo exemplar não pode possuir mais de um empréstimo com status `OPEN`;
+- a validação do cliente e o registro do empréstimo participam da mesma transação;
+- falha na operação provoca rollback;
+- conflitos de integridade resultam em erro explícito.
+
+#### Validação do cliente
+
+A operação utiliza a validação da situação do cliente implementada em
+`GET /api/v1/clients/{client_id}/validation`.
+
+Além da validação disponibilizada pelo endpoint de consulta, o backend
+revalida o cliente durante o registro do empréstimo.
+
+#### Erros possíveis
+
+| Código | HTTP | Descrição |
+|---|---:|---|
+| `client_not_found` | 404 | Cliente não encontrado |
+| `client_inactive` | 403 | Cliente inativo |
+| `client_has_pending` | 409 | Cliente possui pendência |
+| — | 404 | Exemplar não encontrado ou inativo |
+| — | 409 | Exemplar indisponível |
+| — | 409 | Conflito ao registrar empréstimo |
+
+#### Testes
+
+- registro com cliente válido e exemplar disponível;
+- cliente inativo;
+- cliente com pendência;
+- exemplar inexistente ou inativo;
+- exemplar indisponível;
+- erro de integridade;
+- erro de banco e rollback;
+- autorização por papel;
+- integração do endpoint.
 
 ### Devolução
 
@@ -242,7 +397,6 @@ O registro deve conter:
 - obrigatoriedade de título e autor;
 - checksum no cadastro de ISBN;
 - ator de cada operação de circulação;
-- penalidades de clientes;
 - política de reservas;
 - confirmação e cancelamento de vendas;
 - criação de funcionário e usuário na mesma transação;
@@ -319,3 +473,113 @@ A revogação de sessões e a inativação do usuário ocorrem na mesma transaç
 - bloqueio de rota protegida com token de conta inativa;
 - repository não controla transação;
 - atomicidade da operação (ordem: revoke → inactivate → commit).
+
+## 16. Gestão administrativa de usuários
+
+Status: `IMPLEMENTED`
+Versão-alvo: v1
+Endpoints: `GET /api/v1/users`, `GET /api/v1/users/{id}` e `PATCH /api/v1/users/{id}`
+Entidades: `users`, `profiles`, `clients`, `employees`, `roles`, `user_roles`
+
+- Somente `ADMINISTRATOR` ativo pode listar, consultar e editar usuários.
+- A listagem inclui contas ativas e inativas e pode ser filtrada por um dos
+  quatro papéis oficiais: `USER`, `SELLER`, `STOCK_KEEPER` e `ADMINISTRATOR`.
+- O cadastro administrativo recebe exatamente um papel inicial.
+- A resposta administrativa nunca expõe senha, hash, tokens ou sessões.
+- Nome, e-mail e papel funcional podem ser alterados; a mudança de papel
+  mantém `user_roles` e o registro `clients` ou `employees` consistentes na
+  mesma transação.
+- Não é permitido remover o próprio papel administrativo.
+- Não é permitido remover nem inativar o último administrador ativo. A
+  verificação é serializada por lock transacional no papel `ADMINISTRATOR`.
+- E-mail permanece único e é armazenado normalizado em minúsculas.
+- A tela de cadastro existente em `/gestao/funcionarios` é reutilizada para os
+  quatro papéis oficiais; `USER` cria `Client`, e papéis internos criam
+  `Employee`.
+
+### Exclusão definitiva
+
+Status: `PENDING`
+
+A exclusão física de usuários não pertence ao contrato implementado. Até serem definidos os impactos sobre histórico, auditoria e referências de circulação, a interface exibe a ação desabilitada e orienta o administrador a usar a inativação. Não existe endpoint `DELETE` para usuários.
+
+## 17. Controle de pendências e penalização de clientes
+
+Status: `IMPLEMENTED`
+Versão: V2
+
+Endpoints:
+- `GET /api/v1/clients/{id}/pendencies`
+- `PATCH /api/v1/clients/{id}/penalty`
+
+Entidades:
+- `clients`
+- `loans`
+- `copies`
+- `books`
+- `audit_logs`
+
+### Pendência
+
+Um cliente possui pendência quando possui pelo menos um empréstimo que satisfaça simultaneamente:
+
+- `status = OPEN`;
+- `returned_at IS NULL`;
+- `due_date < now()`.
+
+A pendência é derivada do estado do empréstimo e não é armazenada em uma tabela própria.
+
+### Penalização
+
+Quando existe pelo menos uma pendência:
+
+- `clients.is_penalized = true`.
+
+Quando não existe mais nenhuma pendência:
+
+- `clients.is_penalized = false`.
+
+A penalização é sincronizada automaticamente pelo backend nas consultas de pendências e nas operações relevantes que utilizarem o serviço de sincronização. O empréstimo, devolução e reserva ainda não estão integrados. Esses três podem consumir o synchronize_penalty().
+
+### Aplicação e remoção manual
+
+`SELLER` e `ADMINISTRATOR` podem solicitar aplicação ou remoção manual da
+penalização.
+
+A aplicação manual exige pelo menos uma pendência ativa.
+
+A remoção manual somente é aceita quando não existem pendências ativas.
+
+O motivo é obrigatório para ambas as operações.
+
+### Histórico
+
+Toda mudança efetiva de penalização gera um registro imutável em `audit_logs`
+contendo:
+
+- ação;
+- estado anterior;
+- novo estado;
+- motivo;
+- responsável;
+- data/hora.
+
+Ações automáticas utilizam `actor_type = SYSTEM` e não possuem
+`employee_id`.
+
+Ações realizadas por funcionários utilizam `actor_type = EMPLOYEE` e
+registram o `employee_id`.
+
+### Atomicidade
+
+A alteração de `clients.is_penalized` e seu histórico devem ocorrer na mesma transação.
+
+### Concorrência
+
+A sincronização utiliza lock transacional sobre o cliente para serializar alterações concorrentes da sua situação de penalização.
+
+### Integração com circulação
+
+Operações de circulação que dependam da aptidão do cliente devem reavaliar as pendências antes de prosseguir.
+
+Os serviços de consulta e sincronização de penalização estão preparados para essa integração. Os fluxos transacionais de empréstimo, devolução e reserva ainda dependem da implementação de seus respectivos services e endpoints.

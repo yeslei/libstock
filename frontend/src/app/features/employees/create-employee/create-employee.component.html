@@ -1,8 +1,8 @@
 <main class="employee-page">
   <section class="employee-page__panel" aria-labelledby="employee-title">
     <header class="employee-header">
-      <p class="employee-header__eyebrow">Gestão de funcionários</p>
-      <h1 class="employee-header__title" id="employee-title">Cadastrar funcionário</h1>
+      <p class="employee-header__eyebrow">Gestão de usuários</p>
+      <h1 class="employee-header__title" id="employee-title">Cadastrar usuário</h1>
     </header>
 
     <div id="employee-form-feedback" tabindex="-1">
@@ -15,19 +15,19 @@
       }
     </div>
 
-    @if (createdEmployee(); as employee) {
-      <dl class="employee-summary" aria-label="Funcionário cadastrado">
+    @if (createdUser(); as user) {
+      <dl class="employee-summary" aria-label="Usuário cadastrado">
         <div>
           <dt>Nome</dt>
-          <dd>{{ employee.name }}</dd>
+          <dd>{{ user.name }}</dd>
         </div>
         <div>
           <dt>E-mail</dt>
-          <dd>{{ employee.email }}</dd>
+          <dd>{{ user.email }}</dd>
         </div>
         <div>
           <dt>Papel confirmado</dt>
-          <dd>{{ employee.role_code }}</dd>
+          <dd>{{ roleCode(user) }}</dd>
         </div>
       </dl>
     }
@@ -117,11 +117,15 @@
       <button class="button" type="submit" [disabled]="isSubmitting" [attr.aria-busy]="isSubmitting">
         @if (isSubmitting) {
           <app-spinner />
-          <span>Cadastrando funcionário…</span>
+          <span>Cadastrando usuário…</span>
         } @else {
-          <span>Cadastrar funcionário</span>
+          <span>Cadastrar usuário</span>
         }
       </button>
     </form>
+
+    <button class="button button--secondary" type="button" (click)="backToUserManagement()">
+      Voltar para gestão de usuários
+    </button>
   </section>
 </main>

@@ -133,6 +133,15 @@ class BookPersistenceError(ApplicationError):
         )
 
 
+class BookUpdatePersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível atualizar a obra.",
+            "book_update_persistence_error",
+            500,
+        )
+
+
 class DuplicateGenreError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Gênero já cadastrado.", "duplicate_genre", 409)
@@ -164,4 +173,75 @@ class UserSelfInactivationError(ApplicationError):
             "Um administrador não pode inativar a si mesmo.",
             "user_self_inactivation",
             422,
+        )
+
+
+class UserSelfRoleRemovalError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Um administrador não pode remover o próprio acesso administrativo.",
+            "user_self_role_removal",
+            422,
+        )
+
+
+class LastActiveAdministratorError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O último administrador ativo não pode perder o acesso.",
+            "last_active_administrator",
+            409,
+        )
+
+class ClientNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Cliente não encontrado.",
+            "client_not_found",
+            404,
+        )
+
+
+class ClientInactiveError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Cliente inativo.",
+            "client_inactive",
+            403,
+        )
+
+
+class ClientHasPendingError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Cliente possui pendência ativa e não pode realizar a operação.",
+            "client_has_pending",
+            409,
+        )
+
+
+class ClientPenaltyApplicationError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O cliente não possui pendência ativa para aplicação da penalidade.",
+            "client_penalty_application_error",
+            409,
+        )
+
+
+class ClientPenaltyRemovalError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O cliente ainda possui pendência ativa e não pode ser desbloqueado.",
+            "client_penalty_removal_error",
+            409,
+        )
+
+
+class ClientPenaltyPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível atualizar a situação de penalização do cliente.",
+            "client_penalty_persistence_error",
+            500,
         )

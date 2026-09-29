@@ -21,7 +21,7 @@ export type CatalogCapability =
 
 const CAPABILITIES_BY_ROLE: Record<RoleCode, CatalogCapability[]> = {
   USER: ['transact'],
-  SELLER: ['counterService', 'registerCopy'],
+  SELLER: ['counterService'],
   STOCK_KEEPER: ['manageStock', 'registerCopy'],
   // "Administrador com controle total das regras de negócio" (SRS, 1.3).
   ADMINISTRATOR: ['counterService', 'manageStock', 'manageCatalog', 'registerCopy'],

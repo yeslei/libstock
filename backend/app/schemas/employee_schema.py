@@ -4,12 +4,11 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # Códigos canônicos aceitos, derivados das migrations aplicadas.
 VALID_ROLE_CODES: frozenset[str] = frozenset({
-    "ATTENDANT",
     "SELLER",
     "STOCK_KEEPER",
-    "MANAGER",
+    "ADMINISTRATOR",
 })
-EmployeeRoleCode = Literal["ATTENDANT", "SELLER", "STOCK_KEEPER", "MANAGER"]
+EmployeeRoleCode = Literal["SELLER", "STOCK_KEEPER", "ADMINISTRATOR"]
 
 
 class EmployeeCreate(BaseModel):

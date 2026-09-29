@@ -6,12 +6,12 @@ import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from app.controllers.copy_controller import create_copy
+from app.controllers.copy_controller import create_copy, create_copies_batch
 from app.core.exceptions import AuditActorRequiredError, PermissionDeniedError
 from app.dependencies.authentication import require_roles
 from app.models.domain import DestinationType
 from app.repositories.copy_repository import CopyRepository
-from app.schemas.copy_schema import CopyCreate
+from app.schemas.copy_schema import CopyBatchCreate, CopyCreate
 from app.services.copy_service import CopyService
 
 
@@ -32,6 +32,23 @@ class FakeCopyService:
             status="AVAILABLE",
             is_active=True,
         )
+
+    def create_copies(self, *, copies_data: CopyBatchCreate, actor_id: int):
+        self.created.append((copies_data, actor_id))
+        return [
+            SimpleNamespace(
+                id=index,
+                book_id=copy.book_id,
+                barcode=copy.barcode,
+                destination=copy.destination,
+                condition=copy.condition,
+                sale_price=copy.sale_price,
+                acquired_at=copy.acquired_at,
+                status="AVAILABLE",
+                is_active=True,
+            )
+            for index, copy in enumerate(copies_data.copies, start=1)
+        ]
 
 
 class FakeCopyRepository:
@@ -62,6 +79,27 @@ class FakeCopyRepository:
             status="AVAILABLE",
             is_active=True,
         )
+
+    def create_copies(self, copies_data: list[CopyCreate]):
+        self.calls.append(f"create_copies({len(copies_data)})")
+
+        if self.copy_error is not None:
+            raise self.copy_error
+
+        return [
+            SimpleNamespace(
+                id=index,
+                book_id=copy_data.book_id,
+                barcode=copy_data.barcode,
+                destination=copy_data.destination,
+                condition=copy_data.condition,
+                sale_price=copy_data.sale_price,
+                acquired_at=copy_data.acquired_at,
+                status="AVAILABLE",
+                is_active=True,
+            )
+            for index, copy_data in enumerate(copies_data, start=1)
+        ]
 
 
 class FakeSession:
@@ -137,10 +175,10 @@ def test_endpoint_preserva_201_e_contrato_da_resposta():
 
 
 def test_roles_existentes_continuam_protegendo_endpoint():
-    dependency = require_roles("SELLER", "STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+    dependency = require_roles("STOCK_KEEPER", "ADMINISTRATOR")
 
     with pytest.raises(PermissionDeniedError):
-        dependency(SimpleNamespace(role_codes=["CLIENT"]))
+        dependency(SimpleNamespace(role_codes=["SELLER"]))
 
 
 def test_validacao_de_entrada_continua_rejeitando_destinacao_invalida():
@@ -240,3 +278,120 @@ def test_set_audit_actor_usa_libstock_employee_id_com_escopo_transacional():
     assert "libstock.employee_id" in str(statement)
     assert "true" in str(statement)
     assert params == {"valor": "42"}
+
+def test_schema_aceita_multiplos_exemplares_da_mesma_obra():
+    batch = CopyBatchCreate(
+        copies=[
+            _copy_data("EX-001"),
+            _copy_data("EX-002"),
+            CopyCreate(
+                book_id=1,
+                barcode="EX-003",
+                destination=DestinationType.DIDACTIC,
+            ),
+        ]
+    )
+
+    assert len(batch.copies) == 3
+    assert batch.copies[0].destination == DestinationType.COMMERCIAL
+    assert batch.copies[2].destination == DestinationType.DIDACTIC
+
+
+def test_schema_rejeita_exemplares_de_obras_diferentes_no_mesmo_lote():
+    with pytest.raises(ValueError, match="mesma obra"):
+        CopyBatchCreate(
+            copies=[
+                _copy_data("EX-001"),
+                CopyCreate(
+                    book_id=2,
+                    barcode="EX-002",
+                    destination=DestinationType.DIDACTIC,
+                ),
+            ]
+        )
+
+
+def test_schema_rejeita_lote_vazio():
+    with pytest.raises(ValueError):
+        CopyBatchCreate(copies=[])
+
+
+def test_service_cria_multiplos_exemplares_em_uma_operacao():
+    repository = FakeCopyRepository()
+    session = FakeSession(book=SimpleNamespace(id=1, is_active=True))
+
+    batch = CopyBatchCreate(
+        copies=[
+            _copy_data("EX-001"),
+            _copy_data("EX-002"),
+            CopyCreate(
+                book_id=1,
+                barcode="EX-003",
+                destination=DestinationType.DIDACTIC,
+            ),
+        ]
+    )
+
+    copies = CopyService(repository, session).create_copies(
+        copies_data=batch,
+        actor_id=7,
+    )
+
+    assert len(copies) == 3
+    assert [copy.barcode for copy in copies] == [
+        "EX-001",
+        "EX-002",
+        "EX-003",
+    ]
+    assert repository.calls == [
+        "is_employee(7)",
+        "set_audit_actor(7)",
+        "create_copies(3)",
+    ]
+    assert session.commits == 1
+
+
+def test_service_faz_rollback_se_o_lote_falhar():
+    repository = FakeCopyRepository(
+        copy_error=IntegrityError("insert", {}, Exception())
+    )
+    session = FakeSession(book=SimpleNamespace(id=1, is_active=True))
+
+    batch = CopyBatchCreate(
+        copies=[
+            _copy_data("EX-001"),
+            _copy_data("EX-002"),
+        ]
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        CopyService(repository, session).create_copies(
+            copies_data=batch,
+            actor_id=7,
+        )
+
+    assert exc.value.status_code == 409
+    assert session.rollbacks == 1
+    assert session.commits == 0
+
+def test_controller_passa_lote_para_o_service():
+    fake = FakeCopyService()
+
+    batch = CopyBatchCreate(
+        copies=[
+            _copy_data("EX-001"),
+            _copy_data("EX-002"),
+        ]
+    )
+
+    response = create_copies_batch(
+        copies=batch,
+        copy_service=fake,
+        current_user=SimpleNamespace(id=7),
+    )
+
+    copies_data, actor_id = fake.created[0]
+
+    assert len(copies_data.copies) == 2
+    assert actor_id == 7
+    assert [copy.barcode for copy in response] == ["EX-001", "EX-002"]

@@ -1,0 +1,39 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+@use 'forms' as *;
+
+@include field;
+@include button-primary;
+
+.edit-page {
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: $space-6 $space-4;
+  background: $bg-page;
+}
+
+.edit-panel {
+  display: grid;
+  align-content: start;
+  gap: $space-5;
+  width: 100%;
+  max-width: 600px;
+  padding: $space-8;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  background: $bg-surface;
+  box-shadow: $shadow-md;
+}
+
+h1 { color: $primary; }
+.eyebrow { color: $verde-medio; font-size: $font-size-xs; font-weight: 700; text-transform: uppercase; }
+form { display: grid; gap: $space-4; }
+.loading { display: flex; justify-content: center; gap: $space-2; padding: $space-8; color: $text-muted; }
+.form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: $space-3; }
+.button--secondary { border-color: $primary; background: $bg-surface; color: $primary; }
+
+@media (max-width: 520px) {
+  .edit-panel { padding: $space-5; }
+  .form-actions { grid-template-columns: 1fr; }
+}

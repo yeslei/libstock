@@ -376,9 +376,16 @@ A interface deve impedir:
 | T09 | Cadastro/edição de obra       | `/gestao/obras/nova` e `/gestao/obras/:id/editar` | `STOCK_KEEPER`, `ADMINISTRATOR` |
 | T10 | Gestão de exemplares          | `/gestao/obras/:id/exemplares`                    | `STOCK_KEEPER`, `ADMINISTRATOR` |
 | T11 | Gestão de clientes            | `/gestao/clientes`                                | `SELLER`, `ADMINISTRATOR`       |
-| T12 | Gestão de funcionários        | `/gestao/funcionarios`                            | `ADMINISTRATOR`                 |
+| T12 | Gestão de usuários            | `/gestao/usuarios`                                | `ADMINISTRATOR`                 |
+| T13 | Cadastro de usuário           | `/gestao/funcionarios`                            | `ADMINISTRATOR`                 |
+| T14 | Edição de usuário             | `/gestao/usuarios/:id/editar`                     | `ADMINISTRATOR`                 |
 
 Criação e edição reutilizam o mesmo template. Drawers, modais, confirmações e estados de erro não são contabilizados como telas independentes.
+
+Na gestão de usuários, o botão “Cadastrar novo usuário” conduz à tela de
+cadastro já existente em `/gestao/funcionarios`. Não existe a rota
+`/gestao/usuarios/novo`. A exclusão definitiva permanece pendente e deve ser
+mostrada desabilitada; a inativação é a ação operacional disponível.
 
 ## 11. Navegação por papel
 
@@ -545,3 +552,16 @@ A V1 estará coerente com os papéis quando:
 * não exibir auditoria e notificações da V3;
 * registrar PF/PJ e propriedade do acervo como pendências enquanto o banco não oferecer contrato suficiente;
 * não simular persistência ou sucesso.
+# Matriz de navegação operacional
+
+| Papel | Item na navegação | Rota | Backend | Estado |
+|---|---|---|---|---|
+| Todos | Início / Explorar livros | `/`, `/explorar` | `/api/v1/catalog/*` | Funcional |
+| `USER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
+| `SELLER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
+| `STOCK_KEEPER` | Cadastrar exemplar | `/gestao/acervo` | `/api/v1/books/*`, `/api/v1/copies/` | Funcional |
+| `ADMINISTRATOR` | Cadastrar exemplar / Gestão de usuários | `/gestao/acervo`, `/gestao/usuarios` | acervo e usuários | Funcional |
+
+Venda, empréstimo, devolução e reserva permanecem planejados. Como ainda não
+possuem controllers e services transacionais completos, não aparecem como
+botões operacionais na navbar nem nos cards do catálogo.

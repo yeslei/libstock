@@ -1,6 +1,7 @@
 import re
 from datetime import date
 from decimal import Decimal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -70,6 +71,7 @@ class BookCreate(BaseModel):
     title: str | None = Field(default=None, max_length=255)
     author: str | None = Field(default=None, max_length=255)
     genre: str | None = Field(default=None, max_length=100)
+    cover_url: str | None = Field(default=None, max_length=2048)
     initial_copy: InitialCopyCreate
 
     model_config = ConfigDict(extra="forbid")
@@ -79,7 +81,7 @@ class BookCreate(BaseModel):
     def validate_isbn(cls, value: str) -> str:
         return normalize_isbn(value)
 
-    @field_validator("title", "author", "genre", mode="before")
+    @field_validator("title", "author", "genre", "cover_url", mode="before")
     @classmethod
     def normalize_optional_text(cls, value: object) -> object:
         if isinstance(value, str):
@@ -87,51 +89,69 @@ class BookCreate(BaseModel):
             return stripped or None
         return value
 
-class BookCreateResponse(BookCreate):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
+    @field_validator("cover_url")
+    @classmethod
+    def validate_cover_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("A capa deve ser uma URL HTTP ou HTTPS válida.")
+        return value
 
 
 class BookUpdate(BaseModel):
-    title: str | None = Field(default=None, max_length=255)
-    author: str | None = Field(default=None, max_length=255)
-    genre: str | None = Field(default=None, max_length=100)
     isbn: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    author: str | None = Field(default=None, min_length=1, max_length=255)
+    genre: str | None = Field(default=None, max_length=100)
     publication_year: int | None = Field(default=None, ge=1000, le=2100)
     publisher: str | None = Field(default=None, max_length=150)
     edition: str | None = Field(default=None, max_length=50)
-    cover_url: str | None = Field(default=None)
+    cover_url: str | None = Field(default=None, max_length=2048)
     is_active: bool | None = None
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("title", "author", mode="before")
+    @field_validator("isbn")
     @classmethod
-    def validate_mandatory_text(cls, value: object) -> object:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped:
-                raise ValueError("O campo não pode ficar em branco.")
-            return stripped
-        return value
+    def validate_optional_isbn(cls, value: str | None) -> str | None:
+        return normalize_isbn(value) if value is not None else None
 
-    @field_validator("genre", "publisher", "edition", "cover_url", mode="before")
+    @field_validator("title", "author", "genre", "publisher", "edition", "cover_url", mode="before")
     @classmethod
-    def normalize_optional_fields(cls, value: object) -> object:
+    def normalize_update_text(cls, value: object) -> object:
         if isinstance(value, str):
             stripped = value.strip()
             return stripped or None
         return value
 
-    @field_validator("isbn")
+    @field_validator("cover_url")
     @classmethod
-    def validate_isbn_if_present(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        return normalize_isbn(value)
+    def validate_update_cover_url(cls, value: str | None) -> str | None:
+        return BookCreate.validate_cover_url(value)
+
+    @model_validator(mode="after")
+    def require_change(self) -> "BookUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Informe ao menos um campo para atualização.")
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("Título não pode ficar vazio.")
+        if "author" in self.model_fields_set and self.author is None:
+            raise ValueError("Autor não pode ficar vazio.")
+        return self
+
+
+class BookMetadataResponse(BaseModel):
+    isbn: str
+    title: str = Field(max_length=255)
+    author: str = Field(max_length=255)
+    genre: str | None = Field(default=None, max_length=100)
+
+class BookCreateResponse(BookCreate):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 class BookSearchParams(BaseModel):
     title: str = Field(min_length=1, pattern=r".*\S.*")
@@ -165,7 +185,12 @@ class BookResponse(BaseModel):
     title: str
     author: str
     genre: str | None = None
+    cover_url: str | None = None
     is_active: bool
     initial_copy: CopyResponse | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BookDetailResponse(BookResponse):
+    copies: list[CopyResponse] = Field(default_factory=list)

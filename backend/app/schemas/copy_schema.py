@@ -21,6 +21,25 @@ class CopyCreate(BaseModel):
             raise ValueError("sale_price não deve ser informado para exemplares didáticos.")
         return self
 
+class CopyBatchCreate(BaseModel):
+    copies: list[CopyCreate] = Field(
+        min_length=1,
+        description="Lista de exemplares físicos a serem cadastrados em uma única operação",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_same_book(self) -> "CopyBatchCreate":
+        book_ids = {copy.book_id for copy in self.copies}
+
+        if len(book_ids) != 1:
+            raise ValueError(
+                "Todos os exemplares da operação devem pertencer à mesma obra."
+            )
+
+        return self
+
 class CopyResponse(CopyCreate):
     id: int
     status: CopyStatus

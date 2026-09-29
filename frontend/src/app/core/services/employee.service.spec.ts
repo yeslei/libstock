@@ -25,13 +25,13 @@ describe('EmployeeService', () => {
       name: 'Ana Souza',
       email: 'ana@exemplo.com',
       password: 'senhaforte',
-      accessLevel: 'ATTENDANT',
+      accessLevel: 'SELLER',
     };
     const response: CreateEmployeeResponse = {
       id: 123,
       name: 'Ana Souza',
       email: 'ana@exemplo.com',
-      role_code: 'ATTENDANT',
+      role_code: 'SELLER',
     };
     const received: CreateEmployeeResponse[] = [];
 

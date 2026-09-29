@@ -11,16 +11,19 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.exceptions import (
+    LastActiveAdministratorError,
     UserAlreadyInactiveError,
     UserInactiveError,
     UserNotFoundError,
     UserSelfInactivationError,
+    UserSelfRoleRemovalError,
 )
 from app.dependencies.authentication import get_current_user
 from app.dependencies.services import get_user_service
 from app.main import app
 from app.repositories.user_repository import UserRepository
 from app.services.user_service import UserService
+from app.schemas.user_schema import UserUpdate
 
 client = TestClient(app)
 
@@ -41,6 +44,7 @@ def _make_user(
         email="teste@example.com",
         is_active=is_active,
         role_codes=role_codes or ["USER"],
+        created_at=datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
         updated_at=datetime(2026, 9, 6, 12, 0, 0, tzinfo=timezone.utc),
     )
 
@@ -50,11 +54,27 @@ class FakeUserService:
         self.error = error
         self._user = user or _make_user(is_active=False, role_codes=["USER"])
         self.calls: list[tuple[int, int]] = []
+        self.list_calls: list[str | None] = []
 
     def get_by_id(self, user_id: int) -> SimpleNamespace:
         return self._user
 
     def inactivate_user(self, target_id: int, *, actor_id: int) -> SimpleNamespace:
+        self.calls.append((target_id, actor_id))
+        if self.error:
+            raise self.error
+        return self._user
+
+    def list_users(self, role_code: str | None = None) -> list[SimpleNamespace]:
+        self.list_calls.append(role_code)
+        return [self._user]
+
+    def get_admin_user(self, user_id: int) -> SimpleNamespace:
+        if self.error:
+            raise self.error
+        return self._user
+
+    def update_user(self, target_id: int, data, *, actor_id: int) -> SimpleNamespace:
         self.calls.append((target_id, actor_id))
         if self.error:
             raise self.error
@@ -80,6 +100,71 @@ def _use_fake_service(
     fake = FakeUserService(error=error, user=user)
     app.dependency_overrides[get_user_service] = lambda: fake
     return fake
+
+
+# ---------------------------------------------------------------------------
+# Controller — gestão administrativa de usuários
+# ---------------------------------------------------------------------------
+
+
+def test_listar_usuarios_exige_administrador():
+    _use_fake_service()
+    _authenticate_as("USER")
+
+    response = client.get("/api/v1/users")
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "permission_denied"
+
+
+def test_listar_usuarios_com_filtro_de_cargo():
+    fake = _use_fake_service(user=_make_user(user_id=42, role_codes=["SELLER"]))
+    _authenticate_as("ADMINISTRATOR")
+
+    response = client.get("/api/v1/users?role=SELLER")
+
+    assert response.status_code == 200
+    assert response.json()[0]["role_codes"] == ["SELLER"]
+    assert fake.list_calls == ["SELLER"]
+
+
+def test_listar_usuarios_rejeita_cargo_legado():
+    _use_fake_service()
+    _authenticate_as("ADMINISTRATOR")
+
+    response = client.get("/api/v1/users?role=MANAGER")
+
+    assert response.status_code == 422
+
+
+def test_consultar_usuario_inexistente_retorna_404():
+    _use_fake_service(error=UserNotFoundError())
+    _authenticate_as("ADMINISTRATOR")
+
+    response = client.get("/api/v1/users/999")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "user_not_found"
+
+
+def test_editar_usuario_com_sucesso():
+    updated = _make_user(user_id=42, role_codes=["STOCK_KEEPER"])
+    updated.name = "Nome Atualizado"
+    fake = _use_fake_service(user=updated)
+    _authenticate_as("ADMINISTRATOR", user_id=99)
+
+    response = client.patch(
+        "/api/v1/users/42",
+        json={
+            "name": "Nome Atualizado",
+            "email": "novo@example.com",
+            "role_code": "STOCK_KEEPER",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Nome Atualizado"
+    assert fake.calls == [(42, 99)]
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +335,75 @@ def test_service_ordem_operacoes_atomica():
     service.inactivate_user(3, actor_id=1)
 
     assert events == ["revoke", "inactivate", "commit"]
+
+
+def test_service_nao_inativa_ultimo_administrador_ativo():
+    service, db, user_repo, session_repo = _build_service()
+    target = _make_user(user_id=10, role_codes=["ADMINISTRATOR"])
+    user_repo.find_by_id.return_value = target
+    user_repo.count_active_administrators_for_update.return_value = 1
+
+    with pytest.raises(LastActiveAdministratorError):
+        service.inactivate_user(10, actor_id=1)
+
+    session_repo.revoke_all_for_user.assert_not_called()
+    user_repo.inactivate.assert_not_called()
+    db.rollback.assert_called_once()
+
+
+def test_service_atualiza_usuario_e_confirma_transacao():
+    service, db, user_repo, _session_repo = _build_service()
+    target = _make_user(user_id=10, role_codes=["SELLER"])
+    user_repo.find_by_id.return_value = target
+
+    result = service.update_user(
+        10,
+        UserUpdate(name="Nome Novo", email="NOVO@example.com", role_code="STOCK_KEEPER"),
+        actor_id=1,
+    )
+
+    assert result is target
+    user_repo.update.assert_called_once_with(
+        target,
+        name="Nome Novo",
+        email="novo@example.com",
+    )
+    user_repo.replace_role.assert_called_once_with(target, "STOCK_KEEPER")
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(target)
+
+
+def test_service_impede_remover_proprio_papel_administrativo():
+    service, db, user_repo, _session_repo = _build_service()
+    target = _make_user(user_id=10, role_codes=["ADMINISTRATOR"])
+    user_repo.find_by_id.return_value = target
+
+    with pytest.raises(UserSelfRoleRemovalError):
+        service.update_user(
+            10,
+            UserUpdate(role_code="SELLER"),
+            actor_id=10,
+        )
+
+    user_repo.update.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_service_impede_remover_ultimo_administrador_ativo():
+    service, db, user_repo, _session_repo = _build_service()
+    target = _make_user(user_id=10, role_codes=["ADMINISTRATOR"])
+    user_repo.find_by_id.return_value = target
+    user_repo.count_active_administrators_for_update.return_value = 1
+
+    with pytest.raises(LastActiveAdministratorError):
+        service.update_user(
+            10,
+            UserUpdate(role_code="SELLER"),
+            actor_id=1,
+        )
+
+    user_repo.update.assert_not_called()
+    db.rollback.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

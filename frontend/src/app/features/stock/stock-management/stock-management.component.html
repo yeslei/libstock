@@ -1,0 +1,67 @@
+<main class="stock">
+  <header class="stock__header">
+    <div>
+      <p class="eyebrow">Gestão do acervo</p>
+      <h1>Cadastrar exemplar</h1>
+      <p>Localize uma obra existente, altere seus dados ou adicione um exemplar.</p>
+    </div>
+    <a class="button" routerLink="/obras/nova">Cadastrar nova obra</a>
+  </header>
+
+  <form class="search" (submit)="$event.preventDefault(); search()">
+    <label for="stock-criterion">Buscar por</label>
+    <select id="stock-criterion" [value]="criterion()" (change)="criterion.set($any($event.target).value)">
+      <option value="title">Título</option>
+      <option value="author">Autor</option>
+      <option value="isbn">ISBN</option>
+      <option value="barcode">Código de barras</option>
+    </select>
+    <label for="stock-term">Termo</label>
+    <input id="stock-term" [value]="term()" (input)="term.set($any($event.target).value)" />
+    <button type="submit">Pesquisar</button>
+  </form>
+
+  @if (results(); as state) {
+    <section class="results">
+      @switch (state.status) {
+        @case ('loading') { <p><app-spinner /> Buscando obras…</p> }
+        @case ('error') { <app-alert [message]="state.message" variant="error" /> }
+        @case ('loaded') {
+          @if (!state.data.length) { <p>Nenhuma obra encontrada.</p> }
+          @else {
+            <ul>
+              @for (book of state.data; track book.id) {
+                <li><button type="button" (click)="select(book.id)"><strong>{{ book.title }}</strong><span>{{ book.author }}</span></button></li>
+              }
+            </ul>
+          }
+        }
+      }
+    </section>
+  }
+
+  @if (selected(); as state) {
+    <section class="detail">
+      @switch (state.status) {
+        @case ('loading') { <p><app-spinner /> Carregando exemplares…</p> }
+        @case ('error') { <app-alert [message]="state.message" variant="error" /> }
+        @case ('loaded') {
+          <div class="detail__book">
+            @if (state.data.cover_url) { <img [src]="state.data.cover_url" [alt]="'Capa de ' + state.data.title" /> }
+            <div><h2>{{ state.data.title }}</h2><p>{{ state.data.author }}</p><p>ISBN: {{ state.data.isbn }}</p></div>
+          </div>
+          <div class="actions">
+            <a class="button" [routerLink]="['/gestao/acervo/obras', state.data.id, 'editar']">Editar obra</a>
+            <a class="button button--secondary" [routerLink]="['/obras', state.data.id, 'exemplares', 'novo']">Adicionar exemplar</a>
+          </div>
+          <h3>Exemplares</h3>
+          <ul class="copies">
+            @for (copy of state.data.copies; track copy.id) {
+              <li><strong>{{ copy.barcode }}</strong><span>{{ copy.destination === 'DIDACTIC' ? 'Didático' : 'Comercial' }}</span><span>{{ copy.status }}</span></li>
+            }
+          </ul>
+        }
+      }
+    </section>
+  }
+</main>
