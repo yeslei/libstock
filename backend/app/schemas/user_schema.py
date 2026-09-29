@@ -25,3 +25,13 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserInactivateResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    is_active: bool
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

@@ -35,7 +35,7 @@ describe('BookService', () => {
     request.flush(response, { status: 201, statusText: 'Created' });
   });
 
-  it('dispara requisicao PATCH para /api/v1/acervo/:id com os dados parciais', () => {
+  it('dispara requisicao PATCH para /api/v1/books/:id com os dados parciais', () => {
     const updatePayload = { title: 'Título Atualizado', genre: 'Ficção' };
     const response: BookResponse = {
       id: 10,
@@ -49,7 +49,7 @@ describe('BookService', () => {
 
     service.update(10, updatePayload).subscribe((book) => expect(book).toEqual(response));
 
-    const request = http.expectOne('/api/v1/acervo/10');
+    const request = http.expectOne('/api/v1/books/10');
     expect(request.request.method).toBe('PATCH');
     expect(request.request.body).toEqual(updatePayload);
     request.flush(response, { status: 200, statusText: 'OK' });

@@ -9,6 +9,8 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: GOOGLE_BOOKS_API_KEY
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET_KEY

@@ -5,7 +5,6 @@ import { Observable } from 'rxjs';
 import { BookCreateRequest, BookResponse, BookUpdateRequest } from '../models/book.model';
 
 export const BOOKS_API = '/api/v1/books';
-export const ACERVO_API = '/api/v1/acervo';
 
 @Injectable({ providedIn: 'root' })
 export class BookService {
@@ -16,6 +15,6 @@ export class BookService {
   }
 
   update(id: number, payload: BookUpdateRequest): Observable<BookResponse> {
-    return this.http.patch<BookResponse>(`${ACERVO_API}/${id}`, payload);
+    return this.http.patch<BookResponse>(`${BOOKS_API}/${id}`, payload);
   }
 }

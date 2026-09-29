@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, status
 from app.dependencies.authentication import require_roles
 from app.dependencies.services import get_book_service
 from app.models.user import User
-from app.schemas.book_schema import BookCreate, BookResponse, BookSearchParams
+from app.schemas.book_schema import BookCreate, BookResponse, BookSearchParams, BookUpdate
 from app.services.book_service import BookService
 
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
+
 
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
@@ -17,6 +18,19 @@ async def create_book(
     service: BookService = Depends(get_book_service),
 ) -> BookResponse:
     return await service.create_book(book_data, employee_id=current_user.id)
+
+
+@router.patch("/{book_id}", response_model=BookResponse, status_code=status.HTTP_200_OK)
+def update_book(
+    book_id: int,
+    payload: BookUpdate,
+    current_user: User = Depends(
+        require_roles("STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+    ),
+    service: BookService = Depends(get_book_service),
+) -> BookResponse:
+    book = service.update_book(book_id, payload, employee_id=current_user.id)
+    return BookResponse.model_validate(book)
 
 
 @router.get("/", response_model=list[BookResponse])

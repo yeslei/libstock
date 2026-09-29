@@ -12,7 +12,7 @@ export type CatalogCapability =
   | 'transact'
   /** US01/US05 — atendente: registrar venda, empréstimo e devolução. */
   | 'counterService'
-  /** US03 — estoquista: cadastrar obra com tag de destinação. */
+  /** US03 — estoquista: cadastrar obra com a destinação inicial do exemplar. */
   | 'manageStock'
   /** US04 — gerente/administrador: destaque e conversão de destinação. */
   | 'manageCatalog'

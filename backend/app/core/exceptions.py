@@ -148,20 +148,20 @@ class UserNotFoundError(ApplicationError):
         super().__init__("Usuário não encontrado.", "user_not_found", 404)
 
 
-class AcervoItemNotFoundError(ApplicationError):
+class UserInactiveError(ApplicationError):
     def __init__(self) -> None:
-        super().__init__("Item do acervo não encontrado.", "item_not_found", 404)
+        super().__init__("Usuário inativo.", "user_inactive", 403)
 
 
-class DestinationTagNotFoundError(ApplicationError):
+class UserAlreadyInactiveError(ApplicationError):
     def __init__(self) -> None:
-        super().__init__("Tag de destinação não encontrada.", "destination_tag_not_found", 404)
+        super().__init__("O usuário já está inativo.", "user_already_inactive", 409)
 
 
-class AcervoPersistenceError(ApplicationError):
+class UserSelfInactivationError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(
-            "Não foi possível classificar o item do acervo.",
-            "acervo_persistence_error",
-            500,
+            "Um administrador não pode inativar a si mesmo.",
+            "user_self_inactivation",
+            422,
         )
