@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Copy, Loan
+from app.models.domain import Copy, CopyStatus, Loan, LoanStatus
 from app.schemas.loan_schema import LoanCreate
 
 
@@ -38,4 +38,33 @@ class LoanRepository:
         )
         self.db.add(loan)
         self.db.flush()
+        return loan
+
+    def find_loan_for_return(self, loan_id: int) -> Loan | None:
+        return self.db.scalar(
+            select(Loan)
+            .where(Loan.id == loan_id)
+            .with_for_update()
+        )
+
+    def find_copy_for_return(self, copy_id: int) -> Copy | None:
+        return self.db.scalar(
+            select(Copy)
+            .where(Copy.id == copy_id)
+            .with_for_update()
+        )
+
+    def register_return(
+        self,
+        loan: Loan,
+        copy: Copy,
+        *,
+        returned_at: datetime,
+    ) -> Loan:
+        loan.returned_at = returned_at
+        loan.status = LoanStatus.RETURNED
+        copy.status = CopyStatus.AVAILABLE
+
+        self.db.flush()
+
         return loan
