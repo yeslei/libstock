@@ -31,11 +31,11 @@ Não substitui a documentação técnica da API nem as migrations.
 - disponibilidade derivada dos exemplares;
 - controle de papéis;
 - persistência de entidades de circulação.
+- vendas: registro da venda implementado; bloqueio de venda de exemplares didáticos e baixa de estoque ainda dependem de regras específicas.
 
 ### Planejado, mas não disponível
 
 - reservas;
-- vendas;
 - trocas;
 - notificações;
 - gestão operacional de exemplares.
@@ -433,7 +433,102 @@ Ao registrar a devolução:
 
 ### Venda
 
-Status: `PENDING`.
+Status da regra: `PENDING`.
+
+Versão-alvo: V2.
+
+Endpoint: `POST /api/v1/sales/`.
+
+Entidades:
+
+- `sales`;
+- `sale_items`;
+- `clients`;
+- `copies`;
+- `employees`.
+
+Atores autorizados:
+
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+#### Pré-condições
+
+- o usuário deve estar autenticado;
+- o usuário deve possuir papel autorizado para registrar a venda;
+- os exemplares informados devem existir;
+- os exemplares devem estar ativos;
+- os exemplares devem estar com status `AVAILABLE`;
+- quando um `client_id` for informado, o cliente deve existir.
+
+#### Registro
+
+A venda é registrada:
+
+- vinculada ao funcionário responsável;
+- opcionalmente vinculada a um cliente;
+- contendo um ou mais exemplares;
+- com o preço unitário informado para cada item;
+- com `total_amount` calculado pelo backend a partir dos itens.
+
+A venda é criada inicialmente com:
+
+- `status = PENDING`.
+
+O `employee_id` é obtido a partir do usuário autenticado.
+
+#### Concorrência e integridade
+
+- os exemplares são consultados com bloqueio transacional durante o registro;
+- não é permitida a criação da venda para exemplar inexistente;
+- não é permitida a criação da venda para exemplar inativo;
+- não é permitida a criação da venda para exemplar que não esteja `AVAILABLE`;
+- a criação da venda e de seus itens ocorre na mesma transação;
+- falha na operação provoca rollback;
+- conflitos de integridade resultam em erro explícito.
+
+#### Resultado de sucesso
+
+- HTTP 201;
+- venda persistida;
+- itens da venda persistidos;
+- `total_amount` calculado pelo backend;
+- `status = PENDING`.
+
+#### Erros possíveis
+
+| Situação | HTTP | Descrição |
+|---|---:|---|
+| Cliente não encontrado | 404 | Cliente informado não existe |
+| Exemplar não encontrado | 404 | Um ou mais exemplares informados não existem ou estão inativos |
+| Exemplar indisponível | 409 | Um ou mais exemplares não estão disponíveis para venda |
+| Falha de integridade | 409 | Não foi possível registrar a venda |
+| Falha de banco | 500 | Não foi possível registrar a venda |
+
+#### Testes
+
+- registro de venda com sucesso;
+- registro com múltiplos exemplares;
+- cálculo automático do `total_amount`;
+- venda sem cliente;
+- cliente inexistente;
+- exemplar inexistente;
+- exemplar inativo;
+- exemplar indisponível;
+- erro de integridade;
+- erro de banco e rollback;
+- autorização por papel;
+- validação do contrato do endpoint.
+
+#### Escopo ainda não implementado
+
+Este fluxo não implementa ainda:
+
+- bloqueio automático da venda de exemplares `DIDACTIC`;
+- atualização do status do exemplar para `SOLD` após confirmação da venda;
+- confirmação ou cancelamento da venda.
+
+Essas regras pertencem às implementações específicas correspondentes.
 
 ### Reserva
 
@@ -483,6 +578,8 @@ O registro deve conter:
 - criação de funcionário e usuário na mesma transação;
 - papéis oficiais da aplicação;
 - pertencimento de cada fluxo à V1, V2 ou V3.
+- bloqueio de venda de exemplares com destinação `DIDACTIC`;
+- atualização do estoque/status do exemplar após confirmação da venda;
 
 ## 14. Critérios de implementação
 
