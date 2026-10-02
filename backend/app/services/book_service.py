@@ -11,6 +11,7 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
     BookPersistenceError,
+    BookUpdatePersistenceError,
     DuplicateBarcodeError,
     DuplicateIsbnError,
     EmployeeRecordRequiredError,
@@ -26,7 +27,11 @@ from app.schemas.book_schema import (
     BookAvailabilityResponse,
     BookCreate,
     BookResponse,
+    BookDetailResponse,
+    BookMetadataResponse,
+    BookUpdate,
     CopyResponse,
+    normalize_isbn,
 )
 
 
@@ -132,6 +137,21 @@ class BookService:
                 external_data["genre"] = genre
         return external_data
 
+    async def lookup_metadata(self, isbn: str) -> BookMetadataResponse:
+        normalized_isbn = normalize_isbn(isbn)
+        external_data = await self.fetch_google_books_data(normalized_isbn)
+        if not external_data.get("title") or not external_data.get("author"):
+            raise GoogleBooksInvalidResponseError()
+        try:
+            return BookMetadataResponse(
+                isbn=normalized_isbn,
+                title=external_data["title"],
+                author=external_data["author"],
+                genre=external_data.get("genre"),
+            )
+        except ValidationError as exc:
+            raise GoogleBooksInvalidResponseError() from exc
+
     async def create_book(self, book_data: BookCreate, *, employee_id: int) -> BookResponse:
         try:
             if not self.repository.employee_exists(employee_id):
@@ -172,6 +192,7 @@ class BookService:
                 title=book.title,
                 author=book.author,
                 genre=book.genre,
+                cover_url=book.cover_url,
                 is_active=book.is_active,
                 initial_copy=CopyResponse.model_validate(initial_copy),
             )
@@ -213,3 +234,42 @@ class BookService:
             is_available=available_copies_count > 0,
             available_copies_count=available_copies_count,
         )
+
+    def get_book(self, book_id: int) -> BookDetailResponse:
+        book = self.repository.get_with_copies(book_id)
+        if book is None:
+            raise BookNotFoundError()
+        return BookDetailResponse.model_validate(book)
+
+    def update_book(
+        self, book_id: int, changes: BookUpdate, *, employee_id: int
+    ) -> BookDetailResponse:
+        try:
+            if not self.repository.employee_exists(employee_id):
+                raise EmployeeRecordRequiredError()
+            book = self.repository.get_with_copies(book_id)
+            if book is None:
+                raise BookNotFoundError()
+            if changes.isbn is not None and self.repository.find_by_isbn_except(
+                changes.isbn, book_id
+            ) is not None:
+                raise DuplicateIsbnError()
+            self.db.execute(
+                text("SELECT set_config('libstock.employee_id', :employee_id, true)"),
+                {"employee_id": str(employee_id)},
+            )
+            updated = self.repository.update_book(book, changes)
+            response = BookDetailResponse.model_validate(updated)
+            self.db.commit()
+            return response
+        except IntegrityError as exc:
+            self.db.rollback()
+            if _unique_constraint_name(exc) == "books_isbn_key":
+                raise DuplicateIsbnError() from exc
+            raise BookUpdatePersistenceError() from exc
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise BookUpdatePersistenceError() from exc

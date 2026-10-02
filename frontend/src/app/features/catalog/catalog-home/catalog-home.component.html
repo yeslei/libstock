@@ -119,7 +119,10 @@
 
   @if (searchState(); as state) {
     <section class="section" aria-labelledby="search-results-heading">
-      <div class="section__head"><h2 class="section__title" id="search-results-heading">Resultado da busca</h2></div>
+      <div class="section__head">
+        <h2 class="section__title" id="search-results-heading">Resultado da busca</h2>
+        <button class="btn btn--outline" type="button" (click)="clearSearch()">Limpar busca</button>
+      </div>
       @switch (state.status) {
         @case ('loading') { <p class="state state--loading"><app-spinner /> <span>Buscando livros…</span></p> }
         @case ('error') { <app-alert [message]="state.message" variant="error" /> }
