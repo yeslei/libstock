@@ -15,6 +15,8 @@ from app.repositories.client_pendency_repository import ClientPendencyRepository
 from app.services.client_pendency_service import ClientPendencyService
 from app.repositories.loan_repository import LoanRepository
 from app.services.loan_service import LoanService
+from app.repositories.sale_repository import SaleRepository
+from app.services.sale_service import SaleService
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
@@ -64,4 +66,12 @@ def get_loan_service(
         db=db,
         repository=LoanRepository(db),
         client_pendency_service=client_pendency_service,
+    )
+
+def get_sale_service(
+    db: Session = Depends(get_db),
+) -> SaleService:
+    return SaleService(
+        db=db,
+        repository=SaleRepository(db),
     )
