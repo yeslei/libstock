@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { FormControl, Validators } from '@angular/forms';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
@@ -19,6 +19,7 @@ describe('BookCreateComponent', () => {
     title: 'Python Fluente',
     author: 'Luciano Ramalho',
     genre: 'Tecnologia',
+    cover_url: null,
     is_active: true,
     initial_copy: {
       id: 8,
@@ -34,7 +35,13 @@ describe('BookCreateComponent', () => {
   };
 
   beforeEach(async () => {
-    service = jasmine.createSpyObj<BookService>('BookService', ['create']);
+    service = jasmine.createSpyObj<BookService>('BookService', ['create', 'lookupMetadata']);
+    service.lookupMetadata.and.returnValue(of({
+      isbn: '9788575225530',
+      title: 'Python Fluente',
+      author: 'Luciano Ramalho',
+      genre: 'Tecnologia',
+    }));
     await TestBed.configureTestingModule({
       imports: [BookCreateComponent],
       providers: [provideRouter([]), { provide: BookService, useValue: service }],
@@ -91,6 +98,30 @@ describe('BookCreateComponent', () => {
     expect(control.valid).toBeTrue();
   });
 
+  it('consulta, preenche e bloqueia metadados enquanto o ISBN é digitado', fakeAsync(() => {
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+
+    expect(service.lookupMetadata).toHaveBeenCalledOnceWith('9788575225530');
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.value).toBe('Python Fluente');
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.disabled).toBeTrue();
+    expect(root.textContent).toContain('bloqueados para evitar inconsistências');
+  }));
+
+  it('libera o preenchimento manual quando a consulta falha', fakeAsync(() => {
+    service.lookupMetadata.and.returnValue(
+      throwError(() => ({ status: 503, detail: 'Serviço indisponível.' })),
+    );
+    input('book-isbn', '9788575225530');
+    tick(451);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#book-title')?.disabled).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Preencha título e autor manualmente');
+  }));
+
   it('aplica os limites de título, autor e gênero', () => {
     input('book-isbn', '9788575225530');
     input('book-title', 'T'.repeat(256));
@@ -115,6 +146,7 @@ describe('BookCreateComponent', () => {
       title: 'Python Fluente',
       author: 'Luciano Ramalho',
       genre: 'Tecnologia',
+      cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
         sale_price: null, acquired_at: null,
@@ -128,7 +160,7 @@ describe('BookCreateComponent', () => {
     input('book-title', '   ');
     submit();
     expect(service.create).toHaveBeenCalledOnceWith({
-      isbn: '9788575225530', title: null, author: null, genre: null,
+      isbn: '9788575225530', title: null, author: null, genre: null, cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
         sale_price: null, acquired_at: null,

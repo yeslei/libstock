@@ -14,6 +14,9 @@ class BookRepository:
         # do usuário autenticado precisa existir exatamente em employees.
         return self.db.get(Employee, employee_id) is not None
 
+    def find_by_id(self, book_id: int) -> Book | None:
+        return self.db.get(Book, book_id)
+
     def find_by_isbn(self, isbn: str) -> Book | None:
         return self.db.scalar(select(Book).where(Book.isbn == isbn))
 
@@ -42,7 +45,6 @@ class BookRepository:
             return None
         book, available_copies_count = row
         return book, int(available_copies_count)
-
     def find_copy_by_barcode(self, barcode: str) -> Copy | None:
         return self.db.scalar(select(Copy).where(Copy.barcode == barcode))
 

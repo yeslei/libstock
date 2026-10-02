@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from pydantic import ValidationError
 
-from app.schemas.book_schema import BookCreate, BookResponse, BookSearchParams
+from app.schemas.book_schema import BookCreate, BookResponse, BookSearchParams, BookUpdate
 
 
 class BookSearchParamsTests(unittest.TestCase):
@@ -43,6 +43,7 @@ class BookResponseTests(unittest.TestCase):
                 "title": "O Hobbit",
                 "author": "J. R. R. Tolkien",
                 "genre": None,
+                "cover_url": None,
                 "is_active": True,
                 "initial_copy": None,
             },
@@ -111,6 +112,38 @@ class BookResponseTests(unittest.TestCase):
                         },
                     }
                 )
+
+
+class BookUpdateTests(unittest.TestCase):
+    def test_accepts_valid_partial_update(self) -> None:
+        update = BookUpdate.model_validate({"title": "Dom Casmurro", "publication_year": 1899})
+        self.assertEqual(update.title, "Dom Casmurro")
+        self.assertEqual(update.publication_year, 1899)
+        self.assertIsNone(update.author)
+        self.assertIsNone(update.isbn)
+
+    def test_validates_and_normalizes_isbn(self) -> None:
+        update = BookUpdate.model_validate({"isbn": "978-85-7522-553-0"})
+        self.assertEqual(update.isbn, "9788575225530")
+
+    def test_rejects_invalid_isbn(self) -> None:
+        with self.assertRaises(ValidationError):
+            BookUpdate.model_validate({"isbn": "12345"})
+
+    def test_rejects_blank_mandatory_fields(self) -> None:
+        for field in ("title", "author"):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                BookUpdate.model_validate({field: "   "})
+
+    def test_rejects_year_outside_valid_range(self) -> None:
+        for year in (999, 2101):
+            with self.subTest(year=year), self.assertRaises(ValidationError):
+                BookUpdate.model_validate({"publication_year": year})
+
+    def test_forbids_extra_fields(self) -> None:
+        with self.assertRaises(ValidationError):
+            BookUpdate.model_validate({"extra_field": "not_allowed"})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,9 +26,9 @@ from app.repositories.book_repository import BookRepository
 from app.schemas.book_schema import (
     BookAvailabilityResponse,
     BookCreate,
-    BookResponse,
     BookDetailResponse,
     BookMetadataResponse,
+    BookResponse,
     BookUpdate,
     CopyResponse,
     normalize_isbn,
@@ -162,16 +162,25 @@ class BookService:
                 raise DuplicateBarcodeError()
 
             persisted_data = book_data
-            if not book_data.title or not book_data.author:
-                external_data = await self.fetch_google_books_data(book_data.isbn)
+            try:
+                metadata = await self.lookup_metadata(book_data.isbn)
                 merged_data = book_data.model_dump()
-                for field_name in ("title", "author", "genre"):
-                    if not merged_data[field_name] and external_data.get(field_name):
-                        merged_data[field_name] = external_data[field_name]
+                merged_data["title"] = metadata.title
+                merged_data["author"] = metadata.author
+                if metadata.genre:
+                    merged_data["genre"] = metadata.genre
                 try:
                     persisted_data = BookCreate.model_validate(merged_data)
                 except ValidationError as exc:
                     raise GoogleBooksInvalidResponseError() from exc
+            except (
+                GoogleBooksNotFoundError,
+                GoogleBooksUnavailableError,
+                GoogleBooksRateLimitError,
+                GoogleBooksInvalidResponseError,
+            ):
+                if not book_data.title or not book_data.author:
+                    raise
 
             if not persisted_data.title or not persisted_data.author:
                 raise GoogleBooksInvalidResponseError()
@@ -234,7 +243,6 @@ class BookService:
             is_available=available_copies_count > 0,
             available_copies_count=available_copies_count,
         )
-
     def get_book(self, book_id: int) -> BookDetailResponse:
         book = self.repository.get_with_copies(book_id)
         if book is None:

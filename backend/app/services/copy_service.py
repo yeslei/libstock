@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AuditActorRequiredError
 from app.models.domain import Book
 from app.repositories.copy_repository import CopyRepository
-from app.schemas.copy_schema import CopyCreate
+from app.schemas.copy_schema import CopyBatchCreate, CopyCreate
 
 class CopyService:
     def __init__(self, repository: CopyRepository, db: Session):
@@ -41,4 +41,51 @@ class CopyService:
             raise HTTPException(
                 status_code=500,
                 detail="Não foi possível cadastrar o exemplar.",
+            )
+
+    def create_copies(
+        self,
+        copies_data: CopyBatchCreate,
+        actor_id: int,
+    ):
+        if not self.repository.is_employee(actor_id):
+            raise AuditActorRequiredError()
+
+        try:
+            self.repository.set_audit_actor(actor_id)
+
+            book_id = copies_data.copies[0].book_id
+            book = self.db.get(Book, book_id)
+
+            if book is None or not book.is_active:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Obra não encontrada ou inativa.",
+                )
+
+            copies = self.repository.create_copies(copies_data.copies)
+
+            self.db.commit()
+
+            for copy in copies:
+                self.db.refresh(copy)
+
+            return copies
+
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Já existe um exemplar com este código de barras.",
+            ) from exc
+
+        except HTTPException:
+            self.db.rollback()
+            raise
+
+        except Exception:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível cadastrar os exemplares.",
             )

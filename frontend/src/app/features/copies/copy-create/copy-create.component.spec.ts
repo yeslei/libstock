@@ -3,6 +3,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { ApiError } from '../../../core/models/auth.model';
+import { BookService } from '../../books/services/book.service';
 import { CopyResponse } from '../models/copy.model';
 import { CopyService } from '../services/copy.service';
 import { CopyCreateComponent } from './copy-create.component';
@@ -10,6 +11,7 @@ import { CopyCreateComponent } from './copy-create.component';
 describe('CopyCreateComponent', () => {
   let fixture: ComponentFixture<CopyCreateComponent>;
   let service: jasmine.SpyObj<CopyService>;
+  let books: jasmine.SpyObj<BookService>;
   let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
 
   const response: CopyResponse = {
@@ -18,12 +20,15 @@ describe('CopyCreateComponent', () => {
 
   beforeEach(async () => {
     service = jasmine.createSpyObj<CopyService>('CopyService', ['create']);
+    books = jasmine.createSpyObj<BookService>('BookService', ['get']);
+    books.get.and.returnValue(of({ id: 8, isbn: '9788575225530', title: 'Obra', author: 'Autora', genre: null, cover_url: null, is_active: true, initial_copy: null, copies: [] }));
     params = new BehaviorSubject(convertToParamMap({ id: '8' }));
     await TestBed.configureTestingModule({
       imports: [CopyCreateComponent],
       providers: [
         provideRouter([]),
         { provide: CopyService, useValue: service },
+        { provide: BookService, useValue: books },
         { provide: ActivatedRoute, useValue: { paramMap: params } },
       ],
     }).compileComponents();
@@ -81,6 +86,7 @@ describe('CopyCreateComponent', () => {
   it('bloqueia submit com formulário inválido', () => { submit(); expect(service.create).not.toHaveBeenCalled(); });
   it('impede múltiplos envios durante loading', () => { const pending = new Subject<CopyResponse>(); service.create.and.returnValue(pending); validCommercial(); submit(); submit(); expect(service.create).toHaveBeenCalledTimes(1); });
   it('exibe dados reais devolvidos no 201 e permanece na tela', () => { service.create.and.returnValue(of(response)); validCommercial(); submit(); const text = fixture.nativeElement.textContent; expect(text).toContain('RET-9'); expect(text).toContain('AVAILABLE'); expect(text).toContain('Cadastrar outro exemplar'); });
+  it('recarrega os exemplares da obra depois do cadastro', () => { service.create.and.returnValue(of(response)); validCommercial(); submit(); expect(books.get).toHaveBeenCalledTimes(2); });
   it('limpa campos editáveis e mantém bookId ao cadastrar outro exemplar', () => { service.create.and.returnValue(of(response)); validCommercial(); submit(); (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[type="button"]')!.click(); fixture.detectChanges(); expect((fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#copy-condition')?.value).toBe(''); validCommercial(); service.create.and.returnValue(of(response)); submit(); expect(service.create.calls.mostRecent().args[0].bookId).toBe(8); });
   it('preserva o formulário e trata 401, 403, 404, 409, 422 e 500', () => {
     const errors: ApiError[] = [

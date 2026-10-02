@@ -552,3 +552,16 @@ A V1 estará coerente com os papéis quando:
 * não exibir auditoria e notificações da V3;
 * registrar PF/PJ e propriedade do acervo como pendências enquanto o banco não oferecer contrato suficiente;
 * não simular persistência ou sucesso.
+# Matriz de navegação operacional
+
+| Papel | Item na navegação | Rota | Backend | Estado |
+|---|---|---|---|---|
+| Todos | Início / Explorar livros | `/`, `/explorar` | `/api/v1/catalog/*` | Funcional |
+| `USER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
+| `SELLER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
+| `STOCK_KEEPER` | Cadastrar exemplar | `/gestao/acervo` | `/api/v1/books/*`, `/api/v1/copies/` | Funcional |
+| `ADMINISTRATOR` | Cadastrar exemplar / Gestão de usuários | `/gestao/acervo`, `/gestao/usuarios` | acervo e usuários | Funcional |
+
+Venda, empréstimo, devolução e reserva permanecem planejados. Como ainda não
+possuem controllers e services transacionais completos, não aparecem como
+botões operacionais na navbar nem nos cards do catálogo.

@@ -36,10 +36,27 @@ describe('CatalogHomeComponent', () => {
     fixture.detectChanges();
   });
 
-  it('exibe no card o link de cadastro de exemplar usando book.id', () => {
-    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
-      'a[href="/obras/42/exemplares/novo"]',
-    );
-    expect(link?.textContent).toContain('Cadastrar exemplar');
+  it('não repete o cadastro de exemplar nos cards', () => {
+    expect(fixture.nativeElement.textContent).not.toContain('Cadastrar exemplar');
+  });
+
+  it('exibe apenas os resultados enquanto houver uma busca ativa', () => {
+    const root = fixture.nativeElement as HTMLElement;
+    const input = root.querySelector<HTMLInputElement>('#catalog-search')!;
+    input.value = 'obra';
+    input.dispatchEvent(new Event('input'));
+    root.querySelector<HTMLFormElement>('form.search')!.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(root.textContent).toContain('Resultado da busca');
+    expect(root.textContent).not.toContain('Categorias em destaque');
+    expect(root.textContent).not.toContain('Livros em destaque');
+
+    root.querySelector<HTMLButtonElement>('button.btn--outline')!.click();
+    fixture.detectChanges();
+
+    expect(root.textContent).toContain('Categorias em destaque');
+    expect(root.textContent).toContain('Livros em destaque');
+    expect(input.value).toBe('');
   });
 });

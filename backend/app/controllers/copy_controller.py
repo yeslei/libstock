@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from app.schemas.copy_schema import CopyCreate, CopyResponse
+from app.schemas.copy_schema import CopyBatchCreate, CopyCreate, CopyResponse
 from app.services.copy_service import CopyService
 from app.repositories.copy_repository import CopyRepository
 from app.core.database import get_db
@@ -13,12 +13,29 @@ def get_copy_service(db: Session = Depends(get_db)) -> CopyService:
     repository = CopyRepository(db)
     return CopyService(repository, db)
 
+@router.post(
+    "/batch",
+    response_model=list[CopyResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+def create_copies_batch(
+    copies: CopyBatchCreate,
+    copy_service: CopyService = Depends(get_copy_service),
+    current_user: User = Depends(
+        require_roles("STOCK_KEEPER", "ADMINISTRATOR")
+    ),
+):
+    return copy_service.create_copies(
+        copies_data=copies,
+        actor_id=current_user.id,
+    )
+
 @router.post("/", response_model=CopyResponse, status_code=status.HTTP_201_CREATED)
 def create_copy(
     copy: CopyCreate,
     copy_service: CopyService = Depends(get_copy_service),
     current_user: User = Depends(
-        require_roles("SELLER", "STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+        require_roles("STOCK_KEEPER", "ADMINISTRATOR")
     ),
 ):
     return copy_service.create_new_copy(copy_data=copy, actor_id=current_user.id)
