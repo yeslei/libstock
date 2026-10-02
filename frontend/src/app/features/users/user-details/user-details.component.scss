@@ -1,0 +1,12 @@
+@use 'variables' as *;
+
+.details-page { min-height: 100dvh; padding: $space-6 $space-4; background: $bg-page; }
+.details-card { display: grid; gap: $space-4; max-width: 600px; margin: 0 auto; padding: $space-8; border: 1px solid $border; border-radius: $radius-lg; background: $bg-surface; box-shadow: $shadow-md; }
+.eyebrow { color: $verde-medio; font-size: $font-size-xs; font-weight: 700; text-transform: uppercase; }
+h1 { color: $primary; }
+.state { display: flex; justify-content: center; gap: $space-2; padding: $space-8; color: $text-muted; }
+dl { display: grid; gap: $space-3; margin: 0; }
+dl div { padding-bottom: $space-3; border-bottom: 1px solid $border; }
+dt { color: $text-muted; font-size: $font-size-sm; }
+dd { margin: $space-1 0 0; font-weight: 600; }
+button { min-height: 44px; padding: 0 $space-4; border: 1px solid $primary; border-radius: $radius-md; background: $primary; color: #fff; font-weight: 600; cursor: pointer; }

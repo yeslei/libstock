@@ -38,7 +38,7 @@ def get_user(
     _current_user: User = Depends(require_administrator),
     user_service: UserService = Depends(get_user_service),
 ) -> User:
-    return user_service.get_admin_user(user_id)
+    return user_service.get_user(user_id)
 
 
 @router.patch("/{user_id}", response_model=UserAdminResponse)
