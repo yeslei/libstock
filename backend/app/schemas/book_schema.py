@@ -105,7 +105,11 @@ class BookUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     author: str | None = Field(default=None, min_length=1, max_length=255)
     genre: str | None = Field(default=None, max_length=100)
+    publication_year: int | None = Field(default=None, ge=1000, le=2100)
+    publisher: str | None = Field(default=None, max_length=150)
+    edition: str | None = Field(default=None, max_length=50)
     cover_url: str | None = Field(default=None, max_length=2048)
+    is_active: bool | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -114,7 +118,9 @@ class BookUpdate(BaseModel):
     def validate_optional_isbn(cls, value: str | None) -> str | None:
         return normalize_isbn(value) if value is not None else None
 
-    @field_validator("title", "author", "genre", "cover_url", mode="before")
+    @field_validator(
+        "title", "author", "genre", "publisher", "edition", "cover_url", mode="before"
+    )
     @classmethod
     def normalize_update_text(cls, value: object) -> object:
         if isinstance(value, str):
