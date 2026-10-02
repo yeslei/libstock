@@ -414,6 +414,19 @@ $content-max: 1180px;
   align-items: center;
 }
 
+.availability {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  font-size: $font-size-xs;
+  font-weight: 700;
+}
+
+.availability--available { background: rgba(73, 107, 76, 0.14); color: $verde-medio; }
+.availability--unavailable, .availability--loading, .availability--error { background: $bg-subtle; color: $text-muted; }
+
 .badge {
   display: inline-flex;
   align-items: center;

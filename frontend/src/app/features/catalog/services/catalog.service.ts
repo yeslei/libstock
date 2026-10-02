@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { CatalogBook, Genre, PagedBooks } from '../models/catalog.model';
+import { BookAvailability, CatalogBook, Genre, PagedBooks } from '../models/catalog.model';
 
 export const CATALOG_API = '/api/v1/catalog';
 export type CatalogSearchCriterion = 'title' | 'author' | 'isbn' | 'barcode';
@@ -34,5 +34,9 @@ export class CatalogService {
     return this.http.get<CatalogBook[]>(`${CATALOG_API}/books`, {
       params: { [criterion]: value },
     });
+  }
+
+  getAvailability(bookId: number): Observable<BookAvailability> {
+    return this.http.get<BookAvailability>(`/api/v1/books/${bookId}/availability`);
   }
 }

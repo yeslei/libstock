@@ -128,3 +128,12 @@ class BookResponse(BaseModel):
     initial_copy: CopyResponse | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BookAvailabilityResponse(BaseModel):
+    id: int
+    title: str
+    is_available: bool
+    available_copies_count: int
+
+    model_config = ConfigDict(from_attributes=True)

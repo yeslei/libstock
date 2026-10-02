@@ -18,10 +18,16 @@ from app.core.exceptions import (
     GoogleBooksNotFoundError,
     GoogleBooksRateLimitError,
     GoogleBooksUnavailableError,
+    BookNotFoundError,
 )
 from app.models.domain import Book
 from app.repositories.book_repository import BookRepository
-from app.schemas.book_schema import BookCreate, BookResponse, CopyResponse
+from app.schemas.book_schema import (
+    BookAvailabilityResponse,
+    BookCreate,
+    BookResponse,
+    CopyResponse,
+)
 
 
 GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
@@ -195,3 +201,15 @@ class BookService:
         if not normalized:
             raise ValueError("O título da busca não pode estar vazio.")
         return self.repository.search_by_title(normalized)
+
+    def get_book_availability(self, book_id: int) -> BookAvailabilityResponse:
+        result = self.repository.get_book_availability(book_id)
+        if result is None:
+            raise BookNotFoundError()
+        book, available_copies_count = result
+        return BookAvailabilityResponse(
+            id=book.id,
+            title=book.title,
+            is_available=available_copies_count > 0,
+            available_copies_count=available_copies_count,
+        )

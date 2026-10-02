@@ -3,7 +3,12 @@ from fastapi import APIRouter, Depends, status
 from app.dependencies.authentication import require_roles
 from app.dependencies.services import get_book_service
 from app.models.user import User
-from app.schemas.book_schema import BookCreate, BookResponse, BookSearchParams
+from app.schemas.book_schema import (
+    BookAvailabilityResponse,
+    BookCreate,
+    BookResponse,
+    BookSearchParams,
+)
 from app.services.book_service import BookService
 
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
@@ -25,3 +30,11 @@ def search_books(
     book_service: BookService = Depends(get_book_service),
 ) -> list[BookResponse]:
     return book_service.search_books(params.title)
+
+
+@router.get("/{book_id}/availability", response_model=BookAvailabilityResponse)
+def get_book_availability(
+    book_id: int,
+    book_service: BookService = Depends(get_book_service),
+) -> BookAvailabilityResponse:
+    return book_service.get_book_availability(book_id)

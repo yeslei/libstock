@@ -2,13 +2,13 @@ import { AsyncPipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, map, of, startWith } from 'rxjs';
+import { catchError, map, of, startWith, tap } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { CatalogCapability, capabilitiesFor } from '../models/catalog-capabilities';
-import { BookOffer, CatalogBook, Genre, LoadState } from '../models/catalog.model';
+import { BookAvailability, BookOffer, CatalogBook, Genre, LoadState } from '../models/catalog.model';
 import { CatalogAdminService } from '../services/catalog-admin.service';
 import { CatalogSearchCriterion, CatalogService } from '../services/catalog.service';
 
@@ -50,6 +50,7 @@ export class CatalogHomeComponent {
   /** Livros retirados do destaque nesta sessão, para sumirem sem recarregar. */
   private readonly unfeatured = signal<ReadonlySet<number>>(new Set());
   protected readonly featuredError = signal<string | null>(null);
+  protected readonly availability = signal<Record<number, LoadState<BookAvailability>>>({});
 
   protected readonly genres$ = this.catalog.getFeaturedGenres().pipe(
     map((data): LoadState<Genre[]> => ({ status: 'loaded', data })),
@@ -63,6 +64,7 @@ export class CatalogHomeComponent {
   );
 
   protected readonly books$ = this.catalog.getFeaturedBooks().pipe(
+    tap((books) => this.loadAvailability(books)),
     map((data): LoadState<CatalogBook[]> => ({ status: 'loaded', data })),
     startWith<LoadState<CatalogBook[]>>({ status: 'loading' }),
     catchError(() =>
@@ -96,13 +98,45 @@ export class CatalogHomeComponent {
       .searchBooks(this.searchCriterion(), value)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (data) => this.searchState.set({ status: 'loaded', data }),
+        next: (data) => {
+          this.loadAvailability(data);
+          this.searchState.set({ status: 'loaded', data });
+        },
         error: () =>
           this.searchState.set({
             status: 'error',
             message: 'Não foi possível realizar a busca. Tente novamente.',
           }),
       });
+  }
+
+  protected availabilityFor(bookId: number): LoadState<BookAvailability> | undefined {
+    return this.availability()[bookId];
+  }
+
+  private loadAvailability(books: CatalogBook[]): void {
+    for (const book of books) {
+      if (this.availability()[book.id]) continue;
+      this.availability.update((current) => ({
+        ...current,
+        [book.id]: { status: 'loading' },
+      }));
+      this.catalog
+        .getAvailability(book.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (data) =>
+            this.availability.update((current) => ({
+              ...current,
+              [book.id]: { status: 'loaded', data },
+            })),
+          error: () =>
+            this.availability.update((current) => ({
+              ...current,
+              [book.id]: { status: 'error', message: 'Disponibilidade indisponível.' },
+            })),
+        });
+    }
   }
 
   protected isHidden(book: CatalogBook): boolean {
