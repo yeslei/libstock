@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 
 from app.dependencies.authentication import require_roles
 from app.dependencies.services import get_loan_service
@@ -32,3 +32,15 @@ def create_loan(
         loan_data,
         employee_id=current_user.id,
     )
+
+@router.patch(
+    "/{loan_id}/return",
+    response_model=LoanResponse,
+    status_code=200,
+)
+def register_return(
+    loan_id: int = Path(gt=0),
+    current_user: User = Depends(require_loan_creator),
+    loan_service: LoanService = Depends(get_loan_service),
+) -> LoanResponse:
+    return loan_service.register_return(loan_id)
