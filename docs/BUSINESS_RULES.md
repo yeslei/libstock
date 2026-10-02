@@ -34,7 +34,6 @@ Não substitui a documentação técnica da API nem as migrations.
 
 ### Planejado, mas não disponível
 
-- devoluções;
 - reservas;
 - vendas;
 - trocas;
@@ -306,6 +305,21 @@ O novo empréstimo é criado com:
 
 O `employee_id` é obtido a partir do usuário autenticado.
 
+#### Prazo de devolução
+
+Regra aprovada e implementada: o prazo padrão de empréstimo é de 15 dias corridos.
+
+A `due_date` não é informada pelo cliente no momento da criação do empréstimo.
+
+O backend calcula automaticamente:
+
+- `loan_date`: momento do registro do empréstimo;
+- `due_date`: `loan_date` + 15 dias corridos.
+
+Exemplo:
+- empréstimo realizado em 02/10/2026;
+- devolução prevista em 17/10/2026.
+
 #### Concorrência e integridade
 
 - o cliente é validado antes do registro;
@@ -344,11 +358,78 @@ revalida o cliente durante o registro do empréstimo.
 - erro de integridade;
 - erro de banco e rollback;
 - autorização por papel;
-- integração do endpoint.
+- integração do endpoint;
+- cálculo automático da data prevista de devolução;
+- validação de que `due_date` corresponde a `loan_date + 15 dias corridos`.
 
 ### Devolução
 
-Status: `PENDING`.
+Status: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `PATCH /api/v1/loans/{loan_id}/return`.
+
+Entidades:
+
+- `loans`;
+- `copies`.
+
+Atores autorizados:
+
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+#### Pré-condições
+
+- o empréstimo deve existir;
+- o empréstimo deve possuir status `OPEN`;
+- o exemplar vinculado ao empréstimo deve existir.
+
+#### Registro
+
+Ao registrar a devolução:
+
+- `loans.returned_at` recebe automaticamente o momento da operação;
+- `loans.status` é alterado para `RETURNED`;
+- o exemplar vinculado ao empréstimo tem seu status alterado para `AVAILABLE`.
+
+#### Concorrência e integridade
+
+- o empréstimo é bloqueado transacionalmente durante a devolução;
+- o exemplar vinculado também é bloqueado transacionalmente;
+- não é permitida a devolução de um empréstimo que não esteja com status `OPEN`;
+- a atualização do empréstimo e do exemplar participa da mesma transação;
+- falha na operação provoca rollback;
+- conflitos de integridade resultam em erro explícito.
+
+#### Resultado de sucesso
+
+- HTTP 200;
+- empréstimo com status `RETURNED`;
+- `returned_at` preenchido;
+- exemplar novamente disponível para operação compatível.
+
+#### Erros possíveis
+
+| Situação | HTTP | Descrição |
+|---|---:|---|
+| Empréstimo não encontrado | 404 | Empréstimo informado não existe |
+| Empréstimo não está aberto | 409 | Empréstimo não pode ser devolvido no estado atual |
+| Exemplar não encontrado | 404 | Exemplar vinculado ao empréstimo não foi encontrado |
+| Falha de integridade | 409 | Não foi possível concluir a devolução |
+| Falha de banco | 500 | Não foi possível registrar a devolução |
+
+#### Testes
+
+- devolução de empréstimo aberto;
+- preenchimento automático de `returned_at`;
+- alteração do status para `RETURNED`;
+- atualização do exemplar para `AVAILABLE`;
+- empréstimo inexistente;
+- tentativa de devolver empréstimo já encerrado;
+- erro de banco e rollback;
+- autorização do endpoint.
 
 ### Venda
 
@@ -582,4 +663,8 @@ A sincronização utiliza lock transacional sobre o cliente para serializar alte
 
 Operações de circulação que dependam da aptidão do cliente devem reavaliar as pendências antes de prosseguir.
 
-Os serviços de consulta e sincronização de penalização estão preparados para essa integração. Os fluxos transacionais de empréstimo, devolução e reserva ainda dependem da implementação de seus respectivos services e endpoints.
+O fluxo de empréstimo utiliza a validação da situação do cliente antes do registro da operação.
+
+O serviço de consulta e sincronização de penalização permanece preparado para ser consumido por outros fluxos de circulação.
+
+A reserva ainda não está integrada ao controle de pendências.
