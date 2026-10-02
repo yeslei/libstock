@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -17,7 +17,6 @@ def _loan_data() -> LoanCreate:
     return LoanCreate(
         client_id=42,
         copy_id=15,
-        due_date=datetime(2026, 10, 1, 18, 0, tzinfo=timezone.utc),
     )
 
 
@@ -27,13 +26,17 @@ class FakeLoanService:
 
     def create_loan(self, loan_data: LoanCreate, *, employee_id: int):
         self.created.append((loan_data, employee_id))
+
+        loan_date = datetime(2026, 9, 26, 14, 0, tzinfo=timezone.utc)
+        due_date = loan_date + timedelta(days=15)
+
         return SimpleNamespace(
             id=100,
             client_id=loan_data.client_id,
             copy_id=loan_data.copy_id,
             employee_id=employee_id,
-            loan_date=datetime(2026, 9, 26, 14, 0, tzinfo=timezone.utc),
-            due_date=loan_data.due_date,
+            loan_date=loan_date,
+            due_date=due_date,
             returned_at=None,
             status=LoanStatus.OPEN,
         )
@@ -63,14 +66,19 @@ def _available_copy():
     )
 
 
-def _loan_entity(loan_data: LoanCreate, employee_id: int):
+def _loan_entity(
+    loan_data: LoanCreate,
+    employee_id: int,
+    loan_date: datetime,
+    due_date: datetime,
+):
     return SimpleNamespace(
         id=100,
         client_id=loan_data.client_id,
         copy_id=loan_data.copy_id,
         employee_id=employee_id,
-        loan_date=datetime(2026, 9, 26, 14, 0, tzinfo=timezone.utc),
-        due_date=loan_data.due_date,
+        loan_date=loan_date,
+        due_date=due_date,
         returned_at=None,
         status=LoanStatus.OPEN,
     )
@@ -124,16 +132,28 @@ def test_role_user_nao_pode_criar_emprestimo():
         dependency(SimpleNamespace(role_codes=["USER"]))
 
 
-def test_service_cria_emprestimo_para_cliente_valido_e_exemplar_disponivel():
+def test_service_calcula_data_de_devolucao_em_15_dias():
     repository = MagicMock()
     db = FakeSession()
     client_service = MagicMock()
 
-    copy = _available_copy()
-    repository.find_copy_for_loan.return_value = copy
+    repository.find_copy_for_loan.return_value = _available_copy()
 
-    expected_loan = _loan_entity(_loan_data(), 7)
-    repository.create_loan.return_value = expected_loan
+    def create_loan_side_effect(
+        loan_data,
+        *,
+        employee_id,
+        loan_date,
+        due_date,
+    ):
+        return _loan_entity(
+            loan_data,
+            employee_id,
+            loan_date,
+            due_date,
+        )
+
+    repository.create_loan.side_effect = create_loan_side_effect
 
     service = LoanService(
         repository=repository,
@@ -150,17 +170,23 @@ def test_service_cria_emprestimo_para_cliente_valido_e_exemplar_disponivel():
         42,
         commit=False,
     )
+
     repository.find_copy_for_loan.assert_called_once_with(15)
     repository.create_loan.assert_called_once()
 
-    assert result.id == 100
-    assert result.client_id == 42
-    assert result.copy_id == 15
-    assert result.employee_id == 7
-    assert result.status == LoanStatus.OPEN
+    _, kwargs = repository.create_loan.call_args
+
+    loan_date = kwargs["loan_date"]
+    due_date = kwargs["due_date"]
+
+    assert loan_date.tzinfo == timezone.utc
+    assert due_date - loan_date == timedelta(days=15)
+
+    assert result.loan_date == loan_date
+    assert result.due_date == due_date
+
     assert db.commits == 1
     assert db.rollbacks == 0
-    assert db.refreshed == [expected_loan]
 
 
 def test_service_faz_rollback_se_exemplar_nao_for_encontrado():

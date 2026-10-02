@@ -8,7 +8,6 @@ from app.models.domain import LoanStatus
 class LoanCreate(BaseModel):
     client_id: int = Field(gt=0)
     copy_id: int = Field(gt=0)
-    due_date: datetime
 
 
 class LoanResponse(BaseModel):

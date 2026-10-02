@@ -1,7 +1,9 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Copy, CopyStatus, Loan
+from app.models.domain import Copy, Loan
 from app.schemas.loan_schema import LoanCreate
 
 
@@ -24,12 +26,15 @@ class LoanRepository:
         loan_data: LoanCreate,
         *,
         employee_id: int,
+        loan_date: datetime,
+        due_date: datetime,
     ) -> Loan:
         loan = Loan(
             client_id=loan_data.client_id,
             copy_id=loan_data.copy_id,
             employee_id=employee_id,
-            due_date=loan_data.due_date,
+            loan_date=loan_date,
+            due_date=due_date,
         )
         self.db.add(loan)
         self.db.flush()
