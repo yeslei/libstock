@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.controllers.sale_controller import create_sale
-from app.models.domain import CopyStatus, SaleStatus
+from app.models.domain import CopyStatus, DestinationType, SaleStatus
 from app.schemas.sale_schema import SaleCreate
 from app.services.sale_service import SaleService
 
@@ -29,11 +29,13 @@ def _copy(
     *,
     status_: CopyStatus = CopyStatus.AVAILABLE,
     is_active: bool = True,
+    destination_: DestinationType = DestinationType.COMMERCIAL,
 ):
     return SimpleNamespace(
         id=copy_id,
         status=status_,
         is_active=is_active,
+        destination=destination_,
     )
 
 
@@ -374,3 +376,66 @@ def test_schema_rejeita_preco_negativo():
                 }
             ],
         )
+
+def test_service_bloqueia_venda_de_exemplar_didatico():
+    repository = MagicMock()
+    db = FakeSession()
+
+    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.find_copies_for_sale.return_value = [
+        _copy(
+            15,
+            destination_=DestinationType.DIDACTIC,
+        ),
+    ]
+
+    with pytest.raises(HTTPException) as exc:
+        _service(repository, db).create_sale(
+            SaleCreate(
+                client_id=42,
+                items=[
+                    {
+                        "copy_id": 15,
+                        "unit_price": Decimal("39.90"),
+                    }
+                ],
+            ),
+            employee_id=7,
+        )
+
+    assert exc.value.status_code == status.HTTP_409_CONFLICT
+    assert exc.value.detail == "Exemplares didáticos não podem ser vendidos."
+    repository.create_sale.assert_not_called()
+    repository.create_sale_items.assert_not_called()
+    assert db.commits == 0
+    assert db.rollbacks == 1
+
+
+def test_service_bloqueia_venda_comercial_quando_um_exemplar_e_didatico():
+    repository = MagicMock()
+    db = FakeSession()
+
+    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.find_copies_for_sale.return_value = [
+        _copy(
+            15,
+            destination_=DestinationType.COMMERCIAL,
+        ),
+        _copy(
+            16,
+            destination_=DestinationType.DIDACTIC,
+        ),
+    ]
+
+    with pytest.raises(HTTPException) as exc:
+        _service(repository, db).create_sale(
+            _sale_data(),
+            employee_id=7,
+        )
+
+    assert exc.value.status_code == status.HTTP_409_CONFLICT
+    assert exc.value.detail == "Exemplares didáticos não podem ser vendidos."
+    repository.create_sale.assert_not_called()
+    repository.create_sale_items.assert_not_called()
+    assert db.commits == 0
+    assert db.rollbacks == 1

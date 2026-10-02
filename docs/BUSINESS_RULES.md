@@ -30,8 +30,8 @@ Não substitui a documentação técnica da API nem as migrations.
 - cadastro de funcionários;
 - disponibilidade derivada dos exemplares;
 - controle de papéis;
-- persistência de entidades de circulação.
-- vendas: registro da venda implementado; bloqueio de venda de exemplares didáticos e baixa de estoque ainda dependem de regras específicas.
+- persistência de entidades de circulação;
+- vendas: registro da venda e bloqueio de venda de exemplares didáticos implementados; confirmação da venda, atualização do status do exemplar e demais etapas do fluxo ainda dependem de regras específicas.
 
 ### Planejado, mas não disponível
 
@@ -433,7 +433,7 @@ Ao registrar a devolução:
 
 ### Venda
 
-Status da regra: `PENDING`.
+Status da regra: `IMPLEMENTED`.
 
 Versão-alvo: V2.
 
@@ -461,6 +461,13 @@ Atores autorizados:
 - os exemplares devem estar com status `AVAILABLE`;
 - quando um `client_id` for informado, o cliente deve existir.
 
+#### Regra de destinação
+
+- exemplares com destinação `DIDACTIC` não podem ser vendidos;
+- a venda deve ser bloqueada antes da criação da venda e dos itens da venda;
+- caso uma solicitação contenha exemplares de destinação `COMMERCIAL` e `DIDACTIC`, a operação inteira deve ser rejeitada;
+- exemplares de destinação `COMMERCIAL` podem prosseguir para o registro da venda quando as demais pré-condições forem atendidas.
+
 #### Registro
 
 A venda é registrada:
@@ -483,6 +490,7 @@ O `employee_id` é obtido a partir do usuário autenticado.
 - não é permitida a criação da venda para exemplar inexistente;
 - não é permitida a criação da venda para exemplar inativo;
 - não é permitida a criação da venda para exemplar que não esteja `AVAILABLE`;
+- não é permitida a criação da venda para exemplar com destinação `DIDACTIC`;
 - a criação da venda e de seus itens ocorre na mesma transação;
 - falha na operação provoca rollback;
 - conflitos de integridade resultam em erro explícito.
@@ -502,6 +510,7 @@ O `employee_id` é obtido a partir do usuário autenticado.
 | Cliente não encontrado | 404 | Cliente informado não existe |
 | Exemplar não encontrado | 404 | Um ou mais exemplares informados não existem ou estão inativos |
 | Exemplar indisponível | 409 | Um ou mais exemplares não estão disponíveis para venda |
+| Exemplar didático | 409 | Exemplar com destinação `DIDACTIC` não pode ser vendido |
 | Falha de integridade | 409 | Não foi possível registrar a venda |
 | Falha de banco | 500 | Não foi possível registrar a venda |
 
@@ -515,6 +524,8 @@ O `employee_id` é obtido a partir do usuário autenticado.
 - exemplar inexistente;
 - exemplar inativo;
 - exemplar indisponível;
+- bloqueio de venda de exemplar `DIDACTIC`;
+- bloqueio de venda quando uma operação contém exemplar `COMMERCIAL` e `DIDACTIC`;
 - erro de integridade;
 - erro de banco e rollback;
 - autorização por papel;
@@ -524,7 +535,6 @@ O `employee_id` é obtido a partir do usuário autenticado.
 
 Este fluxo não implementa ainda:
 
-- bloqueio automático da venda de exemplares `DIDACTIC`;
 - atualização do status do exemplar para `SOLD` após confirmação da venda;
 - confirmação ou cancelamento da venda.
 
@@ -578,7 +588,6 @@ O registro deve conter:
 - criação de funcionário e usuário na mesma transação;
 - papéis oficiais da aplicação;
 - pertencimento de cada fluxo à V1, V2 ou V3.
-- bloqueio de venda de exemplares com destinação `DIDACTIC`;
 - atualização do estoque/status do exemplar após confirmação da venda;
 
 ## 14. Critérios de implementação

@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models.domain import CopyStatus, SaleStatus
+from app.models.domain import CopyStatus, DestinationType, SaleStatus
 from app.repositories.sale_repository import SaleRepository
 from app.schemas.sale_schema import SaleCreate, SaleItemResponse, SaleResponse
 
@@ -57,6 +57,12 @@ class SaleService:
                     raise HTTPException(
                         status_code=409,
                         detail="Um ou mais exemplares não estão disponíveis para venda.",
+                    )
+
+                if copy.destination == DestinationType.DIDACTIC:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Exemplares didáticos não podem ser vendidos.",
                     )
 
             total_amount = sum(
