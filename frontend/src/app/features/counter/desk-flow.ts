@@ -18,6 +18,8 @@ export function toLoadState<T>(source: Observable<T>, fallback: string): Observa
 /** Operação que só roda depois da confirmação explícita do funcionário. */
 export interface PendingAction<R = unknown> {
   readonly title: string;
+  readonly intro?: string;
+  readonly detailsTitle?: string;
   readonly details: readonly string[];
   readonly confirmLabel: string;
   readonly run: () => Observable<R>;

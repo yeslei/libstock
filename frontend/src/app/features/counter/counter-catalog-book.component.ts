@@ -92,18 +92,32 @@ export class CounterCatalogBookComponent {
     });
   }
 
+  /** Situação lida dos exemplares carregados; o backend não bloqueia a inativação por esses vínculos. */
+  protected deactivationSituation(book: StaffCatalogBookDetail): string[] {
+    const active = book.copies.filter((copy) => copy.is_active);
+    const borrowed = active.filter((copy) => copy.status === 'BORROWED');
+    const reserved = active.filter((copy) => copy.allocated_for_purchase);
+    const lines = [book.total_copies === 1 ? '1 exemplar vinculado' : `${book.total_copies} exemplares vinculados`];
+    if (!borrowed.length && !reserved.length) {
+      lines.push('Nenhum exemplar emprestado ou reservado para venda');
+      return lines;
+    }
+    for (const copy of borrowed) lines.push(`Exemplar ${copy.barcode} emprestado`);
+    for (const copy of reserved) lines.push(`Exemplar ${copy.barcode} reservado para venda`);
+    lines.push('O sistema não impede a inativação nestes casos');
+    return lines;
+  }
+
   protected askDeactivate(book: StaffCatalogBookDetail): void {
     if (!this.canEdit || !book.is_active) return;
     this.flow.ask({
-      title: 'Inativar obra?',
-      details: [
-        `Obra: ${book.title}`,
-        'A obra deixa de aparecer no acervo ativo. Não há reativação por esta tela.',
-      ],
-      confirmLabel: 'Inativar obra',
+      title: `Inativar ${book.title}?`,
+      intro: 'A obra deixa de aparecer no acervo ativo e não aceita novos exemplares. Os registros anteriores são preservados. Não há reativação por esta tela. Confira a situação dos exemplares antes de confirmar.',
+      detailsTitle: 'Situação verificada',
+      details: this.deactivationSituation(book),
+      confirmLabel: 'Confirmar inativação',
       run: () => this.books.update(book.id, { is_active: false }),
-      success: () => `Obra “${book.title}” inativada.`,
+      success: () => `${book.title} foi inativada. O histórico foi preservado.`,
     });
   }
 }
-

@@ -29,6 +29,12 @@ let nextId = 0;
       (cancel)="onEscape($event)"
     >
       <h2 [id]="id + '-title'">{{ title }}</h2>
+      @if (intro) {
+        <p class="confirm__intro">{{ intro }}</p>
+      }
+      @if (detailsTitle) {
+        <h3 class="confirm__details-title">{{ detailsTitle }}</h3>
+      }
       <ul class="confirm__details" [id]="id + '-details'">
         @for (line of details; track line) {
           <li>{{ line }}</li>
@@ -59,6 +65,8 @@ let nextId = 0;
 })
 export class ConfirmDialogComponent implements AfterViewInit, OnDestroy {
   @Input({ required: true }) title = '';
+  @Input() intro = '';
+  @Input() detailsTitle = '';
   @Input() details: readonly string[] = [];
   @Input() confirmLabel = 'Confirmar';
   @Input() busy = false;
