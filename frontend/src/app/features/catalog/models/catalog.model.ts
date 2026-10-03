@@ -48,6 +48,13 @@ export interface CatalogBookDetail extends CatalogBook {
   };
 }
 
+export interface BookAvailability {
+  readonly id: number;
+  readonly title: string;
+  readonly is_available: boolean;
+  readonly available_copies_count: number;
+}
+
 export interface PagedBooks {
   /** Vem do backend para a tela ter o nome exibível, não só o slug da URL. */
   readonly genre: Genre;

@@ -43,6 +43,8 @@ export class CatalogHomeComponent {
     capabilitiesFor(this.user()?.role_codes ?? []),
   );
 
+  protected readonly canRegisterCopy = computed(() => this.capabilities().has('registerCopy'));
+
   protected readonly canManageCatalog = computed(() => this.capabilities().has('manageCatalog'));
 
   /** Livros retirados do destaque nesta sessão, para sumirem sem recarregar. */

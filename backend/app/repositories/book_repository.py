@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.domain import Book, Copy, CopyStatus, Employee
@@ -14,6 +14,9 @@ class BookRepository:
         # do usuário autenticado precisa existir exatamente em employees.
         return self.db.get(Employee, employee_id) is not None
 
+    def find_by_id(self, book_id: int) -> Book | None:
+        return self.db.get(Book, book_id)
+
     def find_by_isbn(self, isbn: str) -> Book | None:
         return self.db.scalar(select(Book).where(Book.isbn == isbn))
 
@@ -25,6 +28,23 @@ class BookRepository:
             select(Book).options(selectinload(Book.copies)).where(Book.id == book_id)
         )
 
+    def get_book_availability(self, book_id: int) -> tuple[Book, int] | None:
+        statement = (
+            select(Book, func.count(Copy.id))
+            .outerjoin(
+                Copy,
+                (Copy.book_id == Book.id)
+                & Copy.is_active.is_(True)
+                & (Copy.status == CopyStatus.AVAILABLE),
+            )
+            .where(Book.id == book_id, Book.is_active.is_(True))
+            .group_by(Book.id)
+        )
+        row = self.db.execute(statement).one_or_none()
+        if row is None:
+            return None
+        book, available_copies_count = row
+        return book, int(available_copies_count)
     def find_copy_by_barcode(self, barcode: str) -> Copy | None:
         return self.db.scalar(select(Copy).where(Copy.barcode == barcode))
 

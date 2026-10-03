@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, Subject, of } from 'rxjs';
+import { User } from '../../../core/models/user.model';
 import { CatalogBook } from '../models/catalog.model';
 
 import { AuthService } from '../../../core/services/auth.service';
@@ -12,11 +13,12 @@ describe('CatalogHomeComponent', () => {
   let fixture: ComponentFixture<CatalogHomeComponent>;
   const params = new BehaviorSubject(convertToParamMap({}));
   let search: jasmine.Spy;
+  let user$: BehaviorSubject<User>;
 
   beforeEach(async () => {
     params.next(convertToParamMap({}));
     search = jasmine.createSpy('searchBooks').and.returnValue(of([]));
-    const user$ = new BehaviorSubject({
+    user$ = new BehaviorSubject<User>({
       id: 1, name: 'Vendedora', email: 'vendedora@teste.dev', role_codes: ['SELLER' as const], created_at: '2026-09-06',
     });
     await TestBed.configureTestingModule({
@@ -44,6 +46,15 @@ describe('CatalogHomeComponent', () => {
 
   it('não repete o cadastro de exemplar nos cards', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Cadastrar exemplar');
+  });
+
+  it('preserva o cadastro de exemplares para o estoquista junto ao link de detalhes', () => {
+    user$.next({ ...user$.value, role_codes: ['STOCK_KEEPER'] });
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('Cadastrar exemplar');
+    expect(root.querySelector('a[href="/obras/42/exemplares/novo"]')).not.toBeNull();
+    expect(root.querySelector('a[href="/livros/42"]')).not.toBeNull();
   });
 
   it('exibe apenas os resultados enquanto houver uma busca ativa', () => {

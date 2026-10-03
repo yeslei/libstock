@@ -30,14 +30,12 @@ Não substitui a documentação técnica da API nem as migrations.
 - cadastro de funcionários;
 - disponibilidade derivada dos exemplares;
 - controle de papéis;
-- persistência de entidades de circulação.
+- persistência de entidades de circulação;
+- vendas: registro da venda e bloqueio de venda de exemplares didáticos implementados; confirmação da venda, atualização do status do exemplar e demais etapas do fluxo ainda dependem de regras específicas.
 
 ### Planejado, mas não disponível
 
-- empréstimos;
-- devoluções;
 - reservas;
-- vendas;
 - trocas;
 - notificações;
 - gestão operacional de exemplares.
@@ -198,6 +196,25 @@ Não existe classificação, tag ou campo de destinação secundário.
 As transições permitidas devem ser documentadas antes da implementação dos
 services de circulação.
 
+Regra aprovada: uma mesma obra pode possuir quantidades distintas de exemplares
+para diferentes destinações de acervo dentro do mesmo cadastro. A quantidade é
+representada pelos próprios registros individuais de `Copy`, e não por um campo
+de quantidade na entidade.
+
+A operação em lote permite cadastrar vários exemplares da mesma obra em uma
+única transação, com destinações distintas entre os exemplares.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V2.
+- Endpoint: `POST /api/v1/copies/batch`.
+- Entidades: `Book`, `Copy`.
+- Ator autorizado: `STOCK_KEEPER` ou `ADMINISTRATOR`.
+- Cada exemplar deve possuir seu próprio `barcode`.
+- A criação do lote é atômica: falha em qualquer exemplar provoca rollback
+  integral da operação.
+- Testes: lote com múltiplos exemplares, destinações distintas, lote vazio,
+  obras diferentes no mesmo lote, erro de persistência e rollback.
+
 ## 10. Operações transacionais
 
 Cada operação deve documentar:
@@ -211,17 +228,317 @@ Cada operação deve documentar:
 - comportamento em concorrência;
 - registro de auditoria.
 
+(#29) Validação da situação do cliente
+
+Status: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `GET /api/v1/clients/{client_id}/validation`.
+
+Atores autorizados: `SELLER` e `ADMINISTRATOR`.
+
+Pré-condições:
+- o cliente deve existir;
+- o usuário associado ao cliente deve estar ativo;
+- o cliente não pode possuir empréstimo em aberto com devolução não registrada e
+  data de vencimento ultrapassada.
+
+Resultado de sucesso:
+- HTTP 200;
+- retorna `client_id` e `valid = true`.
+
+Erros possíveis:
+
+| Código | HTTP | Descrição |
+|---|---:|---|
+| `client_not_found` | 404 | Cliente não encontrado |
+| `client_inactive` | 403 | Cliente inativo |
+| `client_has_pending` | 409 | Cliente possui pendência ativa |
+| `invalid_token` | 401 | Usuário não autenticado |
+
+Concorrência:
+- a consulta do cliente utiliza bloqueio transacional (`FOR UPDATE`);
+- qualquer sincronização da penalização permanece na mesma transação.
+
+Auditoria:
+- caso a validação provoque alteração automática de `is_penalized`, a mudança é
+  registrada no histórico de auditoria pelo mecanismo de controle de pendências.
+
 ### Empréstimo
 
-Status: `PENDING`.
+Status: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `POST /api/v1/loans/`.
+
+Entidades:
+- `clients`;
+- `copies`;
+- `loans`;
+- `employees`.
+
+Atores autorizados:
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+#### Pré-condições
+
+- o cliente deve existir;
+- o usuário associado ao cliente deve estar ativo;
+- o cliente não pode possuir pendências de empréstimos em atraso;
+- o exemplar deve existir;
+- o exemplar deve estar ativo;
+- o exemplar deve possuir status `AVAILABLE`.
+
+#### Registro
+
+O empréstimo deve ser vinculado:
+- ao cliente;
+- ao exemplar;
+- ao funcionário responsável pela operação.
+
+O novo empréstimo é criado com:
+- `status = OPEN`;
+- `returned_at = NULL`.
+
+O `employee_id` é obtido a partir do usuário autenticado.
+
+#### Prazo de devolução
+
+Regra aprovada e implementada: o prazo padrão de empréstimo é de 15 dias corridos.
+
+A `due_date` não é informada pelo cliente no momento da criação do empréstimo.
+
+O backend calcula automaticamente:
+
+- `loan_date`: momento do registro do empréstimo;
+- `due_date`: `loan_date` + 15 dias corridos.
+
+Exemplo:
+- empréstimo realizado em 02/10/2026;
+- devolução prevista em 17/10/2026.
+
+#### Concorrência e integridade
+
+- o cliente é validado antes do registro;
+- o exemplar é bloqueado transacionalmente durante a operação;
+- um mesmo exemplar não pode possuir mais de um empréstimo com status `OPEN`;
+- a validação do cliente e o registro do empréstimo participam da mesma transação;
+- falha na operação provoca rollback;
+- conflitos de integridade resultam em erro explícito.
+
+#### Validação do cliente
+
+A operação utiliza a validação da situação do cliente implementada em
+`GET /api/v1/clients/{client_id}/validation`.
+
+Além da validação disponibilizada pelo endpoint de consulta, o backend
+revalida o cliente durante o registro do empréstimo.
+
+#### Erros possíveis
+
+| Código | HTTP | Descrição |
+|---|---:|---|
+| `client_not_found` | 404 | Cliente não encontrado |
+| `client_inactive` | 403 | Cliente inativo |
+| `client_has_pending` | 409 | Cliente possui pendência |
+| — | 404 | Exemplar não encontrado ou inativo |
+| — | 409 | Exemplar indisponível |
+| — | 409 | Conflito ao registrar empréstimo |
+
+#### Testes
+
+- registro com cliente válido e exemplar disponível;
+- cliente inativo;
+- cliente com pendência;
+- exemplar inexistente ou inativo;
+- exemplar indisponível;
+- erro de integridade;
+- erro de banco e rollback;
+- autorização por papel;
+- integração do endpoint;
+- cálculo automático da data prevista de devolução;
+- validação de que `due_date` corresponde a `loan_date + 15 dias corridos`.
 
 ### Devolução
 
-Status: `PENDING`.
+Status: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `PATCH /api/v1/loans/{loan_id}/return`.
+
+Entidades:
+
+- `loans`;
+- `copies`.
+
+Atores autorizados:
+
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+#### Pré-condições
+
+- o empréstimo deve existir;
+- o empréstimo deve possuir status `OPEN`;
+- o exemplar vinculado ao empréstimo deve existir.
+
+#### Registro
+
+Ao registrar a devolução:
+
+- `loans.returned_at` recebe automaticamente o momento da operação;
+- `loans.status` é alterado para `RETURNED`;
+- o exemplar vinculado ao empréstimo tem seu status alterado para `AVAILABLE`.
+
+#### Concorrência e integridade
+
+- o empréstimo é bloqueado transacionalmente durante a devolução;
+- o exemplar vinculado também é bloqueado transacionalmente;
+- não é permitida a devolução de um empréstimo que não esteja com status `OPEN`;
+- a atualização do empréstimo e do exemplar participa da mesma transação;
+- falha na operação provoca rollback;
+- conflitos de integridade resultam em erro explícito.
+
+#### Resultado de sucesso
+
+- HTTP 200;
+- empréstimo com status `RETURNED`;
+- `returned_at` preenchido;
+- exemplar novamente disponível para operação compatível.
+
+#### Erros possíveis
+
+| Situação | HTTP | Descrição |
+|---|---:|---|
+| Empréstimo não encontrado | 404 | Empréstimo informado não existe |
+| Empréstimo não está aberto | 409 | Empréstimo não pode ser devolvido no estado atual |
+| Exemplar não encontrado | 404 | Exemplar vinculado ao empréstimo não foi encontrado |
+| Falha de integridade | 409 | Não foi possível concluir a devolução |
+| Falha de banco | 500 | Não foi possível registrar a devolução |
+
+#### Testes
+
+- devolução de empréstimo aberto;
+- preenchimento automático de `returned_at`;
+- alteração do status para `RETURNED`;
+- atualização do exemplar para `AVAILABLE`;
+- empréstimo inexistente;
+- tentativa de devolver empréstimo já encerrado;
+- erro de banco e rollback;
+- autorização do endpoint.
 
 ### Venda
 
-Status: `PENDING`.
+Status da regra: `IMPLEMENTED`.
+
+Versão-alvo: V2.
+
+Endpoint: `POST /api/v1/sales/`.
+
+Entidades:
+
+- `sales`;
+- `sale_items`;
+- `clients`;
+- `copies`;
+- `employees`.
+
+Atores autorizados:
+
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+#### Pré-condições
+
+- o usuário deve estar autenticado;
+- o usuário deve possuir papel autorizado para registrar a venda;
+- os exemplares informados devem existir;
+- os exemplares devem estar ativos;
+- os exemplares devem estar com status `AVAILABLE`;
+- quando um `client_id` for informado, o cliente deve existir.
+
+#### Regra de destinação
+
+- exemplares com destinação `DIDACTIC` não podem ser vendidos;
+- a venda deve ser bloqueada antes da criação da venda e dos itens da venda;
+- caso uma solicitação contenha exemplares de destinação `COMMERCIAL` e `DIDACTIC`, a operação inteira deve ser rejeitada;
+- exemplares de destinação `COMMERCIAL` podem prosseguir para o registro da venda quando as demais pré-condições forem atendidas.
+
+#### Registro
+
+A venda é registrada:
+
+- vinculada ao funcionário responsável;
+- opcionalmente vinculada a um cliente;
+- contendo um ou mais exemplares;
+- com o preço unitário informado para cada item;
+- com `total_amount` calculado pelo backend a partir dos itens.
+
+A venda é criada inicialmente com:
+
+- `status = PENDING`.
+
+O `employee_id` é obtido a partir do usuário autenticado.
+
+#### Concorrência e integridade
+
+- os exemplares são consultados com bloqueio transacional durante o registro;
+- não é permitida a criação da venda para exemplar inexistente;
+- não é permitida a criação da venda para exemplar inativo;
+- não é permitida a criação da venda para exemplar que não esteja `AVAILABLE`;
+- não é permitida a criação da venda para exemplar com destinação `DIDACTIC`;
+- a criação da venda e de seus itens ocorre na mesma transação;
+- falha na operação provoca rollback;
+- conflitos de integridade resultam em erro explícito.
+
+#### Resultado de sucesso
+
+- HTTP 201;
+- venda persistida;
+- itens da venda persistidos;
+- `total_amount` calculado pelo backend;
+- `status = PENDING`.
+
+#### Erros possíveis
+
+| Situação | HTTP | Descrição |
+|---|---:|---|
+| Cliente não encontrado | 404 | Cliente informado não existe |
+| Exemplar não encontrado | 404 | Um ou mais exemplares informados não existem ou estão inativos |
+| Exemplar indisponível | 409 | Um ou mais exemplares não estão disponíveis para venda |
+| Exemplar didático | 409 | Exemplar com destinação `DIDACTIC` não pode ser vendido |
+| Falha de integridade | 409 | Não foi possível registrar a venda |
+| Falha de banco | 500 | Não foi possível registrar a venda |
+
+#### Testes
+
+- registro de venda com sucesso;
+- registro com múltiplos exemplares;
+- cálculo automático do `total_amount`;
+- venda sem cliente;
+- cliente inexistente;
+- exemplar inexistente;
+- exemplar inativo;
+- exemplar indisponível;
+- bloqueio de venda de exemplar `DIDACTIC`;
+- bloqueio de venda quando uma operação contém exemplar `COMMERCIAL` e `DIDACTIC`;
+- erro de integridade;
+- erro de banco e rollback;
+- autorização por papel;
+- validação do contrato do endpoint.
+
+#### Escopo ainda não implementado
+
+Este fluxo não implementa ainda:
+
+- atualização do status do exemplar para `SOLD` após confirmação da venda;
+- confirmação ou cancelamento da venda.
+
+Essas regras pertencem às implementações específicas correspondentes.
 
 ### Reserva
 
@@ -266,12 +583,12 @@ O registro deve conter:
 - obrigatoriedade de título e autor;
 - checksum no cadastro de ISBN;
 - ator de cada operação de circulação;
-- penalidades de clientes;
 - política de reservas;
 - confirmação e cancelamento de vendas;
 - criação de funcionário e usuário na mesma transação;
 - papéis oficiais da aplicação;
 - pertencimento de cada fluxo à V1, V2 ou V3.
+- atualização do estoque/status do exemplar após confirmação da venda;
 
 ## 14. Critérios de implementação
 
@@ -455,3 +772,127 @@ Estado: `PENDING` para política de cancelamento, ausência de retirada, expira�
 Limitação técnica: a solicitação de empréstimo não retém exemplar. A disponibilidade é revalidada na retirada. Consulta local continua não configurada por decisão expressa do usuário.
 
 Rastreabilidade e pendências para os devs: [V2_REVIEW.md](V2_REVIEW.md).
+
+## 20. Controle de pendências e penalização de clientes
+
+Status: `IMPLEMENTED`
+Versão: V2
+
+Endpoints:
+- `GET /api/v1/clients/{id}/pendencies`
+- `PATCH /api/v1/clients/{id}/penalty`
+
+Entidades:
+- `clients`
+- `loans`
+- `copies`
+- `books`
+- `audit_logs`
+
+### Pendência
+
+Um cliente possui pendência quando possui pelo menos um empréstimo que satisfaça simultaneamente:
+
+- `status = OPEN`;
+- `returned_at IS NULL`;
+- `due_date < now()`.
+
+A pendência é derivada do estado do empréstimo e não é armazenada em uma tabela própria.
+
+### Penalização
+
+Quando existe pelo menos uma pendência:
+
+- `clients.is_penalized = true`.
+
+Quando não existe mais nenhuma pendência:
+
+- `clients.is_penalized = false`.
+
+A penalização é sincronizada automaticamente pelo backend nas consultas de pendências e nas operações relevantes que utilizarem o serviço de sincronização. O empréstimo, devolução e reserva ainda não estão integrados. Esses três podem consumir o synchronize_penalty().
+
+### Aplicação e remoção manual
+
+`SELLER` e `ADMINISTRATOR` podem solicitar aplicação ou remoção manual da
+penalização.
+
+A aplicação manual exige pelo menos uma pendência ativa.
+
+A remoção manual somente é aceita quando não existem pendências ativas.
+
+O motivo é obrigatório para ambas as operações.
+
+### Histórico
+
+Toda mudança efetiva de penalização gera um registro imutável em `audit_logs`
+contendo:
+
+- ação;
+- estado anterior;
+- novo estado;
+- motivo;
+- responsável;
+- data/hora.
+
+Ações automáticas utilizam `actor_type = SYSTEM` e não possuem
+`employee_id`.
+
+Ações realizadas por funcionários utilizam `actor_type = EMPLOYEE` e
+registram o `employee_id`.
+
+### Atomicidade
+
+A alteração de `clients.is_penalized` e seu histórico devem ocorrer na mesma transação.
+
+### Concorrência
+
+A sincronização utiliza lock transacional sobre o cliente para serializar alterações concorrentes da sua situação de penalização.
+
+### Integração com circulação
+
+Operações de circulação que dependam da aptidão do cliente devem reavaliar as pendências antes de prosseguir.
+
+O fluxo de empréstimo utiliza a validação da situação do cliente antes do registro da operação.
+
+O serviço de consulta e sincronização de penalização permanece preparado para ser consumido por outros fluxos de circulação.
+
+A reserva ainda não está integrada ao controle de pendências.
+
+## Política operacional de promoção de release — Issue #113
+
+- Status: `APPROVED` — simplificação autorizada pelo usuário em 2026-10-03;
+  implementação e testes locais não significam ativação ou execução real.
+- Versão-alvo: pipeline simplificado da Issue #113; não altera regras do domínio
+  da API.
+- Endpoint/entidades de negócio: não se aplica; refs Git `integracao`, `main`
+  e tag de release.
+- Regra aprovada: após disparo manual, o pipeline sempre usa a ponta remota de
+  `integracao` e faz merge direto para `main`, sem PR de promoção. A CI é
+  independente e não é repetida pelo pipeline. O operador promove uma integração
+  já validada. Respeitar proteções sem force push ou bypass.
+- Regra aprovada: a versão incrementa a maior tag remota estável
+  `vMAJOR.MINOR.PATCH` conforme a escolha manual `patch` (padrão), `minor`
+  ou `major`, zerando os componentes inferiores. Sem tags estáveis, usa
+  `v0.0.0` como base do incremento escolhido.
+  Tags de pré-release e outros formatos são ignorados. A tag anotada aponta
+  para o commit resultante em `main`; não altera versões de pacotes ou da API.
+- Regra aprovada: conflito, ausência de novidades, colisão de tag, avanço
+  detectado das branches ou rejeição do servidor impedem publicação parcial.
+  Render e Vercel usam as integrações Git existentes, sem gatilhos duplicados.
+- Limitação técnica: o workflow manual precisa estar na branch padrão e o helper
+  em `integracao`. Proteções incompatíveis com merge direto recusam o push.
+  A App e a configuração dos provedores não foram verificadas nesta alteração.
+  A serialização do workflow não bloqueia escritores externos.
+- Testes esperados: incremento automático, merge/tag locais, conflitos,
+  concorrência e rejeição atômica pelo servidor.
+
+Detalhes e condições de operação em [RELEASE.md](RELEASE.md).
+
+## Compatibilidade após integração com a main — PR #118
+
+Estado: `PENDING` para unificação dos contratos de circulação.
+
+- Os endpoints diretos de empréstimo/venda/pendências recebidos da main permanecem disponíveis, junto aos endpoints de confirmação das solicitações V2.
+- O empréstimo direto (`LoanService`) mantém o prazo existente de 15 dias corridos. A confirmação da solicitação V2 (`CirculationService`) mantém um mês de calendário. A divergência exige uma decisão explícita e unificação futura; não foi alterada silenciosamente na resolução de conflitos.
+- O serviço de pendências recebido da main usa vencimento por instante (`due_date < now()`); o acompanhamento V2 usa o calendário de America/Sao_Paulo. A sincronização das políticas e da penalização entre os serviços permanece pendente.
+- A home mantém a disponibilidade por modalidade e os links para detalhes da V2. O contrato administrativo de consulta de disponibilidade e o cadastro de exemplares foram preservados.

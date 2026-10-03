@@ -1,0 +1,61 @@
+name: Promove release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Tipo de incremento da versao
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promotion-main
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cria token da GitHub App
+        id: app
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - uses: actions/checkout@v4
+        with:
+          ref: integracao
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Incrementa versao e promove integracao para main
+        id: release
+        env:
+          RELEASE_BUMP: ${{ inputs.bump }}
+        run: |
+          git config user.name 'LibStock Release'
+          git config user.email 'release@users.noreply.github.com'
+          python scripts/release/promote.py prepare --bump "$RELEASE_BUMP" --state "$RUNNER_TEMP/release.json"
+          python scripts/release/promote.py publish --state "$RUNNER_TEMP/release.json"
+
+      - name: Registra versao publicada
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_SHA: ${{ steps.release.outputs.candidate }}
+        run: |
+          printf 'Release %s publicada em main (%s).\nRender e Vercel seguem suas integracoes Git existentes.\n' "$RELEASE_TAG" "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"

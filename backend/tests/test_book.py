@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
+    BookNotFoundError,
     BookPersistenceError,
     DuplicateIsbnError,
     DuplicateBarcodeError,
@@ -37,6 +38,16 @@ class FakeBookService:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
         self.calls: list[tuple[BookCreate, int]] = []
+
+    def get_book_availability(self, book_id: int):
+        if self.error:
+            raise self.error
+        return SimpleNamespace(
+            id=book_id,
+            title="Livro disponível",
+            is_available=True,
+            available_copies_count=2,
+        )
 
     async def create_book(self, book_data: BookCreate, *, employee_id: int):
         self.calls.append((book_data, employee_id))
@@ -67,6 +78,10 @@ class FakeBookRepository:
         self.error: Exception | None = None
         self.existing_copy = None
         self.created_copy = None
+        self.availability = None
+
+    def get_book_availability(self, book_id: int):
+        return self.availability
 
     def employee_exists(self, employee_id: int) -> bool:
         return self.has_employee
@@ -230,6 +245,31 @@ def test_isbn_duplicado_retorna_409_com_codigo_estavel():
     assert response.json()["code"] == "duplicate_isbn"
 
 
+def test_consulta_disponibilidade_retorna_apenas_projecao_publica():
+    _use_fake_service()
+
+    response = client.get("/api/v1/books/1/availability")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 1,
+        "title": "Livro disponível",
+        "is_available": True,
+        "available_copies_count": 2,
+    }
+    assert "barcode" not in response.json()
+    assert "status" not in response.json()
+
+
+def test_consulta_disponibilidade_de_obra_inexistente_retorna_404():
+    _use_fake_service(BookNotFoundError())
+
+    response = client.get("/api/v1/books/999/availability")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "book_not_found"
+
+
 # ---- Service ------------------------------------------------------------
 
 
@@ -246,6 +286,34 @@ def _service(*, mock_external: bool = True):
             }
         )
     return service, db, repository
+
+
+def test_service_disponibilidade_considera_contagem_derivada():
+    service, _db, repository = _service()
+    repository.availability = (SimpleNamespace(id=1, title="Livro"), 3)
+
+    response = service.get_book_availability(1)
+
+    assert response.is_available is True
+    assert response.available_copies_count == 3
+
+
+def test_service_sem_exemplares_disponiveis_retorna_indisponivel():
+    service, _db, repository = _service()
+    repository.availability = (SimpleNamespace(id=1, title="Livro"), 0)
+
+    response = service.get_book_availability(1)
+
+    assert response.is_available is False
+    assert response.available_copies_count == 0
+
+
+def test_service_obra_inexistente_ou_inativa_lanca_404():
+    service, _db, repository = _service()
+    repository.availability = None
+
+    with pytest.raises(BookNotFoundError):
+        service.get_book_availability(999)
 
 
 @pytest.mark.anyio

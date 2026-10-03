@@ -15,7 +15,11 @@ from app.controllers.client_tracking_controller import router as client_tracking
 from app.controllers.circulation_controller import router as circulation_router
 from app.core.config import get_settings
 from app.core.exceptions import ApplicationError
-
+from app.controllers.client_pendency_controller import (
+    router as client_pendency_router,
+)
+from app.controllers.loan_controller import router as loan_router
+from app.controllers.sale_controller import router as sale_router
 
 
 settings = get_settings()
@@ -73,3 +77,6 @@ app.include_router(purchase_request_router)
 app.include_router(client_tracking_router)
 
 app.include_router(circulation_router)
+app.include_router(client_pendency_router)
+app.include_router(loan_router)
+app.include_router(sale_router)
