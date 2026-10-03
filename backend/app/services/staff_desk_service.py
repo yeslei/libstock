@@ -1,11 +1,11 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today
 from app.core.exceptions import ApplicationError
 from app.models.domain import ReservationStatus
 from app.repositories.staff_desk_repository import StaffDeskRepository
 from app.schemas.staff_desk_schema import (
-    EligibleCopy, StaffBook, StaffClient, StaffClientPendencies, StaffLoan, StaffLoanRequest, StaffPurchaseReservation,
+    EligibleCopy, StaffBook, StaffClient, StaffClientPendencies, StaffDashboard, StaffLoan, StaffLoanRequest, StaffPurchaseReservation,
 )
 from app.services.client_eligibility import is_client_eligible
 
@@ -58,6 +58,12 @@ class StaffDeskService:
                                    'search_term_too_short', 422)
         _, cutoff = self._guard(actor_id)
         return [self._client(row) for row in self._read(lambda: self.repository.search_clients(term, cutoff, limit))]
+
+    def dashboard(self, actor_id):
+        """Indicadores somente leitura do painel do balcão."""
+        today, cutoff = self._guard(actor_id)
+        next_cutoff = datetime.combine(today + timedelta(days=1), time.min, ZONE)
+        return StaffDashboard(**self._read(lambda: self.repository.dashboard_counts(cutoff, next_cutoff)))
 
     def loan_requests(self, actor_id, term, client_id, limit):
         _, cutoff = self._guard(actor_id)

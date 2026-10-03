@@ -74,3 +74,10 @@ class StaffPurchaseReservation(BaseModel):
     free_commercial_copies: int
     can_allocate: bool
     allocation_blocked_reason: AllocationBlock | None
+
+
+class StaffDashboard(BaseModel):
+    active_loans: int
+    returns_today: int
+    waiting_reservations: int
+    pendencies: int

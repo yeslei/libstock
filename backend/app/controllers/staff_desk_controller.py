@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.dependencies.authentication import require_roles
 from app.models.user import User
 from app.repositories.staff_desk_repository import StaffDeskRepository
-from app.schemas.staff_desk_schema import StaffClient, StaffClientPendencies, StaffLoan, StaffLoanRequest, StaffPurchaseReservation
+from app.schemas.staff_desk_schema import StaffClient, StaffClientPendencies, StaffDashboard, StaffLoan, StaffLoanRequest, StaffPurchaseReservation
 from app.services.staff_desk_service import StaffDeskService
 
 router = APIRouter(prefix='/api/v1/staff', tags=['Balcão do funcionário'])
@@ -17,6 +17,11 @@ staff_only = require_roles('SELLER', 'ADMINISTRATOR')
 
 def get_staff_desk_service(db: Session = Depends(get_db)):
     return StaffDeskService(db, StaffDeskRepository(db))
+
+
+@router.get('/dashboard', response_model=StaffDashboard)
+def dashboard(user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
+    return service.dashboard(user.id)
 
 
 @router.get('/clients', response_model=list[StaffClient])

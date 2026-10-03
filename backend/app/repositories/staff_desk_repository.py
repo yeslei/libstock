@@ -25,11 +25,14 @@ class StaffDeskRepository(ClientRequestRepository):
     """Consultas somente leitura do balcão. Devolve fatos; a elegibilidade é decidida no service."""
 
     @staticmethod
-    def _client_columns(cutoff: datetime):
+    def _overdue_conditions(loan, cutoff: datetime):
+        """Regra V2 de atraso: empréstimo OPEN vencido antes do início da data de negócio atual."""
+        return (loan.status == LoanStatus.OPEN, loan.due_date < cutoff)
+
+    @classmethod
+    def _client_columns(cls, cutoff: datetime):
         late = aliased(Loan)
-        overdue = exists().where(
-            late.client_id == Client.id, late.status == LoanStatus.OPEN, late.due_date < cutoff,
-        ).label('has_overdue_loan')
+        overdue = exists().where(late.client_id == Client.id, *cls._overdue_conditions(late, cutoff)).label('has_overdue_loan')
         return (Client.id.label('client_id'), User.name.label('client_name'), User.email.label('client_email'),
                 Profile.is_active.label('profile_active'), User.is_active.label('user_active'),
                 Client.is_penalized.label('client_penalized'), overdue)
@@ -104,3 +107,17 @@ class StaffDeskRepository(ClientRequestRepository):
         free = free_copies_statement().where(
             Copy.book_id.in_(book_ids), Copy.destination == DestinationType.COMMERCIAL).subquery()
         return dict(self.db.execute(select(free.c.book_id, func.count()).group_by(free.c.book_id)).all())
+
+    def dashboard_counts(self, cutoff: datetime, next_cutoff: datetime):
+        """Indicadores do painel; cutoff/next_cutoff delimitam o dia de negócio atual (America/Sao_Paulo)."""
+        def scalar(statement):
+            return self.db.scalar(statement) or 0
+        return {
+            'active_loans': scalar(select(func.count()).select_from(Loan).where(Loan.status == LoanStatus.OPEN)),
+            'returns_today': scalar(select(func.count()).select_from(Loan).where(
+                Loan.returned_at >= cutoff, Loan.returned_at < next_cutoff)),
+            'waiting_reservations': scalar(select(func.count()).select_from(PurchaseReservation).where(
+                PurchaseReservation.status == ReservationStatus.WAITING)),
+            'pendencies': scalar(select(func.count(func.distinct(Loan.client_id))).where(
+                *self._overdue_conditions(Loan, cutoff))),
+        }
