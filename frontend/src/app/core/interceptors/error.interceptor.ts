@@ -35,6 +35,22 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   google_books_invalid_response:
     'O Google Books não retornou título e autor válidos para este ISBN.',
   book_persistence_error: 'Não foi possível cadastrar a obra. Tente novamente.',
+  // Balcão V2 (circulação e consultas de funcionário).
+  client_required: 'Este usuário não possui cadastro de cliente.',
+  client_ineligible: 'O cliente está inativo, penalizado ou com empréstimo em atraso.',
+  loan_request_not_found: 'A solicitação de empréstimo não foi encontrada. Atualize a lista.',
+  pickup_already_confirmed: 'A retirada desta solicitação já foi confirmada.',
+  loan_unavailable: 'O exemplar escolhido não está mais disponível para retirada.',
+  loan_not_found: 'O empréstimo não foi encontrado. Atualize a lista.',
+  loan_already_closed: 'Este empréstimo já foi encerrado.',
+  book_not_found: 'A obra não foi encontrada ou está inativa.',
+  reservation_not_found: 'Não há reserva de compra aguardando disponibilidade para esta obra.',
+  reservation_not_ready: 'Esta reserva ainda não tem exemplar destinado para retirada.',
+  reservation_expired: 'O prazo de retirada desta reserva expirou.',
+  purchase_unavailable: 'Não há exemplar comercial livre para esta operação.',
+  circulation_persistence_error: 'Não foi possível concluir a operação. Nada foi alterado; tente novamente.',
+  search_term_too_short: 'Informe ao menos 2 caracteres para buscar.',
+  desk_query_error: 'Não foi possível consultar o balcão. Tente novamente.',
 };
 
 const MESSAGE_BY_STATUS: Readonly<Record<number, string>> = {
