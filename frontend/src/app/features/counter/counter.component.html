@@ -1,0 +1,33 @@
+<main class="counter">
+  <header class="counter__heading">
+    <p class="eyebrow">FUNCIONÁRIO · BALCÃO</p>
+    <h1>Balcão</h1>
+    <p class="intro">Operações presenciais V2: retiradas, devoluções e reservas de compra. Cada alteração pede confirmação.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Operações de balcão">
+    @for (item of tabs; track item.id; let i = $index) {
+      <button
+        type="button"
+        role="tab"
+        [id]="'tab-' + item.id"
+        [attr.aria-selected]="tab() === item.id"
+        [attr.aria-controls]="'panel-' + item.id"
+        [attr.tabindex]="tab() === item.id ? 0 : -1"
+        [class.tabs__tab--active]="tab() === item.id"
+        class="tabs__tab"
+        (click)="select(item.id)"
+        (keydown)="moveFocus($event, i)"
+      >{{ item.label }}</button>
+    }
+  </div>
+
+  <div role="tabpanel" [id]="'panel-' + tab()" [attr.aria-labelledby]="'tab-' + tab()">
+    @switch (tab()) {
+      @case ('clientes') { <app-clients-panel (open)="openClient($event)" /> }
+      @case ('retiradas') { <app-pickups-panel [client]="client()" (clearClient)="clearClient()" /> }
+      @case ('devolucoes') { <app-returns-panel [client]="client()" (clearClient)="clearClient()" /> }
+      @case ('reservas') { <app-reservations-panel [client]="client()" (clearClient)="clearClient()" /> }
+    }
+  </div>
+</main>

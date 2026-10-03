@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.models.domain import Book, Client, Loan, LoanStatus, Profile
+from app.models.domain import Book, Client, Employee, Loan, LoanStatus, Profile
 from app.models.user import User
 
 
@@ -23,3 +23,9 @@ class ClientRequestRepository:
         return self.db.scalar(select(Loan.id).where(
             Loan.client_id == client_id, Loan.status == LoanStatus.OPEN, Loan.due_date < cutoff,
         ).limit(1)) is not None
+
+    def is_active_employee(self, actor_id):
+        return self.db.scalar(select(Employee.id).join(Profile, Profile.id == Employee.id)
+            .join(User, User.id == Employee.id).where(
+                Employee.id == actor_id, Profile.is_active.is_(True), User.is_active.is_(True),
+            )) is not None

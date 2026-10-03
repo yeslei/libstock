@@ -15,6 +15,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/client-tracking/client-tracking.component').then(m => m.ClientTrackingComponent),
   },
   {
+    path: 'balcao', canActivate: [authGuard, roleGuard], data: { roles: ['SELLER', 'ADMINISTRATOR'] },
+    title: 'Balcão · LibStock',
+    loadComponent: () => import('./features/counter/counter.component').then(m => m.CounterComponent),
+  },
+  {
     path: '',
     pathMatch: 'full',
     title: 'LibStock — Gestão de acervo',
