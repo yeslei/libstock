@@ -6,7 +6,7 @@ import { Subject, catchError, map, of, startWith, switchMap } from 'rxjs';
 import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
-import { ClientPendencies, CounterService, StaffClient } from './counter.service';
+import { CLIENT_SEARCH_LIMIT, ClientPendencies, CounterService, StaffClient } from './counter.service';
 import { errorMessage, ineligibleReasons } from './desk-panel';
 
 export type DeskTab = 'retiradas' | 'devolucoes' | 'reservas';
@@ -39,6 +39,7 @@ export class ClientsPanelComponent {
   protected readonly pendencies = signal<LoadState<ClientPendencies> | null>(null);
   protected readonly ineligibleReasons = ineligibleReasons;
   protected readonly minLength = MIN_SEARCH_LENGTH;
+  protected readonly limit = CLIENT_SEARCH_LIMIT;
 
   private readonly searches = new Subject<string>();
   private readonly lookups = new Subject<StaffClient>();

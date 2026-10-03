@@ -26,7 +26,10 @@
           @if (!s.data.length) {
             <p class="empty" role="status">Nenhuma solicitação de empréstimo pendente.</p>
           } @else {
-            <ul class="cards">
+                      @if (s.data.length >= limit) {
+            <p class="note" role="status">Mostrando os primeiros {{ limit }} resultados. Refine a busca para ver os demais.</p>
+          }
+          <ul class="cards">
               @for (request of s.data; track request.id) {
                 <li>
                   <article class="card" [attr.aria-labelledby]="'pickup-' + request.id">

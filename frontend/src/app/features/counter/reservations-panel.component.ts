@@ -64,6 +64,8 @@ export class ReservationsPanelComponent extends DeskPanel<StaffPurchaseReservati
     return (
       reservation.status === 'NOTIFIED' &&
       reservation.allocated_copy_id !== null &&
+      reservation.client.eligible &&
+      reservation.book.is_active &&
       !reservation.expired &&
       !this.submitting()
     );

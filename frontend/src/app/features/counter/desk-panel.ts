@@ -4,7 +4,7 @@ import { Observable, Subject, catchError, finalize, map, of, startWith, switchMa
 
 import { ApiError } from '../../core/models/auth.model';
 import { LoadState } from '../../core/models/load-state.model';
-import { CirculationResult, CounterService, StaffClient } from './counter.service';
+import { CirculationResult, CounterService, LIST_LIMIT, StaffClient } from './counter.service';
 
 export interface Feedback {
   readonly kind: 'success' | 'error';
@@ -53,6 +53,7 @@ export abstract class DeskPanel<T> implements OnInit, OnChanges {
   protected readonly confirming = signal<Confirmation | null>(null);
   protected readonly submitting = signal(false);
   protected readonly ineligibleReasons = ineligibleReasons;
+  protected readonly limit = LIST_LIMIT;
 
   private readonly requests = new Subject<void>();
   private opener: HTMLElement | null = null;

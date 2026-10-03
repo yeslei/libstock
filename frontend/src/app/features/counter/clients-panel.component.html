@@ -21,6 +21,9 @@
           <p class="empty" role="status">Nenhum cliente encontrado para o termo informado.</p>
         } @else {
           <p class="hint" role="status">{{ r.data.length }} cliente(s) encontrado(s).</p>
+          @if (r.data.length >= limit) {
+            <p class="note" role="status">Mostrando os primeiros {{ limit }} resultados. Refine a busca para ver os demais.</p>
+          }
           <ul class="cards">
             @for (client of r.data; track client.id) {
               <li>
@@ -43,13 +46,13 @@
                           @case ('loading') { <p class="loading"><app-spinner /> Consultando pendências…</p> }
                           @case ('error') { <app-alert [message]="p.message" /> }
                           @case ('loaded') {
-                            @if (!p.data.has_pending) {
-                              <p class="hint">Sem empréstimos em atraso.{{ p.data.is_penalized ? ' O cliente consta como penalizado.' : '' }}</p>
+                            @if (!p.data.overdue_loans.length) {
+                              <p class="hint">Sem empréstimos em atraso.{{ p.data.client.is_penalized ? ' O cliente consta como penalizado.' : '' }}</p>
                             } @else {
-                              <p class="note">Empréstimos em atraso: {{ p.data.overdue_loans.length }}.{{ p.data.is_penalized ? ' Cliente penalizado.' : '' }}</p>
+                              <p class="note">Empréstimos em atraso: {{ p.data.overdue_loans.length }}.{{ p.data.client.is_penalized ? ' Cliente penalizado.' : '' }}</p>
                               <ul>
-                                @for (loan of p.data.overdue_loans; track loan.loan_id) {
-                                  <li>{{ loan.book_title }} · exemplar #{{ loan.copy_id }} · devolução prevista em {{ loan.due_date | date: 'dd/MM/yyyy' }}</li>
+                                @for (loan of p.data.overdue_loans; track loan.id) {
+                                  <li>{{ loan.book.title }} · exemplar {{ loan.copy_barcode }} · devolução prevista em {{ loan.due_date | date: 'dd/MM/yyyy' }} · {{ loan.days_late }} dia(s) de atraso</li>
                                 }
                               </ul>
                             }

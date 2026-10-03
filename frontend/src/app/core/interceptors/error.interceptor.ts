@@ -44,7 +44,7 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   loan_not_found: 'O empréstimo não foi encontrado. Atualize a lista.',
   loan_already_closed: 'Este empréstimo já foi encerrado.',
   book_not_found: 'A obra não foi encontrada ou está inativa.',
-  reservation_not_found: 'Não há reserva de compra aguardando disponibilidade para esta obra.',
+  reservation_not_found: 'Reserva não encontrada ou sem fila aguardando. Atualize a lista.',
   reservation_not_ready: 'Esta reserva ainda não tem exemplar destinado para retirada.',
   reservation_expired: 'O prazo de retirada desta reserva expirou.',
   purchase_unavailable: 'Não há exemplar comercial livre para esta operação.',

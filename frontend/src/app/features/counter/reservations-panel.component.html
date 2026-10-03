@@ -32,6 +32,9 @@
         @if (!s.data.length) {
           <p class="empty" role="status">Nenhuma reserva de compra em andamento.</p>
         } @else {
+                    @if (s.data.length >= limit) {
+            <p class="note" role="status">Mostrando os primeiros {{ limit }} resultados. Refine a busca para ver os demais.</p>
+          }
           <ul class="cards">
             @for (reservation of s.data; track reservation.id) {
               <li>

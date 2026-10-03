@@ -74,20 +74,15 @@ export interface StaffPurchaseReservation {
   readonly allocation_blocked_reason: AllocationBlock | null;
 }
 
-/** `GET /api/v1/clients/{id}/pendencies` (já existente; SELLER e ADMINISTRATOR). */
+/** `GET /api/v1/staff/clients/{id}/pendencies`: somente leitura, atraso pela regra V2. */
 export interface ClientPendencies {
-  readonly client_id: number;
-  readonly has_pending: boolean;
-  readonly is_penalized: boolean;
-  readonly overdue_loans: readonly {
-    readonly loan_id: number;
-    readonly copy_id: number;
-    readonly book_id: number;
-    readonly book_title: string;
-    readonly loan_date: string;
-    readonly due_date: string;
-  }[];
+  readonly client: StaffClient;
+  readonly overdue_loans: readonly StaffLoan[];
 }
+
+/** Limites enviados explicitamente para que a tela saiba quando a lista foi truncada. */
+export const LIST_LIMIT = 50;
+export const CLIENT_SEARCH_LIMIT = 20;
 
 export interface CirculationResult {
   readonly id: number;
@@ -114,16 +109,16 @@ export class CounterService {
   private readonly http = inject(HttpClient);
 
   searchClients(q: string): Observable<StaffClient[]> {
-    return this.http.get<StaffClient[]>(`${STAFF}/clients`, { params: params({ q: q.trim() }) });
+    return this.http.get<StaffClient[]>(`${STAFF}/clients`, { params: params({ q: q.trim(), limit: CLIENT_SEARCH_LIMIT }) });
   }
 
   getClientPendencies(clientId: number): Observable<ClientPendencies> {
-    return this.http.get<ClientPendencies>(`/api/v1/clients/${clientId}/pendencies`);
+    return this.http.get<ClientPendencies>(`${STAFF}/clients/${clientId}/pendencies`);
   }
 
   listLoanRequests(filter: DeskFilter = {}): Observable<StaffLoanRequest[]> {
     return this.http.get<StaffLoanRequest[]>(`${STAFF}/loan-requests`, {
-      params: params({ q: filter.q?.trim(), client_id: filter.clientId }),
+      params: params({ q: filter.q?.trim(), client_id: filter.clientId, limit: LIST_LIMIT }),
     });
   }
 
@@ -135,7 +130,7 @@ export class CounterService {
 
   listLoans(filter: DeskFilter = {}): Observable<StaffLoan[]> {
     return this.http.get<StaffLoan[]>(`${STAFF}/loans`, {
-      params: params({ q: filter.q?.trim(), client_id: filter.clientId }),
+      params: params({ q: filter.q?.trim(), client_id: filter.clientId, limit: LIST_LIMIT }),
     });
   }
 
@@ -147,7 +142,7 @@ export class CounterService {
     filter: DeskFilter & { status?: ReservationStatus | '' } = {},
   ): Observable<StaffPurchaseReservation[]> {
     return this.http.get<StaffPurchaseReservation[]>(`${STAFF}/purchase-reservations`, {
-      params: params({ q: filter.q?.trim(), client_id: filter.clientId, status: filter.status }),
+      params: params({ q: filter.q?.trim(), client_id: filter.clientId, status: filter.status, limit: LIST_LIMIT }),
     });
   }
 

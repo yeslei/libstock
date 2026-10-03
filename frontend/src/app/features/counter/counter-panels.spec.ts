@@ -252,6 +252,28 @@ describe('Balcão: reservas de compra', () => {
     expect(root.textContent).toContain('Prazo de retirada expirado');
   });
 
+  it('desabilita a venda para cliente inelegível ou obra inativa', () => {
+    const base = { status: 'NOTIFIED' as const, allocated_copy_id: 55, allocated_copy_barcode: 'C-055', can_allocate: false };
+    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([
+      reservation({ ...base, client: client({ eligible: false, is_penalized: true }) }),
+      reservation({ ...base, id: 32, book: { ...book, is_active: false } }),
+    ])));
+    root.querySelectorAll('button').forEach((b) => {
+      if (b.textContent?.trim() === 'Confirmar venda') expect(b.disabled).toBeTrue();
+    });
+  });
+
+  it('avisa quando a lista atinge o limite e pode estar truncada', () => {
+    const many = Array.from({ length: 50 }, (_, i) => reservation({ id: i + 1 }));
+    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of(many)));
+    expect(root.textContent).toContain('Mostrando os primeiros 50 resultados. Refine a busca');
+  });
+
+  it('não avisa de truncamento abaixo do limite', () => {
+    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([reservation()])));
+    expect(root.textContent).not.toContain('Mostrando os primeiros');
+  });
+
   it('filtra por situação', () => {
     const { fixture, root, service } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([])));
     const select = root.querySelector('#reservation-status') as HTMLSelectElement;
@@ -279,8 +301,8 @@ describe('Balcão: clientes e navegação', () => {
   it('lista clientes, seleciona e consulta pendências', () => {
     const { fixture, root, service } = setup(ClientsPanelComponent, (s) => {
       s.searchClients.and.returnValue(of([client(), client({ id: 4, name: 'Bia', eligible: false, has_overdue_loan: true })]));
-      s.getClientPendencies.and.returnValue(of({ client_id: 4, has_pending: true, is_penalized: true,
-        overdue_loans: [{ loan_id: 1, copy_id: 9, book_id: 10, book_title: 'Dom Casmurro', loan_date: '2026-08-01T12:00:00Z', due_date: '2026-09-01T12:00:00Z' }] }));
+      s.getClientPendencies.and.returnValue(of({ client: client({ id: 4, is_penalized: true, eligible: false }),
+        overdue_loans: [loan({ id: 1, days_late: 3 })] }));
     });
     search(fixture, root, 'an');
     expect(service.searchClients).toHaveBeenCalledOnceWith('an');
@@ -289,6 +311,14 @@ describe('Balcão: clientes e navegação', () => {
     expect(service.getClientPendencies).toHaveBeenCalledOnceWith(4);
     expect(root.textContent).toContain('Empréstimos em atraso: 1');
     expect(root.textContent).toContain('Cliente penalizado');
+    expect(root.textContent).toContain('3 dia(s) de atraso');
+  });
+
+  it('avisa quando a busca de clientes atinge o limite', () => {
+    const many = Array.from({ length: 20 }, (_, i) => client({ id: i + 1 }));
+    const { fixture, root } = setup(ClientsPanelComponent, (s) => s.searchClients.and.returnValue(of(many)));
+    search(fixture, root, 'an');
+    expect(root.textContent).toContain('Mostrando os primeiros 20 resultados');
   });
 
   it('mostra vazio e erro de busca de forma distinta', () => {

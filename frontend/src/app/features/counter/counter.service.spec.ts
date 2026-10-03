@@ -24,12 +24,13 @@ describe('CounterService', () => {
     const request = http.expectOne((r) => r.url === '/api/v1/staff/clients');
     expect(request.request.method).toBe('GET');
     expect(request.request.params.get('q')).toBe('ana');
+    expect(request.request.params.get('limit')).toBe('20');
     request.flush([]);
   });
 
-  it('consulta pendências pelo endpoint existente de clientes', () => {
+  it('consulta pendências pelo endpoint de balcão somente leitura, não pelo V1', () => {
     service.getClientPendencies(7).subscribe();
-    const request = http.expectOne('/api/v1/clients/7/pendencies');
+    const request = http.expectOne('/api/v1/staff/clients/7/pendencies');
     expect(request.request.method).toBe('GET');
     request.flush({});
   });
@@ -39,12 +40,13 @@ describe('CounterService', () => {
     service.listLoans({ q: ' dom ', clientId: 5 }).subscribe();
     service.listPurchaseReservations({ q: '', clientId: null, status: 'WAITING' }).subscribe();
     const requests = http.expectOne((r) => r.url === '/api/v1/staff/loan-requests');
-    expect(requests.request.params.keys()).toEqual([]);
+    expect(requests.request.params.keys()).toEqual(['limit']);
+    expect(requests.request.params.get('limit')).toBe('50');
     const loans = http.expectOne((r) => r.url === '/api/v1/staff/loans');
     expect(loans.request.params.get('q')).toBe('dom');
     expect(loans.request.params.get('client_id')).toBe('5');
     const reservations = http.expectOne((r) => r.url === '/api/v1/staff/purchase-reservations');
-    expect(reservations.request.params.keys()).toEqual(['status']);
+    expect(reservations.request.params.keys()).toEqual(['status', 'limit']);
     expect(reservations.request.params.get('status')).toBe('WAITING');
     [requests, loans, reservations].forEach((r) => {
       expect(r.request.method).toBe('GET');

@@ -26,6 +26,9 @@
         @if (!s.data.length) {
           <p class="empty" role="status">Nenhum empréstimo ativo encontrado.</p>
         } @else {
+                    @if (s.data.length >= limit) {
+            <p class="note" role="status">Mostrando os primeiros {{ limit }} resultados. Refine a busca para ver os demais.</p>
+          }
           <ul class="cards">
             @for (loan of s.data; track loan.id) {
               <li>
