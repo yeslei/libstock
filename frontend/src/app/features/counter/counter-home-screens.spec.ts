@@ -31,7 +31,7 @@ describe('Balcão: painel', () => {
     const cards = Array.from(root.querySelectorAll('a.card--access'));
     expect(cards.map((c) => c.querySelector('.card__title')?.textContent)).toEqual([
       'Consultar acervo', 'Registrar devolução', 'Vendas', 'Empréstimo']);
-    expect(cards.map((c) => c.getAttribute('href'))).toEqual(['/', '/balcao/devolucoes', '/balcao/vendas', '/balcao/emprestimos']);
+    expect(cards.map((c) => c.getAttribute('href'))).toEqual(['/balcao/acervo', '/balcao/devolucoes', '/balcao/vendas', '/balcao/emprestimos']);
     expect(cards[0].textContent).toContain('Buscar obras e disponibilidade');
     expect(cards[0].textContent).toContain('Acessar');
   });

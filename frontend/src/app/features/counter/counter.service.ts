@@ -88,9 +88,60 @@ export interface StaffDashboard {
   readonly pendencies: number;
 }
 
+export type CopyDestination = 'DIDACTIC' | 'COMMERCIAL';
+export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'RESERVED' | 'SOLD' | 'INACTIVE';
+
+/** `GET /api/v1/staff/books`: obra com a contagem de exemplares ativos e não vendidos. */
+export interface StaffCatalogBook {
+  readonly id: number;
+  readonly title: string;
+  readonly author: string;
+  readonly isbn: string | null;
+  readonly genre: string | null;
+  readonly is_active: boolean;
+  readonly total_copies: number;
+  readonly didactic_copies: number;
+  readonly commercial_copies: number;
+}
+
+export interface StaffCatalogCopy {
+  readonly id: number;
+  readonly barcode: string;
+  readonly destination: CopyDestination;
+  readonly status: CopyStatus;
+  readonly condition: string | null;
+  /** Decimal serializado pela API como texto. */
+  readonly sale_price: string | number | null;
+  readonly is_active: boolean;
+  readonly free: boolean;
+  readonly allocated_for_purchase: boolean;
+}
+
+export interface StaffCatalogBookDetail extends StaffCatalogBook {
+  readonly copies: readonly StaffCatalogCopy[];
+}
+
+export type SaleBlock = 'DIDACTIC' | 'NOT_AVAILABLE';
+
+/** `GET /api/v1/staff/copies`: a elegibilidade para venda é decidida no backend. */
+export interface StaffCopyLookup {
+  readonly id: number;
+  readonly barcode: string;
+  readonly destination: CopyDestination;
+  readonly status: CopyStatus;
+  readonly condition: string | null;
+  readonly sale_price: string | number | null;
+  readonly book: { readonly id: number; readonly title: string; readonly author: string; readonly isbn: string | null; readonly is_active: boolean };
+  readonly free: boolean;
+  readonly free_commercial_copies: number;
+  readonly sellable: boolean;
+  readonly sale_block_reason: SaleBlock | null;
+}
+
 /** Limites enviados explicitamente para que a tela saiba quando a lista foi truncada. */
 export const LIST_LIMIT = 50;
 export const CLIENT_SEARCH_LIMIT = 20;
+export const COPY_LOOKUP_LIMIT = 20;
 
 export interface CirculationResult {
   readonly id: number;
@@ -111,7 +162,7 @@ function params(values: Record<string, string | number | null | undefined>): Htt
   return result;
 }
 
-/** Cliente HTTP dedicado ao balcão V2; não toca nos endpoints transacionais antigos (`/loans`, `/sales`). */
+/** Cliente HTTP do balcão: consultas e confirmações V2 em `/staff`. */
 @Injectable({ providedIn: 'root' })
 export class CounterService {
   private readonly http = inject(HttpClient);
@@ -138,6 +189,18 @@ export class CounterService {
     return this.http.post<CirculationResult>(`${STAFF}/loan-requests/${requestId}/confirm-pickup`, {
       copy_id: copyId,
     });
+  }
+
+  listCatalogBooks(q: string): Observable<StaffCatalogBook[]> {
+    return this.http.get<StaffCatalogBook[]>(`${STAFF}/books`, { params: params({ q: q.trim(), limit: LIST_LIMIT }) });
+  }
+
+  getCatalogBook(bookId: number): Observable<StaffCatalogBookDetail> {
+    return this.http.get<StaffCatalogBookDetail>(`${STAFF}/books/${bookId}`);
+  }
+
+  lookupCopies(q: string): Observable<StaffCopyLookup[]> {
+    return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, { params: params({ q: q.trim(), limit: COPY_LOOKUP_LIMIT }) });
   }
 
   listLoans(filter: DeskFilter = {}): Observable<StaffLoan[]> {

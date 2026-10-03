@@ -9,10 +9,10 @@ interface NavEntry {
   readonly exact: boolean;
 }
 
-/** Itens do menu lateral, na ordem do Figma (Funcionário / Painel). "Acervo" usa a consulta pública de catálogo. */
+/** Itens do menu lateral, na ordem do Figma (Funcionário / Painel).  */
 const NAVIGATION: readonly NavEntry[] = [
   { label: 'Painel', route: '/balcao/painel', exact: false },
-  { label: 'Acervo', route: '/', exact: true },
+  { label: 'Acervo', route: '/balcao/acervo', exact: false },
   { label: 'Clientes', route: '/balcao/clientes', exact: false },
   { label: 'Empréstimos', route: '/balcao/emprestimos', exact: false },
   { label: 'Devoluções', route: '/balcao/devolucoes', exact: false },

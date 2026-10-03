@@ -24,6 +24,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-dashboard.component').then(m => m.CounterDashboardComponent),
       },
       {
+        path: 'acervo', pathMatch: 'full', title: 'Acervo · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-catalog.component').then(m => m.CounterCatalogComponent),
+      },
+      {
+        path: 'acervo/:id', title: 'Obra · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-catalog-book.component').then(m => m.CounterCatalogBookComponent),
+      },
+      {
         path: 'clientes', title: 'Clientes · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterClientsPageComponent),
       },
