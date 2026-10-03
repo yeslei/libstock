@@ -165,31 +165,4 @@ describe('CounterService', () => {
       expect(error?.detail).toBe('Informe o código do exemplar, o ISBN ou o título.');
     });
   });
-
-  describe('venda direta (endpoint anterior à V2)', () => {
-    it('registra um exemplar ao preço cadastrado, sem cliente', () => {
-      let result: unknown;
-      service.registerSale(5, '38.90').subscribe((value) => (result = value));
-      const request = http.expectOne('/api/v1/sales/');
-      expect(request.request.method).toBe('POST');
-      expect(request.request.body).toEqual({ items: [{ copy_id: 5, unit_price: '38.90' }] });
-      request.flush({ id: 12, total_amount: '38.90', status: 'PENDING' });
-      expect(result).toEqual({ id: 12, total_amount: '38.90', status: 'PENDING' });
-    });
-
-    it('propaga conflito de disponibilidade com a mensagem do backend', () => {
-      let error: ApiError | undefined;
-      service.registerSale(5, '38.90').subscribe({ error: (e) => (error = e) });
-      http.expectOne('/api/v1/sales/').flush({ detail: 'Um ou mais exemplares não estão disponíveis para venda.' }, { status: 409, statusText: 'x' });
-      expect(error?.status).toBe(409);
-      expect(error?.detail).toBe('Um ou mais exemplares não estão disponíveis para venda.');
-    });
-
-    it('propaga acesso negado sem tratar como sucesso', () => {
-      let failed = false;
-      service.registerSale(5, '38.90').subscribe({ error: () => (failed = true) });
-      http.expectOne('/api/v1/sales/').flush({ detail: 'Permissão insuficiente.' }, { status: 403, statusText: 'x' });
-      expect(failed).toBeTrue();
-    });
-  });
 });

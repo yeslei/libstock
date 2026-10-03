@@ -138,13 +138,6 @@ export interface StaffCopyLookup {
   readonly sale_block_reason: SaleBlock | null;
 }
 
-/** `POST /api/v1/sales/` (fluxo anterior à V2): a venda nasce PENDING; o backend não a confirma nem altera o exemplar. */
-export interface SaleResult {
-  readonly id: number;
-  readonly total_amount: string | number;
-  readonly status: string;
-}
-
 /** Limites enviados explicitamente para que a tela saiba quando a lista foi truncada. */
 export const LIST_LIMIT = 50;
 export const CLIENT_SEARCH_LIMIT = 20;
@@ -169,7 +162,7 @@ function params(values: Record<string, string | number | null | undefined>): Htt
   return result;
 }
 
-/** Cliente HTTP do balcão: consultas e confirmações V2 em `/staff`; a venda direta usa o endpoint anterior `/sales`. */
+/** Cliente HTTP do balcão: consultas e confirmações V2 em `/staff`. */
 @Injectable({ providedIn: 'root' })
 export class CounterService {
   private readonly http = inject(HttpClient);
@@ -208,11 +201,6 @@ export class CounterService {
 
   lookupCopies(q: string): Observable<StaffCopyLookup[]> {
     return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, { params: params({ q: q.trim(), limit: COPY_LOOKUP_LIMIT }) });
-  }
-
-  /** Venda direta (endpoint anterior à V2): um exemplar, ao preço cadastrado dele, sem cliente. */
-  registerSale(copyId: number, unitPrice: string | number): Observable<SaleResult> {
-    return this.http.post<SaleResult>('/api/v1/sales/', { items: [{ copy_id: copyId, unit_price: unitPrice }] });
   }
 
   listLoans(filter: DeskFilter = {}): Observable<StaffLoan[]> {
