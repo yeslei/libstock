@@ -125,6 +125,20 @@ class PromotionTests(unittest.TestCase):
         with self.assertRaisesRegex(promote.ReleaseError, "validated merge"):
             promote.publish(self.state)
 
+    def test_server_policy_rejects_each_ref_atomically(self):
+        # A bare update hook rejects one ref while accepting the other.
+        for rejected in ("refs/heads/main", "refs/tags/v1.2.3"):
+            with self.subTest(rejected=rejected):
+                self.prepare()
+                hook = self.remote / "hooks" / "update"
+                hook.write_text('#!/bin/sh\n[ "$1" != "' + rejected + '" ]\n', encoding="utf-8")
+                hook.chmod(0o755)
+                before = self.refs()
+                with self.assertRaisesRegex(promote.ReleaseError, "Atomic publication rejected"):
+                    promote.publish(self.state)
+                self.assertEqual(before, self.refs())
+                promote.git("tag", "-d", "v1.2.3")
+
     def test_dirty_checkout_rejected(self):
         Path("untracked.txt").write_text("unsaved")
         with self.assertRaisesRegex(promote.ReleaseError, "clean disposable"):

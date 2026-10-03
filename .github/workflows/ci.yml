@@ -6,10 +6,21 @@ on:
   pull_request:
     branches: [main, integracao]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      candidate_artifact:
+        type: string
+        default: ''
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -21,6 +32,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_artifact && github.sha || inputs.ref || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        if: inputs.candidate_artifact != ''
+        with:
+          name: ${{ inputs.candidate_artifact }}
+          path: ${{ runner.temp }}/release
+
+      - name: Carrega candidato local validado
+        if: inputs.candidate_artifact != ''
+        working-directory: .
+        env:
+          CANDIDATE_SHA: ${{ inputs.ref }}
+        run: |
+          git fetch "$RUNNER_TEMP/release/candidate.bundle" refs/heads/release-candidate
+          git checkout --detach "$CANDIDATE_SHA"
 
       - name: Configura Python
         uses: actions/setup-python@v5
@@ -49,6 +78,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_artifact && github.sha || inputs.ref || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        if: inputs.candidate_artifact != ''
+        with:
+          name: ${{ inputs.candidate_artifact }}
+          path: ${{ runner.temp }}/release
+
+      - name: Carrega candidato local validado
+        if: inputs.candidate_artifact != ''
+        working-directory: .
+        env:
+          CANDIDATE_SHA: ${{ inputs.ref }}
+        run: |
+          git fetch "$RUNNER_TEMP/release/candidate.bundle" refs/heads/release-candidate
+          git checkout --detach "$CANDIDATE_SHA"
 
       - name: Configura Node
         uses: actions/setup-node@v4
@@ -62,3 +109,28 @@ jobs:
 
       - name: Compila o build de producao
         run: npm run build
+
+  release-tests:
+    name: Release helper (local Git)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_artifact && github.sha || inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: inputs.candidate_artifact != ''
+        with:
+          name: ${{ inputs.candidate_artifact }}
+          path: ${{ runner.temp }}/release
+      - name: Carrega candidato local validado
+        if: inputs.candidate_artifact != ''
+        env:
+          CANDIDATE_SHA: ${{ inputs.ref }}
+        run: |
+          git fetch "$RUNNER_TEMP/release/candidate.bundle" refs/heads/release-candidate
+          git checkout --detach "$CANDIDATE_SHA"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s scripts/release -p 'test_*.py' -v
