@@ -85,6 +85,16 @@ describe('Balcão: detalhes da obra', () => {
     expect(button('Inativar obra')).toBeUndefined();
     expect(root.querySelector('input')).toBeNull();
     expect(root.textContent).not.toContain('Excluir exemplar');
+    expect(root.textContent).not.toContain('Novo exemplar');
+  });
+
+  it('oferece Novo exemplar apenas a papéis autorizados e a obras ativas', () => {
+    const admin = setup(of(detail()), ['ADMINISTRATOR']);
+    const link = Array.from(admin.root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Novo exemplar');
+    expect(link?.getAttribute('href')).toBe('/balcao/acervo/7/exemplares/novo');
+    TestBed.resetTestingModule();
+    const inactive = setup(of(detail({ is_active: false })), ['ADMINISTRATOR']);
+    expect(inactive.root.textContent).not.toContain('Novo exemplar');
   });
 
   it('mostra carregamento, depois erro de domínio com nova tentativa', () => {
