@@ -774,3 +774,28 @@ O fluxo de empréstimo utiliza a validação da situação do cliente antes do r
 O serviço de consulta e sincronização de penalização permanece preparado para ser consumido por outros fluxos de circulação.
 
 A reserva ainda não está integrada ao controle de pendências.
+
+## Política operacional de promoção de release — Issue #113
+
+- Status: `APPROVED` — exceção autorizada pelo usuário em 2026-10-03;
+  implementação e testes locais não significam ativação ou execução real.
+- Versão-alvo: pipeline de promoção da Issue #113, com versão SemVer informada
+  no disparo manual; não altera regras do domínio da API.
+- Endpoint/entidades de negócio: não se aplica; refs Git `integracao`, `main`
+  e tag de release.
+- Regra aprovada: exclusivamente o pipeline de promoção, após disparo manual,
+  pode fazer merge direto de `integracao` para `main`, sem PR de promoção,
+  depois de validar a origem e o candidato. A tag deve apontar para o commit
+  resultante de `main`. Respeitar as proteções sem force push ou bypass.
+- Regra aprovada: publicação deve falhar explicitamente em conflito, versão
+  inválida, tag existente, validação falha ou proteção incompatível, sem
+  publicação parcial. O push de produção usa as integrações de deploy
+  existentes, sem criar gatilhos duplicados.
+- Limitação técnica: checks obrigatórios precisam estar registrados no SHA
+  candidato; build local não os substitui. O workflow manual precisa estar
+  registrado na branch padrão. App, configuração dos provedores e confirmação
+  de deploy permanecem pré-requisitos operacionais não verificados.
+- Testes esperados: merge/tag locais, versão, conflitos, tag duplicada,
+  concorrência, rejeição atômica e autorização/proteções via API simulada.
+
+Detalhes e condições de operação em [RELEASE.md](RELEASE.md).
