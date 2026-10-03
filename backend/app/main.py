@@ -11,7 +11,11 @@ from app.controllers.copy_controller import router as copy_router
 from app.controllers.user_controller import router as user_router
 from app.core.config import get_settings
 from app.core.exceptions import ApplicationError
-
+from app.controllers.client_pendency_controller import (
+    router as client_pendency_router,
+)
+from app.controllers.loan_controller import router as loan_router
+from app.controllers.sale_controller import router as sale_router
 
 
 settings = get_settings()
@@ -64,3 +68,6 @@ app.include_router(copy_router)
 app.include_router(book_router)
 app.include_router(catalog_router)
 app.include_router(admin_catalog_router)
+app.include_router(client_pendency_router)
+app.include_router(loan_router)
+app.include_router(sale_router)

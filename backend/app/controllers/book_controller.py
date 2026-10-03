@@ -15,6 +15,7 @@ from app.services.book_service import BookService
 
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 
+
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
     book_data: BookCreate,
@@ -56,7 +57,9 @@ def get_book(
 def update_book(
     book_id: int,
     changes: BookUpdate,
-    current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
+    current_user: User = Depends(
+        require_roles("STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+    ),
     service: BookService = Depends(get_book_service),
 ) -> BookDetailResponse:
     return service.update_book(book_id, changes, employee_id=current_user.id)

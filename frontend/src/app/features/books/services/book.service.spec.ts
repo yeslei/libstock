@@ -35,6 +35,26 @@ describe('BookService', () => {
     request.flush(response, { status: 201, statusText: 'Created' });
   });
 
+  it('dispara requisicao PATCH para /api/v1/books/:id com os dados parciais', () => {
+    const updatePayload = { title: 'Título Atualizado', genre: 'Ficção' };
+    const response: BookResponse = {
+      id: 10,
+      isbn: '9788575225530',
+      title: 'Título Atualizado',
+      author: 'Autor Teste',
+      genre: 'Ficção',
+      is_active: true,
+      initial_copy: null,
+    };
+
+    service.update(10, updatePayload).subscribe((book) => expect(book).toEqual(response));
+
+    const request = http.expectOne('/api/v1/books/10');
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual(updatePayload);
+    request.flush(response, { status: 200, statusText: 'OK' });
+  });
+
   it('consulta metadados pelo ISBN normalizado', () => {
     service.lookupMetadata('9788575225530').subscribe();
     const request = http.expectOne(`${BOOKS_API}/metadata/9788575225530`);

@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
-    BookPersistenceError,
     BookNotFoundError,
+    BookPersistenceError,
     BookUpdatePersistenceError,
     DuplicateBarcodeError,
     DuplicateIsbnError,
