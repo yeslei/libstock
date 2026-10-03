@@ -119,4 +119,77 @@ describe('CounterService', () => {
       expect(error?.code).toBe(code);
     }
   });
+
+  describe('acervo e exemplares (somente leitura)', () => {
+    it('lista obras pelo termo, com limite explícito', () => {
+      let result: unknown;
+      service.listCatalogBooks('  dom ').subscribe((value) => (result = value));
+      const request = http.expectOne((r) => r.url === '/api/v1/staff/books');
+      expect(request.request.method).toBe('GET');
+      expect(request.request.params.get('q')).toBe('dom');
+      expect(request.request.params.get('limit')).toBe('50');
+      request.flush([]);
+      expect(result).toEqual([]);
+    });
+
+    it('lê o detalhe da obra com os exemplares', () => {
+      let result: unknown;
+      service.getCatalogBook(7).subscribe((value) => (result = value));
+      const request = http.expectOne('/api/v1/staff/books/7');
+      expect(request.request.method).toBe('GET');
+      request.flush({ id: 7, copies: [] });
+      expect(result).toEqual({ id: 7, copies: [] } as never);
+    });
+
+    it('propaga obra inexistente como erro de domínio', () => {
+      let error: ApiError | undefined;
+      service.getCatalogBook(99).subscribe({ error: (e) => (error = e) });
+      http.expectOne('/api/v1/staff/books/99').flush({ code: 'book_not_found', detail: 'Obra não encontrada.' }, { status: 404, statusText: 'x' });
+      expect(error?.status).toBe(404);
+      expect(error?.code).toBe('book_not_found');
+    });
+
+    it('localiza exemplares por código, ISBN ou título', () => {
+      service.lookupCopies(' 978-0 ').subscribe();
+      const request = http.expectOne((r) => r.url === '/api/v1/staff/copies');
+      expect(request.request.method).toBe('GET');
+      expect(request.request.params.get('q')).toBe('978-0');
+      expect(request.request.params.get('limit')).toBe('20');
+      request.flush([]);
+    });
+
+    it('explica o termo ausente na busca de exemplares', () => {
+      let error: ApiError | undefined;
+      service.lookupCopies('x').subscribe({ error: (e) => (error = e) });
+      http.expectOne(() => true).flush({ code: 'search_term_required', detail: 'x' }, { status: 422, statusText: 'x' });
+      expect(error?.detail).toBe('Informe o código do exemplar, o ISBN ou o título.');
+    });
+  });
+
+  describe('venda direta (endpoint anterior à V2)', () => {
+    it('registra um exemplar ao preço cadastrado, sem cliente', () => {
+      let result: unknown;
+      service.registerSale(5, '38.90').subscribe((value) => (result = value));
+      const request = http.expectOne('/api/v1/sales/');
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual({ items: [{ copy_id: 5, unit_price: '38.90' }] });
+      request.flush({ id: 12, total_amount: '38.90', status: 'PENDING' });
+      expect(result).toEqual({ id: 12, total_amount: '38.90', status: 'PENDING' });
+    });
+
+    it('propaga conflito de disponibilidade com a mensagem do backend', () => {
+      let error: ApiError | undefined;
+      service.registerSale(5, '38.90').subscribe({ error: (e) => (error = e) });
+      http.expectOne('/api/v1/sales/').flush({ detail: 'Um ou mais exemplares não estão disponíveis para venda.' }, { status: 409, statusText: 'x' });
+      expect(error?.status).toBe(409);
+      expect(error?.detail).toBe('Um ou mais exemplares não estão disponíveis para venda.');
+    });
+
+    it('propaga acesso negado sem tratar como sucesso', () => {
+      let failed = false;
+      service.registerSale(5, '38.90').subscribe({ error: () => (failed = true) });
+      http.expectOne('/api/v1/sales/').flush({ detail: 'Permissão insuficiente.' }, { status: 403, statusText: 'x' });
+      expect(failed).toBeTrue();
+    });
+  });
 });

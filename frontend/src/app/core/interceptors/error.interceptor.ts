@@ -50,6 +50,7 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   purchase_unavailable: 'Não há exemplar comercial livre para esta operação.',
   circulation_persistence_error: 'Não foi possível concluir a operação. Nada foi alterado; tente novamente.',
   search_term_too_short: 'Informe ao menos 2 caracteres para buscar.',
+  search_term_required: 'Informe o código do exemplar, o ISBN ou o título.',
   desk_query_error: 'Não foi possível consultar o balcão. Tente novamente.',
 };
 
