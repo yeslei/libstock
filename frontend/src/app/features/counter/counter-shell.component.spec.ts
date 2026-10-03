@@ -24,6 +24,7 @@ describe('Layout do balcão (menu lateral)', () => {
               { path: 'clientes', component: StubComponent },
               { path: 'emprestimos/solicitacoes', component: StubComponent },
               { path: 'devolucoes', component: StubComponent },
+              { path: 'reservas/:id', component: StubComponent },
             ],
           },
           { path: '', component: StubComponent },
@@ -42,7 +43,7 @@ describe('Layout do balcão (menu lateral)', () => {
   it('lista os itens na ordem do Figma', async () => {
     const { root } = await setup();
     const labels = Array.from(root.querySelectorAll('nav a')).map((a) => a.textContent?.trim());
-    expect(labels).toEqual(['Painel', 'Acervo', 'Clientes', 'Empréstimos', 'Devoluções', 'Vendas']);
+    expect(labels).toEqual(['Painel', 'Acervo', 'Clientes', 'Empréstimos', 'Devoluções', 'Vendas', 'Reservas']);
     expect(root.querySelector('.shell__brand')?.textContent).toBe('LibStock');
   });
 
@@ -51,6 +52,12 @@ describe('Layout do balcão (menu lateral)', () => {
     const current = Array.from(root.querySelectorAll('nav a')).filter((a) => a.getAttribute('aria-current') === 'page');
     expect(current.map((a) => a.textContent?.trim())).toEqual(['Empréstimos']);
     expect(current[0].classList).toContain('shell__link--active');
+  });
+
+  it('mantém Reservas ativo também na tela de atendimento', async () => {
+    const { root } = await setup('/balcao/reservas/31');
+    const current = Array.from(root.querySelectorAll('nav a')).filter((a) => a.getAttribute('aria-current') === 'page');
+    expect(current.map((a) => a.textContent?.trim())).toEqual(['Reservas']);
   });
 
   it('expõe um botão de menu recolhível com estado acessível', async () => {

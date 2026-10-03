@@ -17,6 +17,7 @@ const NAVIGATION: readonly NavEntry[] = [
   { label: 'Empréstimos', route: '/balcao/emprestimos', exact: false },
   { label: 'Devoluções', route: '/balcao/devolucoes', exact: false },
   { label: 'Vendas', route: '/balcao/vendas', exact: false },
+  { label: 'Reservas', route: '/balcao/reservas', exact: false },
 ];
 
 /** Layout da área do funcionário: menu lateral (recolhível em telas pequenas) e conteúdo da rota filha. */

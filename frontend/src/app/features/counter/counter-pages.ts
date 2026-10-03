@@ -4,7 +4,6 @@ import { Router } from '@angular/router';
 import { ClientNavigation, ClientsPanelComponent, DeskTab } from './clients-panel.component';
 import { CounterContext } from './counter-context.service';
 import { PickupsPanelComponent } from './pickups-panel.component';
-import { ReservationsPanelComponent } from './reservations-panel.component';
 
 /** Destino de cada atalho da consulta de clientes dentro da área do funcionário. */
 const DESTINATIONS: Readonly<Record<DeskTab, string>> = {
@@ -38,16 +37,5 @@ export class CounterClientsPageComponent {
   template: `<app-pickups-panel [client]="context.client()" (clearClient)="context.client.set(null)" />`,
 })
 export class CounterPickupsPageComponent {
-  protected readonly context = inject(CounterContext);
-}
-
-@Component({
-  selector: 'app-counter-reservations-page',
-  standalone: true,
-  imports: [ReservationsPanelComponent],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<app-reservations-panel [client]="context.client()" (clearClient)="context.client.set(null)" />`,
-})
-export class CounterReservationsPageComponent {
   protected readonly context = inject(CounterContext);
 }

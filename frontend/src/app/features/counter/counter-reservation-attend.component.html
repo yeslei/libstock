@@ -1,0 +1,164 @@
+<section class="page" aria-labelledby="atender-titulo">
+  @if (state(); as s) {
+    @if (s.status === 'loading') {
+      <p class="page__crumb">LibStock / Reservas de compra</p>
+      <h1 id="atender-titulo" tabindex="-1">Atender reserva</h1>
+      <p class="loading" role="status"><app-spinner /> Carregando reserva…</p>
+    } @else if (s.status === 'error') {
+      <p class="page__crumb">LibStock / Reservas de compra</p>
+      <h1 id="atender-titulo" tabindex="-1">Atender reserva</h1>
+      <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      <div class="actions"><a class="btn" routerLink="/balcao/reservas">Voltar às reservas</a></div>
+    } @else {
+      @if (error(); as message) {
+        <div class="feedback"><app-alert [message]="message" /></div>
+      }
+
+      @switch (screen()) {
+        @case ('missing') {
+          <p class="page__crumb">LibStock / Atender reserva</p>
+          <h1 id="atender-titulo" tabindex="-1">Reserva não encontrada</h1>
+          <div class="callout" role="status">
+            <p class="callout__title">Esta reserva não está mais em andamento</p>
+            <p>Ela pode ter sido concluída ou cancelada. Volte às reservas para consultar a fila atualizada.</p>
+          </div>
+          <div class="actions"><a class="btn btn--primary" routerLink="/balcao/reservas">Voltar às reservas</a></div>
+        }
+
+        @case ('done') {
+          @if (completed(); as done) {
+            <p class="page__crumb">LibStock / Venda da reserva concluída</p>
+            <h1 id="atender-titulo" tabindex="-1">Venda da reserva concluída</h1>
+            <div class="callout callout--ok" role="status">
+              <p class="callout__title">Venda registrada com sucesso</p>
+              <p>A reserva de {{ done.reservation.client.name }} foi concluída.</p>
+            </div>
+            <div class="card">
+              <h2>Resultado</h2>
+              <p class="line">{{ done.reservation.book.title }} · Exemplar {{ done.reservation.allocated_copy_barcode }} · Vendido</p>
+              <p class="line">Venda nº {{ done.saleId }}</p>
+              @if (done.next; as next) {
+                <p class="line">{{ next.client.name }} passa à {{ next.queue_position }}ª posição · aguardando disponibilidade</p>
+              }
+            </div>
+            <div class="actions">
+              <a class="btn btn--primary" routerLink="/balcao/reservas">Voltar à fila</a>
+              <a class="btn" routerLink="/balcao/vendas">Registrar outra venda</a>
+            </div>
+          }
+        }
+
+        @case ('expired') {
+          @if (s.data; as reservation) {
+            <p class="page__crumb">LibStock / Reserva fora do prazo</p>
+            <h1 id="atender-titulo" tabindex="-1">Reserva fora do prazo</h1>
+            <div class="card">
+              <h2>Reserva localizada</h2>
+              <p class="line">{{ reservation.client.name }} · {{ reservation.book.title }} · Exemplar {{ reservation.allocated_copy_barcode }}</p>
+              <p class="line">Prazo de retirada encerrado@if (reservation.expires_at) { em {{ reservation.expires_at | date: 'dd/MM/yyyy' }} }</p>
+              <p class="line">Status: consultar situação atualizada da reserva</p>
+            </div>
+            <div class="callout callout--danger" role="alert">
+              <p class="callout__title">Consulte a fila antes de vender</p>
+              <p>Esta reserva não pode ser atendida como prioridade ativa. Confira o próximo cliente elegível.</p>
+            </div>
+            <div class="actions"><a class="btn btn--primary" routerLink="/balcao/reservas">Consultar fila</a></div>
+          }
+        }
+
+        @case ('unavailable') {
+          @if (s.data; as reservation) {
+            <p class="page__crumb">LibStock / Atender reserva</p>
+            <h1 id="atender-titulo" tabindex="-1">Atender reserva</h1>
+            <div class="callout" role="status">
+              <p class="callout__title">Reserva sem exemplar destinado</p>
+              <p>A reserva de {{ reservation.client.name }} ainda não está disponível para retirada. Destine um exemplar à primeira da fila na lista de reservas.</p>
+            </div>
+            <div class="actions"><a class="btn btn--primary" routerLink="/balcao/reservas">Voltar às reservas</a></div>
+          }
+        }
+
+        @case ('check') {
+          @if (s.data; as reservation) {
+            <p class="page__crumb">LibStock / Atender reserva</p>
+            <h1 id="atender-titulo" tabindex="-1">Atender reserva</h1>
+            <div class="card">
+              <h2>Reserva de {{ reservation.client.name }}</h2>
+              <p class="line">{{ reservation.client.email }} · {{ reservation.client.is_active ? 'conta ativa' : 'conta inativa' }} · {{ reservation.client.eligible ? 'sem pendências' : 'inelegível (' + ineligibleReasons(reservation.client).join(', ') + ')' }}</p>
+              <p class="line">{{ reservation.book.title }} · disponível para retirada</p>
+              <p class="line">Exemplar {{ reservation.allocated_copy_barcode }} · Comercial · destinado à venda</p>
+              @if (reservation.expires_at) {
+                <p class="line">Prazo de retirada: {{ reservation.expires_at | date: 'dd/MM/yyyy' }}</p>
+              }
+            </div>
+
+            @if (!canSell(reservation)) {
+              <div class="callout callout--danger" role="alert">
+                <p class="callout__title">A venda não pode ser confirmada</p>
+                <p>
+                  @if (!reservation.client.eligible) { O cliente está inelegível. }
+                  @if (!reservation.book.is_active) { A obra está inativa. }
+                  Regularize a situação antes de atender esta reserva.
+                </p>
+              </div>
+            } @else {
+              <div class="callout">
+                <p class="callout__title">Confira antes de continuar</p>
+                <p>Confirme o cliente pelo e-mail cadastrado e o código do exemplar entregue no balcão.</p>
+              </div>
+            }
+
+            <form (submit)="check($event, reservation)" novalidate>
+              <div class="field" [class.field--error]="codeError()">
+                <label for="copy-code">Código do exemplar</label>
+                <input
+                  id="copy-code"
+                  type="text"
+                  maxlength="100"
+                  autocomplete="off"
+                  [value]="code()"
+                  [disabled]="!canSell(reservation)"
+                  [attr.aria-invalid]="codeError() ? 'true' : null"
+                  [attr.aria-describedby]="codeError() ? 'copy-code-error' : 'copy-code-hint'"
+                  (input)="setCode($event)"
+                />
+                @if (codeError(); as message) {
+                  <span class="field__error" id="copy-code-error" role="alert">{{ message }}</span>
+                } @else {
+                  <span class="field__hint" id="copy-code-hint">Informe o código do exemplar vinculado a esta reserva.</span>
+                }
+              </div>
+              <div class="actions">
+                <button class="btn btn--primary" type="submit" [disabled]="!canSell(reservation)">Conferir venda</button>
+                <a class="btn" routerLink="/balcao/reservas">Voltar às reservas</a>
+              </div>
+            </form>
+          }
+        }
+
+        @case ('confirm') {
+          @if (s.data; as reservation) {
+            <p class="page__crumb">LibStock / Confirmar venda da reserva</p>
+            <h1 id="atender-titulo" tabindex="-1">Confirmar venda da reserva</h1>
+            <div class="card">
+              <h2>Resumo da operação</h2>
+              <p class="line">Cliente: {{ reservation.client.name }} · {{ reservation.client.email }}</p>
+              <p class="line">Livro: {{ reservation.book.title }} · Exemplar {{ reservation.allocated_copy_barcode }}</p>
+              <p class="line">Origem: reserva de compra</p>
+            </div>
+            <div class="callout">
+              <p class="callout__title">Ao confirmar</p>
+              <p>A venda será registrada, o exemplar ficará Vendido e a reserva será concluída. O estoque e a fila serão atualizados.</p>
+            </div>
+            <div class="actions">
+              <button class="btn btn--primary" type="button" [disabled]="submitting() || !canSell(reservation)" [attr.aria-busy]="submitting()" (click)="confirm(reservation)">
+                @if (submitting()) { Confirmando… } @else { Confirmar venda }
+              </button>
+              <button class="btn" type="button" [disabled]="submitting()" (click)="back()">Voltar</button>
+            </div>
+          }
+        }
+      }
+    }
+  }
+</section>
