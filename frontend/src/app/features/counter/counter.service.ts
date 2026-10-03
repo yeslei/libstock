@@ -158,6 +158,18 @@ export interface SaleRegistration {
   readonly total_amount: string | number;
 }
 
+/** Resposta de `POST /api/v1/loans/`: prazo e datas calculados pelo backend (o frontend não calcula prazo). */
+export interface LoanRegistration {
+  readonly id: number;
+  readonly client_id: number;
+  readonly copy_id: number;
+  readonly employee_id: number;
+  readonly loan_date: string;
+  readonly due_date: string;
+  readonly returned_at: string | null;
+  readonly status: 'OPEN' | 'RETURNED' | 'CANCELLED';
+}
+
 export interface CirculationResult {
   readonly id: number;
 }
@@ -222,6 +234,11 @@ export class CounterService {
   registerSale(copyId: number, unitPrice: string | number): Observable<SaleRegistration> {
     const items: SaleItemRequest[] = [{ copy_id: copyId, unit_price: String(unitPrice) }];
     return this.http.post<SaleRegistration>('/api/v1/sales/', { items });
+  }
+
+  /** Registra o empréstimo direto. Endpoint existente de `/api/v1/loans`, permitido a SELLER e ADMINISTRATOR; o prazo é calculado por ele. */
+  registerLoan(clientId: number, copyId: number): Observable<LoanRegistration> {
+    return this.http.post<LoanRegistration>('/api/v1/loans/', { client_id: clientId, copy_id: copyId });
   }
 
   listLoans(filter: DeskFilter = {}): Observable<StaffLoan[]> {
