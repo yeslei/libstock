@@ -45,7 +45,7 @@ export const routes: Routes = [
       },
       {
         path: 'emprestimos/ativos', title: 'Empréstimos ativos · Balcão · LibStock',
-        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReturnsPageComponent),
+        loadComponent: () => import('./features/counter/counter-active-loans.component').then(m => m.CounterActiveLoansComponent),
       },
       {
         path: 'devolucoes', title: 'Devoluções · Balcão · LibStock',

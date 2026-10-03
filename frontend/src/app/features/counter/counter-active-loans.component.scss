@@ -1,0 +1,46 @@
+@use 'variables' as *;
+@use './staff-page';
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+  margin: 22px 0 $space-4;
+
+  .search {
+    flex: 1 1 24rem;
+    margin: 0;
+  }
+}
+
+.counter {
+  margin: 0;
+  padding: 14px 18px;
+  min-height: 46px;
+  box-sizing: border-box;
+  border: 1px solid $staff-border;
+  border-radius: 10px;
+  background: #f8f9f4;
+  color: $staff-sidebar;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.section {
+  margin: 28px 0 $space-3;
+  color: $staff-accent;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+td.overdue {
+  color: $error;
+}
+
+.footnote {
+  margin: $space-6 0 0;
+  color: $error;
+  font-size: 12px;
+}
