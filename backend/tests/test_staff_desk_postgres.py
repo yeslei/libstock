@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.controllers.circulation_controller import get_circulation_service
@@ -13,7 +13,8 @@ from app.controllers.staff_desk_controller import get_staff_desk_service
 from app.dependencies.authentication import get_current_user
 from app.main import app
 from app.models.domain import (
-    Client, Copy, CopyStatus, DestinationType, Employee, Loan, LoanStatus, Profile, Role, UserRole,
+    Client, Copy, CopyStatus, DestinationType, Employee, Loan, LoanStatus, Profile, PurchaseReservation,
+    ReservationStatus, Role, UserRole,
 )
 from app.models.user import User
 from app.repositories.circulation_repository import CirculationRepository
@@ -264,3 +265,61 @@ def test_pendencies_unknown_client_is_404_and_inactive_employee_403(desk):
         db.get(Profile, seller_id).is_active = False
         db.commit()
     assert http.get(f'{BASE}/clients/1/pendencies').status_code == 403
+
+
+def test_dashboard_requires_active_employee_and_never_writes(desk):
+    http, engine, _, _, seller_id = desk
+    assert set(http.get(f'{BASE}/dashboard').json()) == {'active_loans', 'returns_today', 'waiting_reservations', 'pendencies'}
+    with Session(engine) as db:
+        db.get(Profile, seller_id).is_active = False
+        db.commit()
+    response = http.get(f'{BASE}/dashboard')
+    assert (response.status_code, response.json()['code']) == (403, 'employee_record_required')
+
+
+def test_dashboard_indicator_definitions_and_sao_paulo_day_edges(desk):
+    from datetime import time
+    from app.core.business_dates import BUSINESS_ZONE, business_today as today_sp
+    http, engine, book_id, client_id, seller_id = desk
+    before = http.get(f'{BASE}/dashboard').json()
+    midnight = datetime.combine(today_sp(), time.min, BUSINESS_ZONE)
+    now = datetime.now(BUSINESS_ZONE)
+    with Session(engine) as db:
+        def new_copy(destination=DestinationType.DIDACTIC):
+            db.execute(text("SELECT set_config('libstock.employee_id', :id, true)"), {'id': str(seller_id)})
+            copy = Copy(book_id=book_id, barcode=uuid4().hex, destination=destination,
+                        sale_price=25 if destination == DestinationType.COMMERCIAL else None)
+            db.add(copy); db.flush()
+            return copy.id
+
+        def returned(returned_at):
+            loan = Loan(client_id=client_id, copy_id=new_copy(), employee_id=seller_id,
+                        loan_date=returned_at - timedelta(days=10), due_date=returned_at + timedelta(days=1),
+                        status=LoanStatus.OPEN)
+            db.add(loan); db.flush()
+            loan.status, loan.returned_at = LoanStatus.RETURNED, returned_at  # a trigger exige início OPEN
+            db.flush()
+        returned(midnight)                                   # 00:00 de hoje em São Paulo: conta
+        returned(midnight + timedelta(days=1) - timedelta(seconds=1))  # 23:59:59 de hoje: conta
+        returned(midnight - timedelta(seconds=1))            # 23:59:59 de ontem: não conta
+        returned(midnight + timedelta(days=1))               # 00:00 de amanhã: não conta
+        # empréstimos OPEN: um em atraso (cliente A), outro em dia
+        late_client = new_user(db, 'USER', 'Atrasado dois empréstimos')
+        for due in (midnight - timedelta(seconds=1), midnight - timedelta(days=3)):
+            db.add(Loan(client_id=late_client, copy_id=new_copy(), employee_id=seller_id, loan_date=due - timedelta(days=30),
+                        due_date=due, status=LoanStatus.OPEN))
+        # vence hoje (00:01): ativo, não é atraso pela regra V2
+        db.add(Loan(client_id=client_id, copy_id=new_copy(), employee_id=seller_id, loan_date=midnight - timedelta(days=30),
+                    due_date=midnight + timedelta(minutes=1), status=LoanStatus.OPEN))
+        db.commit()
+        waiting_client = new_user(db, 'USER', 'Fila do painel')
+        db.add(Loan(client_id=client_id, copy_id=commercial_copy(db, book_id).id, employee_id=seller_id,
+                    loan_date=midnight, due_date=midnight + timedelta(days=30), status=LoanStatus.OPEN))
+        db.flush()  # reserva só é aceita se o exemplar comercial está emprestado
+        db.add(PurchaseReservation(client_id=waiting_client, book_id=book_id, status=ReservationStatus.WAITING, queue_position=1))
+        db.commit()
+    after = http.get(f'{BASE}/dashboard').json()
+    assert after['returns_today'] - before['returns_today'] == 2
+    assert after['active_loans'] - before['active_loans'] == 4
+    assert after['pendencies'] - before['pendencies'] == 1  # cliente distinto, apesar de 2 empréstimos atrasados
+    assert after['waiting_reservations'] - before['waiting_reservations'] == 1

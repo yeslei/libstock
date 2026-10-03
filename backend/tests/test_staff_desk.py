@@ -14,7 +14,7 @@ from app.services.staff_desk_service import StaffDeskService
 
 PATHS = ['/api/v1/staff/clients?q=ana', '/api/v1/staff/loan-requests', '/api/v1/staff/loans',
          '/api/v1/staff/purchase-reservations']
-SERVICE_METHODS = ['client_pendencies', 'search_clients', 'loan_requests', 'loans', 'purchase_reservations']
+SERVICE_METHODS = ['dashboard', 'client_pendencies', 'search_clients', 'loan_requests', 'loans', 'purchase_reservations']
 
 
 @pytest.fixture
@@ -275,3 +275,50 @@ def test_pendencies_lists_only_overdue_loans_and_never_writes(monkeypatch):
     assert [(l.id, l.days_late) for l in result.overdue_loans] == [(1, 2)]
     assert result.client.eligible is False
     service.db.commit.assert_not_called()
+
+
+def test_dashboard_requires_authentication_and_staff_role(api):
+    client, fake = api
+    assert client.get('/api/v1/staff/dashboard').status_code == 401
+    for role in ('USER', 'STOCK_KEEPER'):
+        app.dependency_overrides[get_current_user] = lambda role=role: NS(id=7, role_codes=[role])
+        assert client.get('/api/v1/staff/dashboard').status_code == 403
+    fake.dashboard.assert_not_called()
+
+
+@pytest.mark.parametrize('role', ['SELLER', 'ADMINISTRATOR'])
+def test_dashboard_returns_explicit_schema(api, role):
+    client, fake = api
+    fake.dashboard.return_value = {'active_loans': 3, 'returns_today': 2, 'waiting_reservations': 1, 'pendencies': 4}
+    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=[role])
+    response = client.get('/api/v1/staff/dashboard')
+    assert response.status_code == 200
+    assert response.json() == {'active_loans': 3, 'returns_today': 2, 'waiting_reservations': 1, 'pendencies': 4}
+    fake.dashboard.assert_called_once_with(7)
+
+
+def test_dashboard_denies_inactive_employee_without_querying():
+    service, repo = make_service()
+    repo.is_active_employee.return_value = False
+    with pytest.raises(ApplicationError) as error:
+        service.dashboard(7)
+    assert (error.value.status_code, error.value.code) == (403, 'employee_record_required')
+    repo.dashboard_counts.assert_not_called()
+
+
+def test_dashboard_uses_sao_paulo_day_window(monkeypatch):
+    service, repo = make_service()
+    monkeypatch.setattr('app.services.staff_desk_service.business_today', lambda: date(2026, 10, 3))
+    repo.dashboard_counts.return_value = {'active_loans': 1, 'returns_today': 0, 'waiting_reservations': 2, 'pendencies': 0}
+    result = service.dashboard(7)
+    cutoff, next_cutoff = repo.dashboard_counts.call_args.args
+    assert cutoff.isoformat() == '2026-10-03T00:00:00-03:00' and next_cutoff.isoformat() == '2026-10-04T00:00:00-03:00'
+    assert result.model_dump() == {'active_loans': 1, 'returns_today': 0, 'waiting_reservations': 2, 'pendencies': 0}
+
+
+def test_dashboard_database_failure_is_500():
+    service, repo = make_service()
+    repo.dashboard_counts.side_effect = SQLAlchemyError('boom')
+    with pytest.raises(ApplicationError) as error:
+        service.dashboard(7)
+    assert (error.value.status_code, error.value.code) == (500, 'desk_query_error')
