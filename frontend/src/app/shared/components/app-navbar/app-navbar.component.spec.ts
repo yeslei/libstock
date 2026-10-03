@@ -36,6 +36,14 @@ describe('AppNavbarComponent', () => {
     expect(text()).not.toContain('Cadastrar exemplar');
   });
 
+  it('mostra o balcão apenas para vendedor e administrador', () => {
+    for (const [role, visible] of [['SELLER', true], ['ADMINISTRATOR', true], ['STOCK_KEEPER', false], ['USER', false]] as const) {
+      user$.next({ id: 9, name: 'Conta', email: 'c@x.dev', role_codes: [role], created_at: '' });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('a[href="/balcao"]') !== null).withContext(role).toBe(visible);
+    }
+  });
+
   it('une capacidades sem duplicar links', () => {
     user$.next({ id: 3, name: 'Admin', email: 'a@x.dev', role_codes: ['STOCK_KEEPER', 'ADMINISTRATOR'], created_at: '' });
     const content = text();
