@@ -1,4 +1,5 @@
 """Inclusão de exemplar e inativação de obra (Issue #135) contra PostgreSQL descartável migrado pelo Alembic."""
+from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -23,16 +24,17 @@ def copy_service(db):
 
 def test_copy_creation_persists_and_duplicate_barcode_returns_409_without_new_row(desk):  # noqa: F811
     _, engine, book_id, _, seller_id = desk
+    code = 'NEW-135-' + uuid4().hex[:12]
     with Session(engine) as db:
         created = copy_service(db).create_new_copy(
-            CopyCreate(book_id=book_id, barcode='NEW-135-A', destination=DestinationType.DIDACTIC), actor_id=seller_id)
-        assert (created.barcode, created.status.value, created.is_active) == ('NEW-135-A', 'AVAILABLE', True)
+            CopyCreate(book_id=book_id, barcode=code, destination=DestinationType.DIDACTIC), actor_id=seller_id)
+        assert (created.barcode, created.status.value, created.is_active) == (code, 'AVAILABLE', True)
     with Session(engine) as db:
         with pytest.raises(HTTPException) as duplicate:
             copy_service(db).create_new_copy(
-                CopyCreate(book_id=book_id, barcode='NEW-135-A', destination=DestinationType.DIDACTIC), actor_id=seller_id)
+                CopyCreate(book_id=book_id, barcode=code, destination=DestinationType.DIDACTIC), actor_id=seller_id)
         assert duplicate.value.status_code == 409
-        assert db.query(Copy).filter(Copy.barcode == 'NEW-135-A').count() == 1
+        assert db.query(Copy).filter(Copy.barcode == code).count() == 1
 
 
 def test_copy_creation_rejects_inactive_book_and_price_rules_are_validated(desk):  # noqa: F811
