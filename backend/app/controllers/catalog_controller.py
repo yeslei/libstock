@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from app.dependencies.services import get_catalog_service
 from app.schemas.catalog_schema import (
     CatalogBookResponse,
+    CatalogBookDetailResponse,
     CatalogSearchParams,
     GenreResponse,
     PagedBooksResponse,
@@ -61,6 +62,12 @@ def list_featured_genres(
     catalog_service: CatalogService = Depends(get_catalog_service),
 ) -> list[GenreResponse]:
     return catalog_service.list_featured_genres()
+
+
+@router.get("/books/{book_id}", response_model=CatalogBookDetailResponse)
+def get_public_book(book_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+                    catalog_service: CatalogService = Depends(get_catalog_service)):
+    return catalog_service.get_public_book(book_id)
 
 
 @router.get("/genres/{slug}/books", response_model=PagedBooksResponse)

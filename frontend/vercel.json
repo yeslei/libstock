@@ -10,6 +10,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://libstock-gfc5.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

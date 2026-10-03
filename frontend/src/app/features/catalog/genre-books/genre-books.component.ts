@@ -7,6 +7,7 @@ import { AlertComponent } from '../../../shared/components/alert/alert.component
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { LoadState, PagedBooks } from '../models/catalog.model';
 import { CatalogService } from '../services/catalog.service';
+import { CatalogBookCardComponent } from '../components/catalog-book-card/catalog-book-card.component';
 
 /**
  * Listagem de um gênero. Entrega mínima de propósito: o filtro rico e a
@@ -16,7 +17,7 @@ import { CatalogService } from '../services/catalog.service';
 @Component({
   selector: 'app-genre-books',
   standalone: true,
-  imports: [AsyncPipe, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [AsyncPipe, RouterLink, AlertComponent, SpinnerComponent, CatalogBookCardComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './genre-books.component.html',
   styleUrl: './genre-books.component.scss',

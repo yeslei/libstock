@@ -23,7 +23,7 @@ $error:         #b3261e;         // erros — vermelho harmonizado com a terraco
 $success:       $verde-sage;     // confirmações
 
 // ---- Superfícies e texto ----
-$bg-page:       $creme;
+$bg-page:       #ffffff;
 $bg-surface:    #ffffff;
 $bg-subtle:     #f4f6f3;
 $text-primary:  #1a1a1a;
@@ -73,3 +73,9 @@ $transition-base: 200ms ease;
 $bp-sm: 480px;
 $bp-md: 768px;
 $bp-lg: 1024px;
+
+// Referência UX V2: superfícies do cliente e navegação global.
+$client-green: #133325;
+$client-hero: #f6f2e8;
+$client-border: #d6d9cf;
+$client-content-max: 1285px;

@@ -3,11 +3,14 @@ import { CanActivateFn, Router } from '@angular/router';
 
 import { RoleCode } from '../models/user.model';
 import { TokenStoreService } from '../services/token-store.service';
+import { AuthService } from '../services/auth.service';
 
-export const roleGuard: CanActivateFn = (route) => {
+export const roleGuard: CanActivateFn = async (route) => {
   const store = inject(TokenStoreService);
   const router = inject(Router);
   const roles = route.data['roles'];
+  const auth = inject(AuthService);
+  await auth.restoreSession();
 
   if (!store.isAuthenticated) {
     return router.createUrlTree(['/login']);

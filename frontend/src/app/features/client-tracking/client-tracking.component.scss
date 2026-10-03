@@ -1,0 +1,29 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+.tracking { max-width: 1064px; margin: auto; padding: $space-8 $space-4 80px; }
+.tracking-heading { padding-bottom: $space-5; border-bottom: 1px solid $client-border; margin-bottom: $space-8; }
+.eyebrow { margin: 0 0 $space-4; color: $verde-medio; font-size: 11px; font-weight: 600; }
+h1 { color: $client-green; font-size: 30px; margin: 0 0 $space-2; }
+.intro, .author, .guidance, .footnote { color: $text-muted; }
+.intro { font-size: $font-size-sm; margin: 0; }
+.tracking-list { display: flex; flex-direction: column; gap: $space-5; padding: 0; margin: 0; list-style: none; }
+.tracking-card { display: flex; gap: $space-5; min-height: 170px; padding: $space-5; border: 1px solid $client-border; border-radius: 12px; }
+.cover { width: 90px; height: 136px; flex: 0 0 90px; object-fit: contain; border-radius: 4px; background: $bg-subtle; }
+.cover--empty { display: flex; align-items: center; justify-content: center; font-size: 11px; color: $text-muted; }
+.card-content { flex: 1; min-width: 0; }
+.card-heading { display: flex; justify-content: space-between; align-items: baseline; gap: $space-4; }
+h2 { margin: 0 0 $space-1; font-size: 18px; color: $client-green; overflow-wrap: anywhere; }
+h2 a { color: inherit; text-decoration: none; }
+h2 a:hover { text-decoration: underline; }
+.author { font-size: $font-size-xs; margin: 0; }
+.status { color: $verde-medio; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.status--waiting { color: #927100; }
+.status--overdue, .guidance--overdue { color: $error; }
+.dates { margin: $space-5 0 $space-6; font-size: $font-size-xs; overflow-wrap: anywhere; }
+.guidance, .footnote { font-size: 12px; margin: 0; }
+.footnote { margin-top: $space-6; }
+.empty { padding: $space-8; border: 1px solid $client-border; border-radius: 12px; text-align: center; color: $text-muted; }
+.empty a { color: $verde-medio; font-size: $font-size-sm; }
+.loading { display: flex; gap: $space-2; align-items: center; }
+a:focus-visible, button:focus-visible { @include focus-ring; }
+@media (max-width: 599px) { .tracking-card { gap: $space-3; padding: $space-4; } .cover { width: 64px; height: 96px; flex-basis: 64px; } .card-heading { flex-direction: column; gap: $space-2; } h1 { font-size: 26px; } h2 { font-size: 16px; } .status { white-space: normal; } .dates { margin: $space-4 0; } }

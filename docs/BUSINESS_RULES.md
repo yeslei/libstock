@@ -688,9 +688,92 @@ Entidades: `users`, `profiles`, `clients`, `employees`, `roles`, `user_roles`
 
 Status: `PENDING`
 
-A exclusão física de usuários não pertence ao contrato implementado. Até serem definidos os impactos sobre histórico, auditoria e referências de circulação, a interface exibe a ação desabilitada e orienta o administrador a usar a inativação. Não existe endpoint `DELETE` para usuários.
+A exclusão física de usuários não pertence ao contrato implementado. Até serem
+definidos os impactos sobre histórico, auditoria e referências de circulação,
+a interface exibe a ação desabilitada e orienta o administrador a usar a
+inativação. Não existe endpoint `DELETE` para usuários.
 
-## 17. Controle de pendências e penalização de clientes
+## 17. Referência UX para a V2
+
+Estado: `APPROVED` para a direção visual solicitada; funcionalidades de circulação permanecem `PENDING` até definição dos contratos e implementação.
+
+- Versão-alvo: V2.
+- Referência: Figma LibStock — UX V2, incluindo a seção de complementos.
+- Home e login usam fundo branco e cabeçalho verde escuro; componentes compartilhados apresentam dados reais da API.
+- A referência descreve reserva de compra e bloqueio de venda de exemplares didáticos. Estes requisitos ainda não equivalem a endpoints implementados.
+- Prazo de devolução, prazo/expiração da reserva e política de pendências não são inferidos de datas ilustrativas.
+- A proposta de empréstimo direto no balcão exige validação, conforme anotação do próprio Figma.
+- Matriz de implementação, limitações e validação: [V2_IMPLEMENTATION.md](V2_IMPLEMENTATION.md).
+
+## 18. V2 — detalhes e solicitações do cliente
+
+Estado: `APPROVED` para o recorte inicial solicitado em 03/10/2026; as alterações de acompanhamento da seção 19 substituem os limites abaixo. Implementação e
+validação detalhadas em `V2_IMPLEMENTATION.md`.
+
+- A busca global apresenta resultados na home; cada card abre `/livros/:id`.
+- Detalhes são públicos e respeitam a visibilidade vigente do catálogo.
+- `GET /api/v1/catalog/books/{id}` retorna disponibilidade por modalidade:
+  empréstimo, venda e consulta local. O frontend não a deduz do gênero.
+- Empréstimo conta exemplares didáticos ativos e `AVAILABLE`; venda conta
+  comerciais ativos e `AVAILABLE`. Exemplares em vendas pendentes/confirmadas
+  são excluídos. Somente o backend decide a elegibilidade.
+- Consulta local permanece explicitamente não configurada, conforme confirmação
+  do usuário; a disponibilidade é `null`, sem simular uma quantidade.
+- `POST /api/v1/loan-requests` e `POST /api/v1/purchase-requests` exigem papel
+  `USER`, usuário/perfil ativo, registro de cliente e ausência de penalidade.
+  O cliente é obtido da autenticação, nunca do corpo da requisição.
+- A data pretendida de retirada deve ser hoje ou posterior, no calendário de
+  `America/Sao_Paulo`. O prazo do empréstimo é um mês de calendário, limitado ao
+  último dia do próximo mês quando necessário (31/01 → 28/02, ou 29/02 em ano
+  bissexto). O backend calcula a devolução; o frontend mostra uma prévia somente leitura.
+- Uma solicitação fica `PENDING`, vinculada à obra, ao cliente e à data de
+  retirada. Não equivale à retirada ou à venda concluída. Não altera o estado
+  físico, não retém exemplar e não garante disponibilidade futura.
+- Existe no máximo uma solicitação pendente por cliente/obra em cada modalidade;
+  empréstimo e compra possuem unicidade independente.
+- A criação verifica disponibilidade atual, trava cliente/obra/exemplar durante
+  a transação e persiste somente após validar os requisitos. Conflitos de
+  duplicidade são protegidos por índices únicos; falhas provocam rollback.
+- Uma solicitação de compra exige exemplar comercial disponível. Didáticos
+  nunca habilitam essa solicitação. A compra é finalizada no balcão; a tela
+  orienta o cliente a informar seu e-mail cadastrado na retirada.
+- A auditoria de criação é registrada no banco na mesma transação, identificando
+  o cliente em `new_value.client_id`; não há funcionário fictício.
+- O snackbar de sucesso só aparece após resposta de persistência da API.
+
+### Limites deste recorte
+
+Estado: `PENDING` para atendimento/retirada pelo funcionário, cancelamento,
+expiração, histórico visual, fila/prioridade, retenção de exemplares, registro
+efetivo de empréstimo/venda e reserva de compra de exemplares indisponíveis.
+`purchase_requests` registra a intenção de retirada de exemplar disponível;
+`purchase_reservations` continua sendo a estrutura futura da fila de compra
+de exemplares indisponíveis. Não se alteram os triggers existentes dessa fila.
+
+## 19. V2 — acompanhamento e integridade da circulação
+
+Estado: `APPROVED` conforme o fluxo de acompanhamento solicitado em 03/10/2026.
+
+- As consultas do cliente usam o usuário autenticado; não recebem identidade, estado ou posição de fila do frontend.
+- Somente solicitações de empréstimo sem retirada confirmada e empréstimos OPEN aparecem em Meus empréstimos. Retirada e devolução são exclusivas de SELLER/ADMINISTRATOR com cadastro de funcionário ativo.
+- O empréstimo efetivo começa na retirada real. A devolução é um mês de calendário após essa retirada; a data da solicitação é uma prévia.
+- Atraso significa que a data de negócio em America/Sao_Paulo ultrapassou a data de devolução nesse mesmo calendário. A data de vencimento ainda não conta como atraso.
+- Cliente com usuário/perfil inativo, penalidade cadastrada ou empréstimo OPEN em atraso não pode solicitar empréstimo, solicitar compra, entrar na fila ou concluir retirada/compra. A devolução continua permitida para regularizar o exemplar.
+- Compra usa o domínio existente PurchaseReservation: WAITING, NOTIFIED e FULFILLED. NOTIFIED é o estado interno de disponibilidade para retirada; não significa envio de notificação V3.
+- Solicitação de compra disponível é vinculada a uma reserva NOTIFIED com exemplar comercial. A intenção da data de retirada fica em PurchaseRequest; os estados operacionais pertencem à reserva, sem um segundo ciclo de estados.
+- A fila usa a ordem persistida no backend. A posição exibida conta somente WAITING anteriores da mesma obra. Destinar um exemplar atende o primeiro WAITING; novas solicitações de compra não podem passar essa fila.
+- Somente exemplares comerciais ativos podem atender compras. Exemplares destinados são excluídos da disponibilidade pública e protegidos de empréstimo, inativação, conversão, troca de obra e venda a outro cliente, inclusive no banco.
+- Destinação ao cliente mantém o status físico AVAILABLE; uma venda confirmada aplica SOLD e conclui a reserva de forma atômica. Uma falha mantém o exemplar e a reserva anteriores.
+- A auditoria de transições registra o funcionário que executou a operação. A devolução por outro funcionário não atribui a auditoria ao responsável pela retirada original.
+- Minhas reservas inclui somente WAITING/NOTIFIED; compras concluídas não aparecem. Meus empréstimos e Minhas reservas possuem mensagens explícitas para listas vazias.
+
+Estado: `PENDING` para política de cancelamento, ausência de retirada, expiração e tratamento do primeiro cliente da fila que ficou inelegível. O backend não inventa prazos: expires_at só é apresentado quando existente.
+
+Limitação técnica: a solicitação de empréstimo não retém exemplar. A disponibilidade é revalidada na retirada. Consulta local continua não configurada por decisão expressa do usuário.
+
+Rastreabilidade e pendências para os devs: [V2_REVIEW.md](V2_REVIEW.md).
+
+## 20. Controle de pendências e penalização de clientes
 
 Status: `IMPLEMENTED`
 Versão: V2
@@ -804,3 +887,12 @@ A reserva ainda não está integrada ao controle de pendências.
   concorrência e rejeição atômica pelo servidor.
 
 Detalhes e condições de operação em [RELEASE.md](RELEASE.md).
+
+## Compatibilidade após integração com a main — PR #118
+
+Estado: `PENDING` para unificação dos contratos de circulação.
+
+- Os endpoints diretos de empréstimo/venda/pendências recebidos da main permanecem disponíveis, junto aos endpoints de confirmação das solicitações V2.
+- O empréstimo direto (`LoanService`) mantém o prazo existente de 15 dias corridos. A confirmação da solicitação V2 (`CirculationService`) mantém um mês de calendário. A divergência exige uma decisão explícita e unificação futura; não foi alterada silenciosamente na resolução de conflitos.
+- O serviço de pendências recebido da main usa vencimento por instante (`due_date < now()`); o acompanhamento V2 usa o calendário de America/Sao_Paulo. A sincronização das políticas e da penalização entre os serviços permanece pendente.
+- A home mantém a disponibilidade por modalidade e os links para detalhes da V2. O contrato administrativo de consulta de disponibilidade e o cadastro de exemplares foram preservados.
