@@ -197,7 +197,7 @@ As transições são auditadas e falhas provocam rollback. Sem autenticação: 4
 
 ### Consultas de balcão V2 (somente leitura)
 
-Todos os GET abaixo ficam sob `/api/v1/staff`, exigem `SELLER` ou `ADMINISTRATOR` e funcionário com cadastro ativo (usuário e perfil ativos); caso contrário respondem 403 `employee_record_required`. Sem token: 401; `USER` e `STOCK_KEEPER`: 403 `permission_denied`. `q` é busca parcial sem diferenciar maiúsculas (máx. 100 caracteres; `%` e `_` são literais); `limit` vai de 1 a 100; `client_id` precisa ser inteiro positivo (422 caso contrário). Ordenação determinística. Nenhuma consulta altera dados.
+Todos os GET abaixo ficam sob `/api/v1/staff`, exigem `SELLER` ou `ADMINISTRATOR` e funcionário com cadastro ativo. Sem token: 401; usuário inativo: 403 `user_inactive` (autenticação); perfil/funcionário inativo ou ausente: 403 `employee_record_required`; `USER` e `STOCK_KEEPER`: 403 `permission_denied`. `q` é busca parcial sem diferenciar maiúsculas (máx. 100 caracteres; `%` e `_` são literais); `limit` vai de 1 a 100; `client_id` precisa ser inteiro positivo (422 caso contrário). Ordenação determinística. Nenhuma consulta altera dados.
 
 | Endpoint | Parâmetros | Resposta (200) |
 | --- | --- | --- |
@@ -208,7 +208,9 @@ Todos os GET abaixo ficam sob `/api/v1/staff`, exigem `SELLER` ou `ADMINISTRATOR
 
 `client` é `{id, name, email, is_active, is_penalized, has_overdue_loan, eligible}`; `eligible` usa o mesmo predicado de `client_eligibility.py` aplicado nas confirmações. `can_allocate` é verdadeiro somente para a primeira reserva WAITING da obra com cliente elegível e exemplar comercial livre; caso contrário `allocation_blocked_reason` é `NOT_FIRST_IN_QUEUE`, `CLIENT_INELIGIBLE`, `NO_FREE_COPY` ou `BOOK_INACTIVE`. Cliente inelegível na frente da fila continua bloqueando a destinação (sem salto automático).
 
-Pendências do cliente reutilizam o endpoint existente `GET /api/v1/clients/{id}/pendencies` (`SELLER` ou `ADMINISTRATOR`). Limitação técnica herdada: ele sincroniza a penalização automática do cliente antes de responder (efeito de escrita num GET) e não exige cadastro de funcionário ativo.
+GET `/api/v1/staff/clients/{client_id}/pendencies` (mesmos papéis e guard; 404 `client_not_found`; `client_id` inteiro positivo): somente leitura, devolve `{client: {id, name, email, is_active, is_penalized, has_overdue_loan, eligible}, overdue_loans: [mesmo item de /staff/loans com status OVERDUE e days_late]}`. Atraso pela regra V2 (data de negócio em America/Sao_Paulo; vencer hoje não é atraso). Não grava nada nem sincroniza penalidade.
+
+O endpoint legado `GET /api/v1/clients/{id}/pendencies` não é usado pelo balcão: ele sincroniza a penalização automática (escreve num GET), usa `due_date < now()` e não exige funcionário ativo. Comportamento herdado, não alterado.
 
 Erros de consulta inesperados retornam 500 `desk_query_error` sem detalhes de SQL.
 

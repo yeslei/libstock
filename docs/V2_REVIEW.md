@@ -93,7 +93,7 @@ Não entram neste repasse: histórico do cliente, notificações V3, pagamentos 
 | SELLER/ADMINISTRATOR | GET `/api/v1/staff/loan-requests` | Solicitações pendentes com exemplares elegíveis |
 | SELLER/ADMINISTRATOR | GET `/api/v1/staff/loans` | Empréstimos ativos e atraso |
 | SELLER/ADMINISTRATOR | GET `/api/v1/staff/purchase-reservations` | Reservas WAITING/NOTIFIED e `can_allocate` |
-| SELLER/ADMINISTRATOR | GET `/api/v1/clients/{id}/pendencies` | Pendências (endpoint existente) |
+| SELLER/ADMINISTRATOR | GET `/api/v1/staff/clients/{id}/pendencies` | Pendências somente leitura (regra V2) |
 | SELLER/ADMINISTRATOR | POST `/api/v1/staff/loan-requests/{id}/confirm-pickup` | `{copy_id}`; devolve ID do Loan |
 | SELLER/ADMINISTRATOR | POST `/api/v1/staff/loans/{id}/confirm-return` | Sem corpo |
 | SELLER/ADMINISTRATOR | POST `/api/v1/staff/books/{id}/allocate-purchase` | Sem corpo; primeiro WAITING |

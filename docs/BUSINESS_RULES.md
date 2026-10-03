@@ -870,8 +870,9 @@ Estado: `APPROVED` para o recorte de telas e consultas solicitado em 03/10/2026;
 - Decisão pendente (não alterada): o enunciado "alocar para a primeira reserva elegível" conflita com a regra aprovada de que o primeiro cliente da fila, se inelegível, bloqueia a destinação. A tela segue a regra aprovada: apenas a primeira reserva da fila pode receber exemplar e o bloqueio é explicado. Pular clientes inelegíveis exige decisão de negócio e mudança no backend.
 - Decisão pendente: prazo de retirada da reserva destinada, ausência, cancelamento e expiração. A tela exibe `expires_at` somente se já existir e sinaliza reserva expirada sem oferecer ação; a venda de reserva expirada é recusada pelo backend (`reservation_expired`).
 - Decisão pendente: unificação do prazo de devolução entre o fluxo transacional antigo (15 dias) e a retirada V2 (um mês de calendário). A tela de balcão não exibe prazo antes da retirada e não unifica as regras.
-- Limitação técnica: as consultas retornam no máximo `limit` itens (até 100), sem paginação. A posição na fila é calculada por reserva na consulta.
-- Limitação técnica: a consulta de pendências reutiliza `GET /api/v1/clients/{id}/pendencies`, que sincroniza a penalização automática (efeito de escrita num GET) e não exige cadastro de funcionário ativo.
+- Limitação técnica: as consultas retornam no máximo `limit` itens (até 100), sem paginação; a tela avisa quando o limite é atingido. A posição na fila é calculada por reserva na consulta.
+- Regra aprovada: a consulta de pendências do balcão é `GET /api/v1/staff/clients/{id}/pendencies`, somente leitura, com atraso pela regra V2 (calendário de America/Sao_Paulo) e sem sincronizar penalidade.
+- Limitação técnica / decisão pendente: o endpoint V1 `GET /api/v1/clients/{id}/pendencies` permanece como estava (comportamento herdado, não alterado): sincroniza a penalização com regra de atraso por instante e não exige funcionário ativo. A divergência V1/V2 de atraso e de sincronização de penalidade aguarda decisão de unificação; não é classificada como defeito. O balcão não o utiliza.
 - Fora do escopo: venda direta no balcão sem reserva, comprovante digital, cancelamento de reservas, notificações e gestão manual de penalidade pela interface.
 
 ## Política operacional de promoção de release — Issues #113 e #120

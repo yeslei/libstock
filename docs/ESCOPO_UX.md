@@ -560,7 +560,7 @@ A V1 estará coerente com os papéis quando:
 | Todos | Início / Explorar livros | `/`, `/explorar` | `/api/v1/catalog/*` | Funcional |
 | `USER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
 | `SELLER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
-| `SELLER`, `ADMINISTRATOR` | Balcão (V2) | `/balcao` | `/api/v1/staff/*` (consultas e confirmações V2), `/api/v1/clients/{id}/pendencies` | Funcional |
+| `SELLER`, `ADMINISTRATOR` | Balcão (V2) | `/balcao` | `/api/v1/staff/*` (consultas e confirmações V2), `/api/v1/staff/clients/{id}/pendencies` | Funcional |
 | `STOCK_KEEPER` | Cadastrar exemplar | `/gestao/acervo` | `/api/v1/books/*`, `/api/v1/copies/` | Funcional |
 | `ADMINISTRATOR` | Cadastrar exemplar / Gestão de usuários | `/gestao/acervo`, `/gestao/usuarios` | acervo e usuários | Funcional |
 
