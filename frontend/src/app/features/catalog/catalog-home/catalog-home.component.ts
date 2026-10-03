@@ -1,14 +1,14 @@
 import { AsyncPipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
-import { catchError, map, of, startWith } from 'rxjs';
+import { Router, RouterLink } from '@angular/router';
+import { catchError, map, of, startWith, tap } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { CatalogCapability, capabilitiesFor } from '../models/catalog-capabilities';
-import { BookOffer, CatalogBook, Genre, LoadState } from '../models/catalog.model';
+import { BookAvailability, BookOffer, CatalogBook, Genre, LoadState } from '../models/catalog.model';
 import { CatalogAdminService } from '../services/catalog-admin.service';
 import { CatalogSearchCriterion, CatalogService } from '../services/catalog.service';
 
@@ -31,6 +31,7 @@ export class CatalogHomeComponent {
   private readonly catalog = inject(CatalogService);
   private readonly catalogAdmin = inject(CatalogAdminService);
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly user = toSignal(this.auth.user$, { initialValue: null });
@@ -40,10 +41,15 @@ export class CatalogHomeComponent {
   );
 
   protected readonly canManageCatalog = computed(() => this.capabilities().has('manageCatalog'));
+  protected readonly isAuthenticated = computed(() => this.user() !== null);
+  protected readonly canServeCounter = computed(() => this.capabilities().has('counterService'));
+  protected readonly canManageStock = computed(() => this.capabilities().has('manageStock'));
+  protected readonly canRegisterCopy = computed(() => this.capabilities().has('registerCopy'));
 
   /** Livros retirados do destaque nesta sessão, para sumirem sem recarregar. */
   private readonly unfeatured = signal<ReadonlySet<number>>(new Set());
   protected readonly featuredError = signal<string | null>(null);
+  protected readonly availability = signal<Record<number, LoadState<BookAvailability>>>({});
 
   protected readonly genres$ = this.catalog.getFeaturedGenres().pipe(
     map((data): LoadState<Genre[]> => ({ status: 'loaded', data })),
@@ -57,6 +63,7 @@ export class CatalogHomeComponent {
   );
 
   protected readonly books$ = this.catalog.getFeaturedBooks().pipe(
+    tap((books) => this.loadAvailability(books)),
     map((data): LoadState<CatalogBook[]> => ({ status: 'loaded', data })),
     startWith<LoadState<CatalogBook[]>>({ status: 'loading' }),
     catchError(() =>
@@ -90,13 +97,45 @@ export class CatalogHomeComponent {
       .searchBooks(this.searchCriterion(), value)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (data) => this.searchState.set({ status: 'loaded', data }),
+        next: (data) => {
+          this.loadAvailability(data);
+          this.searchState.set({ status: 'loaded', data });
+        },
         error: () =>
           this.searchState.set({
             status: 'error',
             message: 'Não foi possível realizar a busca. Tente novamente.',
           }),
       });
+  }
+
+  protected availabilityFor(bookId: number): LoadState<BookAvailability> | undefined {
+    return this.availability()[bookId];
+  }
+
+  private loadAvailability(books: CatalogBook[]): void {
+    for (const book of books) {
+      if (this.availability()[book.id]) continue;
+      this.availability.update((current) => ({
+        ...current,
+        [book.id]: { status: 'loading' },
+      }));
+      this.catalog
+        .getAvailability(book.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (data) =>
+            this.availability.update((current) => ({
+              ...current,
+              [book.id]: { status: 'loaded', data },
+            })),
+          error: () =>
+            this.availability.update((current) => ({
+              ...current,
+              [book.id]: { status: 'error', message: 'Disponibilidade indisponível.' },
+            })),
+        });
+    }
   }
 
   protected clearSearch(): void {
@@ -125,6 +164,35 @@ export class CatalogHomeComponent {
       style: 'currency',
       currency: 'BRL',
     }).format(Number(offer.price));
+  }
+
+  protected primaryOffer(book: CatalogBook): BookOffer | null {
+    return book.offers.find((offer) => offer.available) ?? book.offers[0] ?? null;
+  }
+
+  protected actionLabel(book: CatalogBook): string {
+    const offer = this.primaryOffer(book);
+    if (offer === null || (!offer.available && !offer.can_reserve)) return 'Indisponível';
+    if (!offer.available) return this.canServeCounter() ? 'Registrar reserva' : 'Reservar compra';
+    if (this.canServeCounter()) {
+      return offer.destination === 'COMMERCIAL' ? 'Registrar venda' : 'Registrar empréstimo';
+    }
+    return offer.destination === 'COMMERCIAL' ? 'Comprar' : 'Pedir emprestado';
+  }
+
+  protected actionDisabled(book: CatalogBook): boolean {
+    const offer = this.primaryOffer(book);
+    return offer === null || (!offer.available && !offer.can_reserve);
+  }
+
+  protected startTransaction(book: CatalogBook): void {
+    if (!this.isAuthenticated()) {
+      void this.router.navigate(['/login'], {
+        queryParams: { redirectTo: this.router.url },
+      });
+      return;
+    }
+    console.info('Fluxo transacional pendente para o livro', book.id);
   }
 
   /** US04: gestor tira o título do destaque direto da vitrine. */
