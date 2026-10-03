@@ -858,33 +858,34 @@ O serviço de consulta e sincronização de penalização permanece preparado pa
 
 A reserva ainda não está integrada ao controle de pendências.
 
-## Política operacional de promoção de release — Issue #113
+## Política operacional de promoção de release — Issues #113 e #120
 
-- Status: `APPROVED` — simplificação autorizada pelo usuário em 2026-10-03;
-  implementação e testes locais não significam ativação ou execução real.
-- Versão-alvo: pipeline simplificado da Issue #113; não altera regras do domínio
-  da API.
-- Endpoint/entidades de negócio: não se aplica; refs Git `integracao`, `main`
-  e tag de release.
-- Regra aprovada: após disparo manual, o pipeline sempre usa a ponta remota de
-  `integracao` e faz merge direto para `main`, sem PR de promoção. A CI é
-  independente e não é repetida pelo pipeline. O operador promove uma integração
-  já validada. Respeitar proteções sem force push ou bypass.
-- Regra aprovada: a versão incrementa a maior tag remota estável
-  `vMAJOR.MINOR.PATCH` conforme a escolha manual `patch` (padrão), `minor`
-  ou `major`, zerando os componentes inferiores. Sem tags estáveis, usa
-  `v0.0.0` como base do incremento escolhido.
-  Tags de pré-release e outros formatos são ignorados. A tag anotada aponta
-  para o commit resultante em `main`; não altera versões de pacotes ou da API.
-- Regra aprovada: conflito, ausência de novidades, colisão de tag, avanço
-  detectado das branches ou rejeição do servidor impedem publicação parcial.
-  Render e Vercel usam as integrações Git existentes, sem gatilhos duplicados.
-- Limitação técnica: o workflow manual precisa estar na branch padrão e o helper
-  em `integracao`. Proteções incompatíveis com merge direto recusam o push.
-  A App e a configuração dos provedores não foram verificadas nesta alteração.
-  A serialização do workflow não bloqueia escritores externos.
-- Testes esperados: incremento automático, merge/tag locais, conflitos,
-  concorrência e rejeição atômica pelo servidor.
+- Status: `APPROVED` — promoção por PR, aprovação automática e merge normal
+  com preservação dos commits originais autorizados pelo usuário em 2026-10-03; substitui a promoção direta
+  anterior. Não altera regras do domínio da API.
+- Regra aprovada: após disparo manual, abrir PR de `integracao` para `main`,
+  aguardar a CI existente, aprovar com identidade diferente do autor do PR e
+  solicitar auto-merge com merge commit, sem rebase ou squash. Respeitar proteções sem bypass.
+- Regra aprovada: calcular a versão pela maior tag remota estável
+  `vMAJOR.MINOR.PATCH` e escolha `patch` (padrão), `minor` ou `major`, zerando
+  componentes inferiores. Sem tags estáveis, usar `v0.0.0` como base.
+- Regra aprovada: somente após o merge de um PR de promoção, publicar tag no
+  SHA resultante daquele PR e criar a GitHub Release com notas automáticas.
+  Não criar commit adicional para a versão ou alterar versões de pacotes/API.
+  PR fechado sem merge não publica Release. Não sobrescrever tags existentes.
+- Regra aprovada: Render e Vercel continuam usando o merge em `main` via suas
+  integrações Git existentes, sem deploy adicional na criação da Release.
+- Limitação técnica: aprovação automática exige permissão da GitHub App para
+  PRs e configuração de aprovação por Actions; auto-merge/merge commits precisam estar
+  habilitados. Exigências de Code Owners ou outras proteções podem exigir
+  ação humana. Conflitos não são resolvidos nem ignorados automaticamente.
+- Limitação técnica: merge, tag e criação de Release não são atômicos. Uma
+  falha da API após o merge deve ser corrigida repetindo o job de publicação.
+  Tags já publicadas são reutilizadas apenas se apontarem para o SHA correto.
+- Limitação técnica: `integracao` não é reescrita pelo workflow. O merge preserva
+  os SHAs e autores originais e adiciona somente o commit de merge do PR.
+- Testes esperados: escolhas de versão, metadados de PR, origem interna,
+  SHA integrado, colisão de tag, autorização, falha da API e repetição segura.
 
 Detalhes e condições de operação em [RELEASE.md](RELEASE.md).
 
