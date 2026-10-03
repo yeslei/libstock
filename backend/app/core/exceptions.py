@@ -1,9 +1,17 @@
 class ApplicationError(Exception):
-    def __init__(self, message: str, code: str, status_code: int) -> None:
+    def __init__(
+        self,
+        message: str,
+        code: str,
+        status_code: int,
+        details: dict | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.code = code
         self.status_code = status_code
+        # Dados estruturados opcionais (ex.: motivos de um bloqueio de domínio).
+        self.details = details
 
 
 class DuplicateEmailError(ApplicationError):
@@ -244,4 +252,45 @@ class ClientPenaltyPersistenceError(ApplicationError):
             "Não foi possível atualizar a situação de penalização do cliente.",
             "client_penalty_persistence_error",
             500,
+        )
+
+
+class CopyNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Exemplar não encontrado.", "copy_not_found", 404)
+
+
+class CopyDeletionBlockedError(ApplicationError):
+    """Exclusão de exemplar bloqueada. O código é o do primeiro motivo.
+
+    Os motivos possíveis são `copy_not_available`, `copy_has_history` e
+    `last_active_copy`; todos seguem em `details["reasons"]`.
+    """
+
+    def __init__(self, reasons: list[dict], history: dict[str, int]) -> None:
+        message = "Exclusão bloqueada: " + " ".join(reason["message"] for reason in reasons)
+        super().__init__(
+            message,
+            reasons[0]["code"],
+            409,
+            {"reasons": reasons, "history": history},
+        )
+
+
+class CopyDeletionPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível excluir o exemplar. Nada foi alterado.",
+            "copy_delete_persistence_error",
+            500,
+        )
+
+
+class BookHasActiveOperationsError(ApplicationError):
+    def __init__(self, counts: dict[str, int], links: list[dict]) -> None:
+        super().__init__(
+            "A obra possui operações em andamento e não pode ser inativada.",
+            "book_has_active_operations",
+            409,
+            {"counts": counts, "links": links},
         )

@@ -46,3 +46,10 @@ class CopyResponse(CopyCreate):
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CopyDeleteResponse(BaseModel):
+    id: int
+    book_id: int
+    barcode: str
+    deleted: bool = True
