@@ -858,6 +858,22 @@ O serviço de consulta e sincronização de penalização permanece preparado pa
 
 A reserva ainda não está integrada ao controle de pendências.
 
+## 21. V2 — balcão operacional (Issue #122)
+
+Estado: `APPROVED` para o recorte de telas e consultas solicitado em 03/10/2026; reutiliza as regras da seção 19 sem alterá-las.
+
+- Regra aprovada: a área de balcão é restrita a funcionário ativo com papel `SELLER` ou `ADMINISTRATOR`, no frontend (guards) e no backend (papéis e cadastro de funcionário ativo). `STOCK_KEEPER` e `USER` não acessam.
+- Regra aprovada: as quatro operações (confirmar retirada, devolução, destinar exemplar e confirmar venda) usam apenas os POST V2 de `/api/v1/staff`. Os endpoints transacionais antigos (`/api/v1/loans`, `/api/v1/sales`) não são usados pela interface do balcão.
+- Regra aprovada: a interface exige seleção na lista (sem digitar IDs), confirmação explícita antes de cada alteração, bloqueio de envio duplicado e só mostra sucesso após resposta 2xx do backend; após qualquer resposta a lista é recarregada.
+- Regra aprovada: consultas de balcão são somente leitura e expõem apenas os dados necessários (nome, e-mail, situação de elegibilidade, obra, exemplar, datas).
+- Regra aprovada: os exemplares oferecidos para retirada e a contagem de comerciais livres usam a mesma definição de exemplar livre da confirmação (disponibilidade comum), incluindo exclusão de exemplares destinados e com venda em andamento.
+- Decisão pendente (não alterada): o enunciado "alocar para a primeira reserva elegível" conflita com a regra aprovada de que o primeiro cliente da fila, se inelegível, bloqueia a destinação. A tela segue a regra aprovada: apenas a primeira reserva da fila pode receber exemplar e o bloqueio é explicado. Pular clientes inelegíveis exige decisão de negócio e mudança no backend.
+- Decisão pendente: prazo de retirada da reserva destinada, ausência, cancelamento e expiração. A tela exibe `expires_at` somente se já existir e sinaliza reserva expirada sem oferecer ação; a venda de reserva expirada é recusada pelo backend (`reservation_expired`).
+- Decisão pendente: unificação do prazo de devolução entre o fluxo transacional antigo (15 dias) e a retirada V2 (um mês de calendário). A tela de balcão não exibe prazo antes da retirada e não unifica as regras.
+- Limitação técnica: as consultas retornam no máximo `limit` itens (até 100), sem paginação. A posição na fila é calculada por reserva na consulta.
+- Limitação técnica: a consulta de pendências reutiliza `GET /api/v1/clients/{id}/pendencies`, que sincroniza a penalização automática (efeito de escrita num GET) e não exige cadastro de funcionário ativo.
+- Fora do escopo: venda direta no balcão sem reserva, comprovante digital, cancelamento de reservas, notificações e gestão manual de penalidade pela interface.
+
 ## Política operacional de promoção de release — Issues #113 e #120
 
 - Status: `APPROVED` — promoção por PR, aprovação automática e merge normal

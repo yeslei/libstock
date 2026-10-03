@@ -408,6 +408,7 @@ mostrada desabilitada; a inativação é a ação operacional disponível.
 
 * Painel;
 * Explorar;
+* Balcão (V2, `/balcao`);
 * Clientes;
 * Perfil;
 * Sair.
@@ -559,9 +560,14 @@ A V1 estará coerente com os papéis quando:
 | Todos | Início / Explorar livros | `/`, `/explorar` | `/api/v1/catalog/*` | Funcional |
 | `USER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
 | `SELLER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
+| `SELLER`, `ADMINISTRATOR` | Balcão (V2) | `/balcao` | `/api/v1/staff/*` (consultas e confirmações V2), `/api/v1/clients/{id}/pendencies` | Funcional |
 | `STOCK_KEEPER` | Cadastrar exemplar | `/gestao/acervo` | `/api/v1/books/*`, `/api/v1/copies/` | Funcional |
 | `ADMINISTRATOR` | Cadastrar exemplar / Gestão de usuários | `/gestao/acervo`, `/gestao/usuarios` | acervo e usuários | Funcional |
 
 Venda, empréstimo, devolução e reserva permanecem planejados. Como ainda não
 possuem controllers e services transacionais completos, não aparecem como
 botões operacionais na navbar nem nos cards do catálogo.
+
+### Balcão V2 (`/balcao`) — Issue #122
+
+Área operacional da V2, separada das operações transacionais antigas da V1 (que seguem como planejadas nesta matriz). Aparece na navbar e no painel apenas para `SELLER` e `ADMINISTRATOR`. Abas: Clientes (busca por nome/e-mail e pendências), Retiradas (escolha do exemplar didático elegível), Devoluções e Reservas de compra (destinar exemplar à primeira reserva da fila e confirmar a venda). Cada alteração abre diálogo de confirmação, bloqueia envio duplicado e recarrega a lista após a resposta do backend. Cliente inelegível na frente da fila bloqueia a destinação; a interface explica o bloqueio e não pula a fila. Regras e decisões pendentes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21.
