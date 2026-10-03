@@ -5,7 +5,7 @@ from app.core.exceptions import ApplicationError
 from app.models.domain import ReservationStatus
 from app.repositories.staff_desk_repository import StaffDeskRepository
 from app.schemas.staff_desk_schema import (
-    EligibleCopy, StaffBook, StaffClient, StaffLoan, StaffLoanRequest, StaffPurchaseReservation,
+    EligibleCopy, StaffBook, StaffClient, StaffClientPendencies, StaffLoan, StaffLoanRequest, StaffPurchaseReservation,
 )
 from app.services.client_eligibility import is_client_eligible
 
@@ -74,6 +74,18 @@ class StaffDeskService:
 
     def loans(self, actor_id, term, client_id, limit):
         today, cutoff = self._guard(actor_id)
+        return self._loans(today, cutoff, term, client_id, limit)
+
+    def client_pendencies(self, actor_id, client_id):
+        """Somente leitura: não sincroniza penalidade; atraso pela regra V2 (calendário de São Paulo)."""
+        today, cutoff = self._guard(actor_id)
+        row = self._read(lambda: self.repository.client_summary(client_id, cutoff))
+        if row is None:
+            raise ApplicationError('Cliente não encontrado.', 'client_not_found', 404)
+        overdue = [loan for loan in self._loans(today, cutoff, None, client_id, 100) if loan.status == 'OVERDUE']
+        return StaffClientPendencies(client=self._client(row), overdue_loans=overdue)
+
+    def _loans(self, today, cutoff, term, client_id, limit):
         result = []
         for row in self._read(lambda: self.repository.open_loans(self._term(term), client_id, cutoff, limit)):
             loan, copy = row['Loan'], row['Copy']

@@ -48,6 +48,11 @@ class StaffDeskRepository(ClientRequestRepository):
             .where(_matches(term, User.name, User.email)).order_by(User.name, Client.id).limit(limit))
         return self.db.execute(statement).mappings().all()
 
+    def client_summary(self, client_id, cutoff):
+        statement = (select(*self._client_columns(cutoff)).select_from(Client)
+            .join(Profile, Profile.id == Client.id).join(User, User.id == Client.id).where(Client.id == client_id))
+        return self.db.execute(statement).mappings().first()
+
     def pending_loan_requests(self, term, client_id, cutoff, limit):
         statement = (select(LoanRequest, Book, *self._client_columns(cutoff)).select_from(LoanRequest)
             .join(Book, Book.id == LoanRequest.book_id).join(Client, Client.id == LoanRequest.client_id)

@@ -50,6 +50,11 @@ class StaffLoan(BaseModel):
     days_late: int
 
 
+class StaffClientPendencies(BaseModel):
+    client: StaffClient
+    overdue_loans: list[StaffLoan]
+
+
 AllocationBlock = Literal['NOT_FIRST_IN_QUEUE', 'CLIENT_INELIGIBLE', 'NO_FREE_COPY', 'BOOK_INACTIVE']
 
 
