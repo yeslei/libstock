@@ -80,6 +80,14 @@ export interface ClientPendencies {
   readonly overdue_loans: readonly StaffLoan[];
 }
 
+/** `GET /api/v1/staff/dashboard`: indicadores somente leitura do Painel (definições em BUSINESS_RULES, seção 21). */
+export interface StaffDashboard {
+  readonly active_loans: number;
+  readonly returns_today: number;
+  readonly waiting_reservations: number;
+  readonly pendencies: number;
+}
+
 /** Limites enviados explicitamente para que a tela saiba quando a lista foi truncada. */
 export const LIST_LIMIT = 50;
 export const CLIENT_SEARCH_LIMIT = 20;
@@ -107,6 +115,10 @@ function params(values: Record<string, string | number | null | undefined>): Htt
 @Injectable({ providedIn: 'root' })
 export class CounterService {
   private readonly http = inject(HttpClient);
+
+  getDashboard(): Observable<StaffDashboard> {
+    return this.http.get<StaffDashboard>(`${STAFF}/dashboard`);
+  }
 
   searchClients(q: string): Observable<StaffClient[]> {
     return this.http.get<StaffClient[]>(`${STAFF}/clients`, { params: params({ q: q.trim(), limit: CLIENT_SEARCH_LIMIT }) });
