@@ -3,10 +3,15 @@ name: Promove release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'SemVer sem v (exemplo: 1.2.3)'
+      bump:
+        description: Tipo de incremento da versao
         required: true
-        type: string
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: read
@@ -16,79 +21,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
-    if: github.ref == 'refs/heads/integracao'
-    runs-on: ubuntu-latest
-    outputs:
-      source: ${{ steps.prepare.outputs.source }}
-      candidate: ${{ steps.prepare.outputs.candidate }}
-      tag: ${{ steps.prepare.outputs.tag }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Prepara merge somente local
-        id: prepare
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
-          DISPATCH_SHA: ${{ github.sha }}
-          READ_TOKEN: ${{ github.token }}
-        run: |
-          export GIT_CONFIG_COUNT=1
-          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$READ_TOKEN" | base64 -w0)"
-          git config user.name 'LibStock Release'
-          git config user.email 'release@users.noreply.github.com'
-          mkdir -p "$RUNNER_TEMP/release"
-          python scripts/release/promote.py prepare --version "$RELEASE_VERSION" --state "$RUNNER_TEMP/release/state.json"
-          python -c 'import json,os; s=json.load(open(os.environ["RUNNER_TEMP"]+"/release/state.json")); assert s["source"] == os.environ["DISPATCH_SHA"], "integracao changed since dispatch; start a new manual run"'
-          git branch release-candidate HEAD
-          git bundle create "$RUNNER_TEMP/release/candidate.bundle" release-candidate
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-candidate
-          path: ${{ runner.temp }}/release/
-          retention-days: 1
-
-  validate-source:
-    needs: prepare
-    uses: ./.github/workflows/ci.yml
-    with:
-      ref: ${{ needs.prepare.outputs.source }}
-
-  validate-candidate:
-    needs: prepare
-    uses: ./.github/workflows/ci.yml
-    with:
-      ref: ${{ needs.prepare.outputs.candidate }}
-      candidate_artifact: release-candidate
-
-  publish:
-    needs: [prepare, validate-source, validate-candidate]
+  promote:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-candidate
-          path: ${{ runner.temp }}/release
-      - name: Importa candidato sem executar seus fontes
-        run: |
-          git fetch "$RUNNER_TEMP/release/candidate.bundle" refs/heads/release-candidate
-          git config user.name 'LibStock Release'
-          git config user.email 'release@users.noreply.github.com'
-      - name: Cria token dedicado da GitHub App
+      - name: Cria token da GitHub App
         id: app
         uses: actions/create-github-app-token@v1
         with:
@@ -96,28 +32,30 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
-      - name: Revalida protecoes e checks sem bypass
-        env:
-          RELEASE_TOKEN: ${{ steps.app.outputs.token }}
-        run: python scripts/release/policy.py --state "$RUNNER_TEMP/release/state.json"
-      - name: Publica main e tag atomicamente
-        env:
-          RELEASE_TOKEN: ${{ steps.app.outputs.token }}
-        run: |
-          # The credential exists only in this step's process environment.
-          export GIT_CONFIG_COUNT=1
-          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)"
-          python scripts/release/promote.py publish --state "$RUNNER_TEMP/release/state.json"
-      - name: Registra publicacao
-        env:
-          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_SHA: ${{ needs.prepare.outputs.candidate }}
-        run: |
-          printf 'Release %s publicada em main (%s).\n\nO push de main e o unico gatilho das integracoes Git de Render/Vercel. Verifique o deploy nos provedores; publicacao nao comprova deploy.\n' "$RELEASE_TAG" "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
 
-  invalid-ref:
-    if: github.ref != 'refs/heads/integracao'
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo 'Dispare este workflow exclusivamente na branch integracao.' >&2; exit 1
+      - uses: actions/checkout@v4
+        with:
+          ref: integracao
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Incrementa versao e promove integracao para main
+        id: release
+        env:
+          RELEASE_BUMP: ${{ inputs.bump }}
+        run: |
+          git config user.name 'LibStock Release'
+          git config user.email 'release@users.noreply.github.com'
+          python scripts/release/promote.py prepare --bump "$RELEASE_BUMP" --state "$RUNNER_TEMP/release.json"
+          python scripts/release/promote.py publish --state "$RUNNER_TEMP/release.json"
+
+      - name: Registra versao publicada
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_SHA: ${{ steps.release.outputs.candidate }}
+        run: |
+          printf 'Release %s publicada em main (%s).\nRender e Vercel seguem suas integracoes Git existentes.\n' "$RELEASE_TAG" "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
