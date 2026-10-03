@@ -14,12 +14,14 @@ import { ActionFlow, copyStatusLabel, destinationLabel, toLoadState } from './de
 
 /** Papéis que o backend autoriza em `PATCH /api/v1/books/{id}`. No balcão, apenas ADMINISTRATOR chega à tela. */
 const EDIT_ROLES = ['STOCK_KEEPER', 'MANAGER', 'ADMINISTRATOR'];
+/** Papéis que o backend autoriza em `POST /api/v1/copies/`. */
+const COPY_ROLES = ['STOCK_KEEPER', 'ADMINISTRATOR'];
 const GENRE_MAX = 100;
 
 /**
  * Frames "Funcionário / Acervo / Detalhes da obra" e "Exemplares": dados da obra e exemplares em leitura.
  * Categoria e inativação usam o endpoint existente de obras e só aparecem para os papéis autorizados.
- * Edição/conversão/exclusão de exemplar e reativação não têm endpoint nem regra aprovada (BUSINESS_RULES, seção 21).
+ * Inclusão de exemplar tem tela própria (/exemplares/novo). Edição/conversão/exclusão de exemplar e reativação não têm endpoint nem regra aprovada (BUSINESS_RULES, seção 21).
  */
 @Component({
   selector: 'app-counter-catalog-book',
@@ -38,6 +40,7 @@ export class CounterCatalogBookComponent {
 
   protected readonly state = signal<LoadState<StaffCatalogBookDetail>>({ status: 'loading' });
   protected readonly canEdit = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => EDIT_ROLES.includes(role));
+  protected readonly canAddCopy = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => COPY_ROLES.includes(role));
   protected readonly editing = signal(false);
   protected readonly genre = signal('');
   protected readonly genreMax = GENRE_MAX;

@@ -52,6 +52,9 @@
 
           <article class="card" aria-labelledby="exemplares-titulo">
             <h2 id="exemplares-titulo">Exemplares de “{{ s.data.title }}”</h2>
+            @if (canAddCopy && s.data.is_active) {
+              <a class="btn btn--primary" [routerLink]="['/balcao/acervo', s.data.id, 'exemplares', 'novo']">Novo exemplar</a>
+            }
             <p class="note">A obra guarda os dados bibliográficos. Cada exemplar possui código, finalidade e status próprios.</p>
             @if (!s.data.copies.length) {
               <p class="empty" role="status">Nenhum exemplar cadastrado para esta obra.</p>
