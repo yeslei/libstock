@@ -1,0 +1,33 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+:host { display: block; }
+.book-details { max-width: $client-content-max + 32px; margin: auto; padding: $space-8 $space-4 100px; }
+.back { display: inline-block; margin-bottom: $space-8; color: $verde-medio; font-size: $font-size-sm; text-decoration: none; }
+.book-layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 60px; }
+.cover { display: block; width: 290px; height: 450px; object-fit: contain; border: 1px solid $client-border; border-radius: 4px; }
+.cover--empty { display: flex; align-items: center; justify-content: center; background: $bg-subtle; color: $text-muted; }
+.book-content { padding-top: $space-4; min-width: 0; }
+h1 { margin: 0 0 $space-2; font-size: 32px; line-height: 1.2; color: $client-green; overflow-wrap: anywhere; }
+.author, .metadata { color: $text-muted; font-size: $font-size-sm; }
+.author { margin: 0 0 $space-4; }
+.metadata { margin-bottom: $space-6; }
+.availability { border-top: 1px solid $client-border; padding-top: $space-4; }
+h2 { font-size: 18px; margin: 0 0 $space-4; }
+.modality { margin-bottom: $space-3; border: 1px solid $client-border; border-radius: $radius-md; }
+summary { display: flex; justify-content: space-between; align-items: center; padding: $space-4; cursor: pointer; list-style: none; font-size: $font-size-sm; }
+summary::-webkit-details-marker { display: none; }
+summary small { display: block; margin-top: $space-1; color: $verde-medio; font-size: $font-size-xs; }
+.chevron { font-size: 22px; color: $client-green; }
+details[open] .chevron { transform: rotate(180deg); }
+.modality-content { margin: 0 $space-4; padding: $space-5 0 $space-4; border-top: 1px solid $client-border; font-size: $font-size-sm; }
+.dates { display: grid; grid-template-columns: 1fr 1fr; gap: $space-6; }
+label { display: flex; flex-direction: column; gap: $space-2; font-size: $font-size-xs; }
+input { min-width: 0; width: 100%; min-height: $control-height; box-sizing: border-box; padding: $space-3; border: 1px solid $client-border; border-radius: $radius-sm; font: inherit; font-size: $font-size-sm; }
+input[readonly] { background: $client-border; }
+label small, .hint { color: $text-muted; font-size: 12px; }
+.primary { margin-top: $space-4; min-height: $control-height; padding: $space-3 $space-4; border: 0; border-radius: $radius-sm; color: white; background: $client-green; font: inherit; cursor: pointer; }
+.primary:disabled { opacity: .65; cursor: default; }
+summary:focus-visible, input:focus-visible, button:focus-visible, a:focus-visible { @include focus-ring; }
+.snackbar { position: fixed; z-index: 100; bottom: $space-6; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: $space-4; max-width: calc(100vw - 32px); padding: $space-3 $space-4; background: $client-green; color: white; border-radius: $radius-sm; box-shadow: $shadow-md; font-size: $font-size-sm; }
+.snackbar button { background: none; border: 0; color: inherit; font-size: 24px; min-height: $target-min; min-width: $target-min; cursor: pointer; }
+@media (max-width: 767px) { .book-layout { grid-template-columns: 1fr; gap: $space-6; } .cover { width: min(290px, 100%); height: 380px; margin: auto; } .dates { grid-template-columns: 1fr; gap: $space-4; } h1 { font-size: 26px; } .snackbar { width: calc(100vw - 32px); box-sizing: border-box; } }

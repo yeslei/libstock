@@ -44,6 +44,25 @@ class CatalogRepository:
         )
         return list(self.db.scalars(statement))
 
+    def find_public_book(self, book_id: int) -> Book | None:
+        return self.db.scalar(self._catalog_books().where(Book.id == book_id))
+
+    def find_free_copies(self, book_id: int) -> list[Copy]:
+        from app.repositories.inventory_availability import free_copies_statement
+        return list(self.db.scalars(free_copies_statement(book_id)))
+
+    def find_free_copy_ids(self, book_ids: list[int]) -> set[int]:
+        from app.repositories.inventory_availability import free_copies_statement
+        return set(self.db.scalars(free_copies_statement().where(
+            Copy.book_id.in_(book_ids),
+        ).with_only_columns(Copy.id)))
+
+    def find_reservable_copy_ids(self, book_ids: list[int]) -> set[int]:
+        from app.repositories.inventory_availability import reservable_commercial_statement
+        return set(self.db.scalars(reservable_commercial_statement().where(
+            Copy.book_id.in_(book_ids),
+        ).with_only_columns(Copy.id)))
+
     @staticmethod
     def _escape_like(value: str) -> str:
         return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

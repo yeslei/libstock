@@ -5,6 +5,16 @@ import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
+    path: 'meus-emprestimos', canActivate: [authGuard, roleGuard], data: { roles: ['USER'], tracking: 'loans' },
+    title: 'Meus empréstimos · LibStock',
+    loadComponent: () => import('./features/client-tracking/client-tracking.component').then(m => m.ClientTrackingComponent),
+  },
+  {
+    path: 'minhas-reservas', canActivate: [authGuard, roleGuard], data: { roles: ['USER'], tracking: 'reservations' },
+    title: 'Minhas reservas · LibStock',
+    loadComponent: () => import('./features/client-tracking/client-tracking.component').then(m => m.ClientTrackingComponent),
+  },
+  {
     path: '',
     pathMatch: 'full',
     title: 'LibStock — Gestão de acervo',
@@ -15,10 +25,15 @@ export const routes: Routes = [
   },
   {
     path: 'explorar',
-    title: 'Explorar livros · LibStock',
+    redirectTo: '',
+    pathMatch: 'full',
+  },
+  {
+    path: 'livros/:id',
+    title: 'Detalhes do livro · LibStock',
     loadComponent: () =>
-      import('./features/catalog/explore-books/explore-books.component').then(
-        (m) => m.ExploreBooksComponent,
+      import('./features/catalog/book-details/book-details.component').then(
+        (m) => m.BookDetailsComponent,
       ),
   },
   {

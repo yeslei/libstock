@@ -1,17 +1,45 @@
 <header class="navbar">
-  <a class="navbar__brand" routerLink="/" aria-label="LibStock — página inicial">
-    <img src="/assets/logo-libstock-wordmark.png" alt="LibStock" width="132" height="32" />
-  </a>
-  <nav class="navbar__links" aria-label="Navegação principal">
-    @for (item of items(); track item.route) {
-      <a [routerLink]="item.route" routerLinkActive="navbar__link--active" [routerLinkActiveOptions]="{ exact: item.route === '/' }">{{ item.label }}</a>
-    }
-  </nav>
-  <div class="navbar__session">
-    @if (user()) {
-      <a routerLink="/painel">Conta</a>
-    } @else {
-      <a routerLink="/login">Entrar</a>
-    }
+  <div class="navbar__inner">
+    <a class="navbar__brand" routerLink="/" aria-label="LibStock — página inicial">LibStock</a>
+    <form class="navbar__search" role="search" (submit)="search($event)">
+      <button class="navbar__search-icon" type="submit" aria-label="Buscar">⌕</button>
+      <label class="visually-hidden" for="global-search">Buscar no acervo</label>
+      <input id="global-search" type="search" placeholder="Buscar por título, autor ou ISBN…" required
+        [value]="query()" (input)="query.set($any($event.target).value)" aria-describedby="global-search-criterion" />
+      <div class="navbar__search-options" id="global-search-criterion">
+        <label for="global-criterion">Buscar por</label>
+        <select id="global-criterion" [value]="criterion()" (change)="criterion.set($any($event.target).value)">
+          <option value="title">Título</option><option value="author">Autor</option>
+          <option value="isbn">ISBN</option><option value="barcode">Código de barras</option>
+        </select>
+      </div>
+    </form>
+    <nav class="navbar__links" aria-label="Navegação principal">
+      @for (item of items(); track item.label) {
+        @if (item.route) {
+          <a [routerLink]="item.route" routerLinkActive="navbar__link--active" ariaCurrentWhenActive="page"
+            [routerLinkActiveOptions]="{ exact: item.route === '/' }">{{ item.label }}</a>
+        } @else {
+          <span class="navbar__upcoming" aria-disabled="true" [attr.aria-label]="item.label + ' — em breve'" title="Em breve">{{ item.label }}</span>
+        }
+      }
+    </nav>
+    <div class="navbar__session">
+      @if (user(); as account) {
+        <details class="navbar__account" #accountMenu>
+          <summary #accountSummary [attr.aria-label]="'Menu da conta de ' + account.name"
+            (keydown.escape)="accountMenu.open = false; accountSummary.focus()">
+            {{ account.name.split(' ')[0] }} <span class="navbar__chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="navbar__account-links" (keydown.escape)="accountMenu.open = false; accountSummary.focus()">
+            <a routerLink="/painel" (click)="accountMenu.open = false">Minha conta</a>
+            <a routerLink="/como-funciona" (click)="accountMenu.open = false">Como funciona</a>
+            <button type="button" (click)="logout(); accountMenu.open = false" [disabled]="signingOut()">{{ signingOut() ? 'Saindo…' : 'Sair' }}</button>
+          </div>
+        </details>
+      } @else {
+        <a routerLink="/login">Entrar</a>
+      }
+    </div>
   </div>
 </header>
