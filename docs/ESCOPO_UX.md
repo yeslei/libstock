@@ -570,4 +570,15 @@ botões operacionais na navbar nem nos cards do catálogo.
 
 ### Balcão V2 (`/balcao`) — Issue #122
 
-Área operacional da V2, separada das operações transacionais antigas da V1 (que seguem como planejadas nesta matriz). Aparece na navbar e no painel apenas para `SELLER` e `ADMINISTRATOR`. Abas: Clientes (busca por nome/e-mail e pendências), Retiradas (escolha do exemplar didático elegível), Devoluções e Reservas de compra (destinar exemplar à primeira reserva da fila e confirmar a venda). Cada alteração abre diálogo de confirmação, bloqueia envio duplicado e recarrega a lista após a resposta do backend. Cliente inelegível na frente da fila bloqueia a destinação; a interface explica o bloqueio e não pula a fila. Regras e decisões pendentes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21.
+Área operacional da V2, separada das operações transacionais antigas da V1 (que seguem como planejadas nesta matriz). Aparece na navbar e no painel apenas para `SELLER` e `ADMINISTRATOR`. A área segue os frames "Funcionário" do Figma (arquivo `gjM1ugpgfNOl5tjngzH65P`, página "LibStock — UX V2"): menu lateral de 250px (Painel, Acervo, Clientes, Empréstimos, Devoluções, Vendas) que vira menu recolhível em telas menores. Cada alteração abre diálogo de confirmação, bloqueia envio duplicado e recarrega a lista após a resposta do backend. Cliente inelegível na frente da fila bloqueia a destinação; a interface explica o bloqueio e não pula a fila.
+
+Mapa frame → rota (estado atual):
+
+| Frame Figma | Rota | Situação |
+| --- | --- | --- |
+| Funcionário / Painel (3:133) | `/balcao/painel` | Conforme o frame; indicadores de `GET /api/v1/staff/dashboard` |
+| Funcionário / Empréstimos / Início (20:2) | `/balcao/emprestimos` | Conforme o frame |
+| Funcionário / Empréstimos / Solicitações de retirada (19:2) | `/balcao/emprestimos/solicitacoes` | Conforme o frame; "Fila desta obra" omitida (sem dado de fila de empréstimo no backend); notas "DEvs" do frame não são UI |
+| Empréstimos / Ativos (19:35), Devolução (3:219), Controle de pendências (8:69), Venda (3:238), Reservas de compra e estados (39:147 a 39:237, 39:639, 39:685), Novo empréstimo (39:519 a 39:609), Acervo (14:2, 8:81) | `/balcao/emprestimos/ativos`, `/balcao/devolucoes`, `/balcao/clientes`, `/balcao/vendas`, Acervo no catálogo público (`/`) | Funcionam com a implementação anterior dentro do novo layout; aguardando leitura dos frames |
+
+Regras e decisões pendentes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21.
