@@ -2,10 +2,12 @@ from datetime import datetime, time, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today
 from app.core.exceptions import ApplicationError
-from app.models.domain import ReservationStatus
+from app.models.domain import DestinationType, ReservationStatus
 from app.repositories.staff_desk_repository import StaffDeskRepository
 from app.schemas.staff_desk_schema import (
-    EligibleCopy, StaffBook, StaffClient, StaffClientPendencies, StaffDashboard, StaffLoan, StaffLoanRequest, StaffPurchaseReservation,
+    EligibleCopy, StaffBook, StaffCatalogBook, StaffCatalogBookDetail, StaffCatalogCopy, StaffClient,
+    StaffClientPendencies, StaffCopyBook, StaffCopyLookup, StaffDashboard, StaffLoan, StaffLoanRequest,
+    StaffPurchaseReservation,
 )
 from app.services.client_eligibility import is_client_eligible
 
@@ -132,4 +134,57 @@ class StaffDeskService:
                 allocated_copy_id=reservation.allocated_copy_id, allocated_copy_barcode=row['allocated_barcode'],
                 free_commercial_copies=available, can_allocate=waiting and blocked is None,
                 allocation_blocked_reason=blocked))
+        return result
+
+    @staticmethod
+    def _catalog_book(row):
+        book = row['Book']
+        return dict(id=book.id, title=book.title, author=book.author, isbn=book.isbn, genre=book.genre,
+                    is_active=book.is_active, total_copies=row['total_copies'],
+                    didactic_copies=row['didactic_copies'], commercial_copies=row['commercial_copies'])
+
+    def catalog_books(self, actor_id, term, limit):
+        """Acervo somente leitura para o balcão (obras e contagem de exemplares)."""
+        self._guard(actor_id)
+        rows = self._read(lambda: self.repository.catalog_books(self._term(term), limit))
+        return [StaffCatalogBook(**self._catalog_book(row)) for row in rows]
+
+    def catalog_book(self, actor_id, book_id):
+        self._guard(actor_id)
+        row = self._read(lambda: self.repository.catalog_book(book_id))
+        if row is None:
+            raise ApplicationError('Obra não encontrada.', 'book_not_found', 404)
+        copies = self._read(lambda: self.repository.book_copies(book_id))
+        return StaffCatalogBookDetail(**self._catalog_book(row), copies=[
+            StaffCatalogCopy(id=item['Copy'].id, barcode=item['Copy'].barcode, destination=item['Copy'].destination,
+                             status=item['Copy'].status, condition=item['Copy'].condition,
+                             sale_price=item['Copy'].sale_price, is_active=item['Copy'].is_active,
+                             free=bool(item['free']), allocated_for_purchase=bool(item['allocated_for_purchase']))
+            for item in copies])
+
+    def copy_lookup(self, actor_id, term, limit):
+        """Exemplares por código, ISBN, título ou autor. A venda só é possível para comercial livre."""
+        term = self._term(term)
+        if term is None:
+            raise ApplicationError('Informe o código do exemplar, o ISBN ou o título.', 'search_term_required', 422)
+        self._guard(actor_id)
+        rows = self._read(lambda: self.repository.copy_lookup(term, limit))
+        book_ids = sorted({row['Book'].id for row in rows})
+        free_counts = self._read(lambda: self.repository.free_commercial_counts(book_ids))
+        result = []
+        for row in rows:
+            copy, book, free = row['Copy'], row['Book'], bool(row['free'])
+            if copy.destination == DestinationType.DIDACTIC:
+                block = 'DIDACTIC'
+            elif not free:
+                block = 'NOT_AVAILABLE'
+            else:
+                block = None
+            result.append(StaffCopyLookup(
+                id=copy.id, barcode=copy.barcode, destination=copy.destination, status=copy.status,
+                condition=copy.condition, sale_price=copy.sale_price,
+                book=StaffCopyBook(id=book.id, title=book.title, author=book.author, isbn=book.isbn,
+                                   is_active=book.is_active),
+                free=free, free_commercial_copies=free_counts.get(book.id, 0), sellable=block is None,
+                sale_block_reason=block))
         return result

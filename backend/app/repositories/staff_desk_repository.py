@@ -1,8 +1,10 @@
 from datetime import datetime
-from sqlalchemy import exists, func, or_, select
+import re
+
+from sqlalchemy import and_, case, exists, false, func, or_, select
 from sqlalchemy.orm import aliased
 from app.models.domain import (
-    Book, Client, Copy, DestinationType, Loan, LoanStatus, Profile, PurchaseReservation, ReservationStatus,
+    Book, Client, Copy, CopyStatus, DestinationType, Loan, LoanStatus, Profile, PurchaseReservation, ReservationStatus,
 )
 from app.models.loan_request import LoanRequest
 from app.models.purchase_request import PurchaseRequest
@@ -19,6 +21,12 @@ def _contains(value: str) -> str:
 def _matches(term: str, *columns):
     pattern = _contains(term)
     return or_(*[column.ilike(pattern, escape='\\') for column in columns])
+
+
+def _matches_isbn(term: str, isbn_column):
+    """O ISBN é gravado compacto; o termo pode vir com hífens ou espaços."""
+    compact = re.sub(r'[\s-]', '', term)
+    return _matches(compact, isbn_column) if compact else false()
 
 
 class StaffDeskRepository(ClientRequestRepository):
@@ -38,11 +46,14 @@ class StaffDeskRepository(ClientRequestRepository):
                 Client.is_penalized.label('client_penalized'), overdue)
 
     @staticmethod
-    def _filtered(statement, term, client_id, *extra_columns):
+    def _filtered(statement, term, client_id, *extra_columns, isbn=None):
         if client_id is not None:
             statement = statement.where(Client.id == client_id)
         if term:
-            statement = statement.where(_matches(term, User.name, User.email, Book.title, Book.author, *extra_columns))
+            conditions = [_matches(term, User.name, User.email, Book.title, Book.author, *extra_columns)]
+            if isbn is not None:
+                conditions.append(_matches_isbn(term, isbn))
+            statement = statement.where(or_(*conditions))
         return statement
 
     def search_clients(self, term, cutoff, limit):
@@ -77,7 +88,7 @@ class StaffDeskRepository(ClientRequestRepository):
             .join(Copy, Copy.id == Loan.copy_id).join(Book, Book.id == Copy.book_id)
             .join(Client, Client.id == Loan.client_id).join(Profile, Profile.id == Client.id)
             .join(User, User.id == Client.id).where(Loan.status == LoanStatus.OPEN))
-        statement = self._filtered(statement, term, client_id, Copy.barcode)
+        statement = self._filtered(statement, term, client_id, Copy.barcode, Book.isbn, isbn=Book.isbn)
         return self.db.execute(statement.order_by(Loan.due_date, Loan.id).limit(limit)).mappings().all()
 
     def active_reservations(self, term, client_id, status, cutoff, limit):
@@ -121,3 +132,49 @@ class StaffDeskRepository(ClientRequestRepository):
             'pendencies': scalar(select(func.count(func.distinct(Loan.client_id))).where(
                 *self._overdue_conditions(Loan, cutoff))),
         }
+
+
+    @staticmethod
+    def _catalog_term(term):
+        return or_(_matches(term, Book.title, Book.author, Book.isbn), _matches_isbn(term, Book.isbn))
+
+    def catalog_books(self, term, limit):
+        """Obras com a contagem de exemplares ativos e não vendidos, por destinação."""
+        counted = and_(Copy.is_active.is_(True), Copy.status != CopyStatus.SOLD)
+        statement = (select(
+                Book,
+                func.count(case((counted, Copy.id))).label('total_copies'),
+                func.count(case((and_(counted, Copy.destination == DestinationType.DIDACTIC), Copy.id))).label('didactic_copies'),
+                func.count(case((and_(counted, Copy.destination == DestinationType.COMMERCIAL), Copy.id))).label('commercial_copies'))
+            .select_from(Book).outerjoin(Copy, Copy.book_id == Book.id).group_by(Book.id))
+        if term:
+            statement = statement.where(self._catalog_term(term))
+        return self.db.execute(statement.order_by(Book.title, Book.id).limit(limit)).mappings().all()
+
+    def catalog_book(self, book_id):
+        counted = and_(Copy.is_active.is_(True), Copy.status != CopyStatus.SOLD)
+        statement = (select(
+                Book,
+                func.count(case((counted, Copy.id))).label('total_copies'),
+                func.count(case((and_(counted, Copy.destination == DestinationType.DIDACTIC), Copy.id))).label('didactic_copies'),
+                func.count(case((and_(counted, Copy.destination == DestinationType.COMMERCIAL), Copy.id))).label('commercial_copies'))
+            .select_from(Book).outerjoin(Copy, Copy.book_id == Book.id).where(Book.id == book_id).group_by(Book.id))
+        return self.db.execute(statement).mappings().first()
+
+    def book_copies(self, book_id):
+        """Exemplares da obra com `free` (mesma definição de exemplar livre) e a marca de destinação a reserva."""
+        free_ids = free_copies_statement(book_id).with_only_columns(Copy.id)
+        allocated = exists().where(PurchaseReservation.allocated_copy_id == Copy.id,
+                                   PurchaseReservation.status == ReservationStatus.NOTIFIED)
+        statement = (select(Copy, Copy.id.in_(free_ids).label('free'), allocated.label('allocated_for_purchase'))
+            .where(Copy.book_id == book_id).order_by(Copy.id))
+        return self.db.execute(statement).mappings().all()
+
+    def copy_lookup(self, term, limit):
+        """Exemplares ativos por código, ISBN, título ou autor; `free` e estoque comercial livre pela definição comum."""
+        free_ids = free_copies_statement().with_only_columns(Copy.id)
+        statement = (select(Copy, Book, Copy.id.in_(free_ids).label('free'))
+            .join(Book, Book.id == Copy.book_id).where(Copy.is_active.is_(True))
+            .where(or_(_matches(term, Copy.barcode, Book.title, Book.author, Book.isbn), _matches_isbn(term, Book.isbn)))
+            .order_by(Book.title, Copy.id).limit(limit))
+        return self.db.execute(statement).mappings().all()

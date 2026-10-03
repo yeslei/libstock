@@ -5,7 +5,10 @@ from app.core.database import get_db
 from app.dependencies.authentication import require_roles
 from app.models.user import User
 from app.repositories.staff_desk_repository import StaffDeskRepository
-from app.schemas.staff_desk_schema import StaffClient, StaffClientPendencies, StaffDashboard, StaffLoan, StaffLoanRequest, StaffPurchaseReservation
+from app.schemas.staff_desk_schema import (
+    StaffCatalogBook, StaffCatalogBookDetail, StaffClient, StaffClientPendencies, StaffCopyLookup, StaffDashboard,
+    StaffLoan, StaffLoanRequest, StaffPurchaseReservation,
+)
 from app.services.staff_desk_service import StaffDeskService
 
 router = APIRouter(prefix='/api/v1/staff', tags=['Balcão do funcionário'])
@@ -53,3 +56,21 @@ def list_purchase_reservations(q: Term = None, client_id: ClientFilter = None,
                                status: Literal['WAITING', 'NOTIFIED'] | None = None, limit: Limit = 50,
                                user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
     return service.purchase_reservations(user.id, q, client_id, status, limit)
+
+
+@router.get('/books', response_model=list[StaffCatalogBook])
+def list_catalog_books(q: Term = None, limit: Limit = 50,
+                       user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
+    return service.catalog_books(user.id, q, limit)
+
+
+@router.get('/books/{book_id}', response_model=StaffCatalogBookDetail)
+def get_catalog_book(book_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+                     user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
+    return service.catalog_book(user.id, book_id)
+
+
+@router.get('/copies', response_model=list[StaffCopyLookup])
+def lookup_copies(q: Annotated[str, Query(min_length=1, max_length=100)], limit: Limit = 20,
+                  user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
+    return service.copy_lookup(user.id, q, limit)
