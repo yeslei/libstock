@@ -30,6 +30,10 @@ class UserRepository:
         )
         return self.db.scalar(statement)
 
+    def get_user_by_id(self, user_id: int) -> User | None:
+        """Consulta um usuário por identificador, sem aplicar regra de negócio."""
+        return self.find_by_id(user_id)
+
     def list_all(self, role_code: str | None = None) -> list[User]:
         statement = select(User).options(
             selectinload(User.roles).selectinload(UserRole.role)

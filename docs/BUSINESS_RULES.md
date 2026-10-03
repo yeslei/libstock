@@ -777,25 +777,30 @@ A reserva ainda não está integrada ao controle de pendências.
 
 ## Política operacional de promoção de release — Issue #113
 
-- Status: `APPROVED` — exceção autorizada pelo usuário em 2026-10-03;
+- Status: `APPROVED` — simplificação autorizada pelo usuário em 2026-10-03;
   implementação e testes locais não significam ativação ou execução real.
-- Versão-alvo: pipeline de promoção da Issue #113, com versão SemVer informada
-  no disparo manual; não altera regras do domínio da API.
+- Versão-alvo: pipeline simplificado da Issue #113; não altera regras do domínio
+  da API.
 - Endpoint/entidades de negócio: não se aplica; refs Git `integracao`, `main`
   e tag de release.
-- Regra aprovada: exclusivamente o pipeline de promoção, após disparo manual,
-  pode fazer merge direto de `integracao` para `main`, sem PR de promoção,
-  depois de validar a origem e o candidato. A tag deve apontar para o commit
-  resultante de `main`. Respeitar as proteções sem force push ou bypass.
-- Regra aprovada: publicação deve falhar explicitamente em conflito, versão
-  inválida, tag existente, validação falha ou proteção incompatível, sem
-  publicação parcial. O push de produção usa as integrações de deploy
-  existentes, sem criar gatilhos duplicados.
-- Limitação técnica: checks obrigatórios precisam estar registrados no SHA
-  candidato; build local não os substitui. O workflow manual precisa estar
-  registrado na branch padrão. App, configuração dos provedores e confirmação
-  de deploy permanecem pré-requisitos operacionais não verificados.
-- Testes esperados: merge/tag locais, versão, conflitos, tag duplicada,
-  concorrência, rejeição atômica e autorização/proteções via API simulada.
+- Regra aprovada: após disparo manual, o pipeline sempre usa a ponta remota de
+  `integracao` e faz merge direto para `main`, sem PR de promoção. A CI é
+  independente e não é repetida pelo pipeline. O operador promove uma integração
+  já validada. Respeitar proteções sem force push ou bypass.
+- Regra aprovada: a versão incrementa a maior tag remota estável
+  `vMAJOR.MINOR.PATCH` conforme a escolha manual `patch` (padrão), `minor`
+  ou `major`, zerando os componentes inferiores. Sem tags estáveis, usa
+  `v0.0.0` como base do incremento escolhido.
+  Tags de pré-release e outros formatos são ignorados. A tag anotada aponta
+  para o commit resultante em `main`; não altera versões de pacotes ou da API.
+- Regra aprovada: conflito, ausência de novidades, colisão de tag, avanço
+  detectado das branches ou rejeição do servidor impedem publicação parcial.
+  Render e Vercel usam as integrações Git existentes, sem gatilhos duplicados.
+- Limitação técnica: o workflow manual precisa estar na branch padrão e o helper
+  em `integracao`. Proteções incompatíveis com merge direto recusam o push.
+  A App e a configuração dos provedores não foram verificadas nesta alteração.
+  A serialização do workflow não bloqueia escritores externos.
+- Testes esperados: incremento automático, merge/tag locais, conflitos,
+  concorrência e rejeição atômica pelo servidor.
 
 Detalhes e condições de operação em [RELEASE.md](RELEASE.md).

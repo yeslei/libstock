@@ -159,6 +159,21 @@
         @if (offerPrice(offer); as price) { <span class="card__price" [class.card__price--out]="!offer.available">{{ price }}</span> }
       }
     </div>
+    @if (availabilityFor(book.id); as availabilityState) {
+      @switch (availabilityState.status) {
+        @case ('loading') { <span class="availability availability--loading">Verificando disponibilidade…</span> }
+        @case ('error') { <span class="availability availability--error">Disponibilidade indisponível</span> }
+        @case ('loaded') {
+          <span class="availability" [class.availability--available]="availabilityState.data.is_available" [class.availability--unavailable]="!availabilityState.data.is_available">
+            {{ availabilityState.data.is_available ? 'Disponível' : 'Indisponível' }}
+          </span>
+        }
+      }
+    }
+    <button class="btn btn--primary card__cta" type="button" [disabled]="actionDisabled(book)" (click)="startTransaction(book)">{{ actionLabel(book) }}</button>
+    @if (canRegisterCopy()) {
+      <a class="btn btn--outline card__manage" [routerLink]="['/obras', book.id, 'exemplares', 'novo']">Cadastrar exemplar</a>
+    }
     @if (featured && canManageCatalog()) {
       <button class="btn btn--outline card__manage" type="button" (click)="removeFromFeatured(book)">Remover destaque</button>
     }

@@ -47,10 +47,28 @@ def output(state):
     print(json.dumps(state))
 
 
-def prepare(version, state_path):
-    tag = version_tag(version)
+def next_tag(bump="patch"):
+    """Increment the greatest stable remote vMAJOR.MINOR.PATCH tag numerically."""
+    if bump not in ("patch", "minor", "major"):
+        raise ReleaseError("Invalid increment: choose patch, minor or major.")
+    versions = []
+    for line in git("ls-remote", "--refs", "--tags", "origin").splitlines():
+        ref = line.split("\t", 1)[1]
+        match = re.fullmatch(r"refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", ref)
+        if match:
+            versions.append(tuple(map(int, match.groups())))
+    major, minor, patch = max(versions, default=(0, 0, 0))
+    if bump == "major":
+        return f"v{major + 1}.0.0"
+    if bump == "minor":
+        return f"v{major}.{minor + 1}.0"
+    return f"v{major}.{minor}.{patch + 1}"
+
+
+def prepare(state_path, bump="patch"):
     if git("status", "--porcelain"):
         raise ReleaseError("Preparation requires a clean disposable checkout.")
+    tag = next_tag(bump)
     refs = remote_refs(tag)
     git("fetch", "--no-tags", "origin", "refs/heads/main:refs/remotes/origin/main", "refs/heads/integracao:refs/remotes/origin/integracao")
     base = git("rev-parse", "refs/remotes/origin/main")
@@ -100,14 +118,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     prep = sub.add_parser("prepare")
-    prep.add_argument("--version", required=True)
     prep.add_argument("--state", required=True)
+    prep.add_argument("--bump", choices=("patch", "minor", "major"), default="patch")
     pub = sub.add_parser("publish")
     pub.add_argument("--state", required=True)
     args = parser.parse_args()
     try:
         if args.command == "prepare":
-            prepare(args.version, args.state)
+            prepare(args.state, args.bump)
         else:
             publish(args.state)
     except (ReleaseError, ValueError, KeyError, OSError) as error:

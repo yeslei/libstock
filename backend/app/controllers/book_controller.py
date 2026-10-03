@@ -4,6 +4,7 @@ from app.dependencies.authentication import require_roles
 from app.dependencies.services import get_book_service
 from app.models.user import User
 from app.schemas.book_schema import (
+    BookAvailabilityResponse,
     BookCreate,
     BookDetailResponse,
     BookMetadataResponse,
@@ -35,10 +36,18 @@ def search_books(
     return book_service.search_books(params.title)
 
 
+@router.get("/{book_id}/availability", response_model=BookAvailabilityResponse)
+def get_book_availability(
+    book_id: int,
+    book_service: BookService = Depends(get_book_service),
+) -> BookAvailabilityResponse:
+    return book_service.get_book_availability(book_id)
+
+
 @router.get("/metadata/{isbn}", response_model=BookMetadataResponse)
 async def lookup_book_metadata(
     isbn: str,
-    current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
+    _current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
     service: BookService = Depends(get_book_service),
 ) -> BookMetadataResponse:
     return await service.lookup_metadata(isbn)
@@ -47,7 +56,7 @@ async def lookup_book_metadata(
 @router.get("/{book_id}", response_model=BookDetailResponse)
 def get_book(
     book_id: int,
-    current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
+    _current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
     service: BookService = Depends(get_book_service),
 ) -> BookDetailResponse:
     return service.get_book(book_id)

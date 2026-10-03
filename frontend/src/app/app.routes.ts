@@ -111,6 +111,16 @@ export const routes: Routes = [
       import('./features/users/user-edit/user-edit.component').then((m) => m.UserEditComponent),
   },
   {
+    path: 'gestao/usuarios/:id',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMINISTRATOR'] },
+    title: 'Detalhes do usuário · LibStock',
+    loadComponent: () =>
+      import('./features/users/user-details/user-details.component').then(
+        (m) => m.UserDetailsComponent,
+      ),
+  },
+  {
     path: '',
     loadChildren: () => import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES),
   },

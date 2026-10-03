@@ -13,7 +13,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { ApiError } from '../../../core/models/auth.model';
-import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { BookResponse, BookUpdateRequest } from '../models/book.model';
 import { BookService } from '../services/book.service';
@@ -27,7 +26,7 @@ export interface ToastMessage {
 @Component({
   selector: 'app-book-edit-modal',
   standalone: true,
-  imports: [ReactiveFormsModule, AlertComponent, SpinnerComponent],
+  imports: [ReactiveFormsModule, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './book-edit-modal.component.html',
   styleUrl: './book-edit-modal.component.scss',

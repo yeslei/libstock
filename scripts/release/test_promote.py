@@ -1,11 +1,9 @@
 """Release tests only ever push to disposable local bare repositories."""
-import contextlib
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import promote
 
@@ -40,32 +38,66 @@ class PromotionTests(unittest.TestCase):
         promote.git("commit", "-m", value)
 
     def prepare(self):
-        return promote.prepare("1.2.3", self.state)
+        return promote.prepare(self.state)
 
     def refs(self):
         return promote.git("ls-remote", "--refs", "origin")
 
     def test_merge_and_annotated_tag_point_to_main(self):
         state = self.prepare()
-        self.assertNotIn("v1.2.3", self.refs())
+        self.assertNotIn("v0.0.1", self.refs())
         promote.publish(self.state)
         self.assertEqual(promote.git("ls-remote", "origin", "refs/heads/main").split()[0], state["candidate"])
-        self.assertEqual(promote.git("rev-parse", "v1.2.3^{}"), state["candidate"])
-        self.assertEqual(promote.git("cat-file", "-t", "v1.2.3"), "tag")
+        self.assertEqual(promote.git("rev-parse", "v0.0.1^{}"), state["candidate"])
+        self.assertEqual(promote.git("cat-file", "-t", "v0.0.1"), "tag")
 
     def test_invalid_semver(self):
-        for version in ("v1.2.3", "1.2", "01.2.3", "1.2.3-01", "1.2.3\n", "../main"):
+        for version in ("v0.0.1", "1.2", "01.2.3", "1.2.3-01", "1.2.3\n", "../main"):
             with self.subTest(version=version), self.assertRaises(promote.ReleaseError):
                 promote.version_tag(version)
         self.assertEqual(promote.version_tag("1.2.3-rc.1+build.2"), "v1.2.3-rc.1+build.2")
 
-    def test_duplicate_tag_rejected(self):
-        promote.git("tag", "v1.2.3")
-        promote.git("push", "origin", "refs/tags/v1.2.3")
+    def test_next_version_uses_highest_stable_remote_tag(self):
+        for tag in ("v1.2.9", "v1.2.10", "v0.9.99", "v2.0.0-rc.1", "other", "v01.2.3"):
+            promote.git("tag", tag)
+            promote.git("push", "origin", f"refs/tags/{tag}")
+        promote.git("tag", "v9.0.0")  # Local-only tags must not affect a release.
+        self.assertEqual(self.prepare()["tag"], "v1.2.11")
+
+    def test_increment_choices_reset_lower_components(self):
+        promote.git("tag", "v1.2.9")
+        promote.git("push", "origin", "refs/tags/v1.2.9")
+        for bump, expected in (("patch", "v1.2.10"), ("minor", "v1.3.0"), ("major", "v2.0.0")):
+            with self.subTest(bump=bump):
+                self.assertEqual(promote.prepare(self.state, bump)["tag"], expected)
+
+    def test_initial_version_for_each_increment(self):
+        for bump, expected in (("patch", "v0.0.1"), ("minor", "v0.1.0"), ("major", "v1.0.0")):
+            with self.subTest(bump=bump):
+                self.assertEqual(promote.next_tag(bump), expected)
+
+    def test_invalid_increment_leaves_remote_unchanged(self):
         before = self.refs()
-        with self.assertRaisesRegex(promote.ReleaseError, "already exists"):
-            self.prepare()
+        with self.assertRaisesRegex(promote.ReleaseError, "Invalid increment"):
+            promote.prepare(self.state, "invalid")
         self.assertEqual(before, self.refs())
+
+    def test_repeated_promotions_increment_patch(self):
+        self.prepare()
+        promote.publish(self.state)
+        promote.git("checkout", "integracao")
+        self.commit("next.txt", "next release")
+        promote.git("push", "origin", "integracao")
+        self.assertEqual(self.prepare()["tag"], "v0.0.2")
+        promote.publish(self.state)
+        self.assertEqual(promote.git("rev-parse", "v0.0.2^{}"), promote.git("rev-parse", "HEAD"))
+
+    def test_source_is_integracao_even_when_checkout_is_main(self):
+        source = promote.git("rev-parse", "integracao")
+        promote.git("checkout", "main")
+        state = self.prepare()
+        self.assertEqual(state["source"], source)
+        self.assertEqual(promote.git("rev-parse", "HEAD^2"), source)
 
     def test_noop_rejected(self):
         promote.git("checkout", "main")
@@ -101,8 +133,8 @@ class PromotionTests(unittest.TestCase):
 
     def test_tag_race_rejected(self):
         self.prepare()
-        promote.git("tag", "v1.2.3")
-        promote.git("push", "origin", "refs/tags/v1.2.3")
+        promote.git("tag", "v0.0.1")
+        promote.git("push", "origin", "refs/tags/v0.0.1")
         before = self.refs()
         with self.assertRaisesRegex(promote.ReleaseError, "already exists"):
             promote.publish(self.state)
@@ -127,7 +159,7 @@ class PromotionTests(unittest.TestCase):
 
     def test_server_policy_rejects_each_ref_atomically(self):
         # A bare update hook rejects one ref while accepting the other.
-        for rejected in ("refs/heads/main", "refs/tags/v1.2.3"):
+        for rejected in ("refs/heads/main", "refs/tags/v0.0.1"):
             with self.subTest(rejected=rejected):
                 self.prepare()
                 hook = self.remote / "hooks" / "update"
@@ -137,7 +169,7 @@ class PromotionTests(unittest.TestCase):
                 with self.assertRaisesRegex(promote.ReleaseError, "Atomic publication rejected"):
                     promote.publish(self.state)
                 self.assertEqual(before, self.refs())
-                promote.git("tag", "-d", "v1.2.3")
+                promote.git("tag", "-d", "v0.0.1")
 
     def test_dirty_checkout_rejected(self):
         Path("untracked.txt").write_text("unsaved")
