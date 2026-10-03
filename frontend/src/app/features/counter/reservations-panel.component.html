@@ -1,0 +1,91 @@
+<section aria-labelledby="reservations-title">
+  <h2 id="reservations-title">Reservas de compra</h2>
+  <p class="hint">Fila por obra e exemplares destinados. Destine um exemplar à primeira reserva e confirme a venda quando o cliente retirar.</p>
+
+  <form class="toolbar" role="search" (submit)="search($event)">
+    <label for="reservation-q">Buscar por cliente, obra ou código de barras</label>
+    <input id="reservation-q" type="search" maxlength="100" [value]="term()" (input)="setTerm($event)" />
+    <label class="visually-hidden" for="reservation-status">Situação</label>
+    <select id="reservation-status" (change)="setStatus($event)">
+      <option value="">Todas as situações</option>
+      <option value="WAITING">Aguardando exemplar</option>
+      <option value="NOTIFIED">Exemplar destinado</option>
+    </select>
+    <button class="btn btn--primary" type="submit">Buscar</button>
+  </form>
+
+  @if (client) {
+    <p class="chip">Cliente: {{ client.name }} <button type="button" (click)="clearClient.emit()">Remover filtro</button></p>
+  }
+
+  <div data-feedback tabindex="-1">
+    @if (feedback(); as f) { <app-alert [message]="f.message" [variant]="f.kind" /> }
+  </div>
+
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') { <p class="loading" role="status"><app-spinner /> Carregando reservas…</p> }
+      @case ('error') {
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        @if (!s.data.length) {
+          <p class="empty" role="status">Nenhuma reserva de compra em andamento.</p>
+        } @else {
+          <ul class="cards">
+            @for (reservation of s.data; track reservation.id) {
+              <li>
+                <article class="card" [attr.aria-labelledby]="'reservation-' + reservation.id">
+                  <header>
+                    <h3 [id]="'reservation-' + reservation.id">{{ reservation.book.title }}</h3>
+                    <span class="badge" [class.badge--warn]="reservation.status === 'WAITING'" [class.badge--danger]="reservation.expired">
+                      @if (reservation.expired) { Prazo de retirada expirado }
+                      @else if (reservation.status === 'WAITING') { Aguardando exemplar }
+                      @else { Exemplar destinado }
+                    </span>
+                  </header>
+                  <dl class="meta">
+                    <div><dt>Cliente</dt><dd>{{ reservation.client.name }}<br />{{ reservation.client.email }}</dd></div>
+                    @if (reservation.status === 'WAITING') {
+                      <div><dt>Posição na fila</dt><dd>{{ reservation.queue_position }}º</dd></div>
+                    } @else {
+                      <div><dt>Exemplar destinado</dt><dd>{{ reservation.allocated_copy_barcode }}</dd></div>
+                      <div><dt>Destinado em</dt><dd>{{ reservation.notified_at | date: 'dd/MM/yyyy HH:mm' }}</dd></div>
+                      @if (reservation.expires_at) {
+                        <div><dt>Retirar até</dt><dd>{{ reservation.expires_at | date: 'dd/MM/yyyy' }}</dd></div>
+                      }
+                    }
+                    @if (reservation.pickup_date) {
+                      <div><dt>Retirada solicitada para</dt><dd>{{ reservation.pickup_date | date: 'dd/MM/yyyy' }}</dd></div>
+                    }
+                    <div><dt>Exemplares comerciais livres da obra</dt><dd>{{ reservation.free_commercial_copies }}</dd></div>
+                  </dl>
+                  @if (!reservation.client.eligible && reservation.status === 'NOTIFIED') {
+                    <p class="note">Cliente inelegível ({{ ineligibleReasons(reservation.client).join(', ') }}). A venda não poderá ser confirmada.</p>
+                  }
+                  @if (blockText(reservation); as text) {
+                    <p class="note">{{ text }}</p>
+                  }
+                  @if (reservation.expired) {
+                    <p class="note">O prazo de retirada expirou; a venda não pode ser confirmada. Ainda não há regra aprovada para tratar reservas expiradas.</p>
+                  }
+                  <div class="actions">
+                    @if (reservation.status === 'WAITING') {
+                      <button class="btn btn--primary" type="button" [disabled]="!reservation.can_allocate || submitting()" (click)="allocate(reservation)">Destinar exemplar</button>
+                    } @else {
+                      <button class="btn btn--primary" type="button" [disabled]="!canSell(reservation)" (click)="confirmSale(reservation)">Confirmar venda</button>
+                    }
+                  </div>
+                </article>
+              </li>
+            }
+          </ul>
+        }
+      }
+    }
+  }
+
+  @if (confirming(); as c) {
+    <app-confirm-dialog [title]="c.title" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="submitting()" (confirmed)="confirm()" (cancelled)="cancel()" />
+  }
+</section>
