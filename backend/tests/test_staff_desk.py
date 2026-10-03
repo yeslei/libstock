@@ -14,7 +14,7 @@ from app.services.staff_desk_service import StaffDeskService
 
 PATHS = ['/api/v1/staff/clients?q=ana', '/api/v1/staff/loan-requests', '/api/v1/staff/loans',
          '/api/v1/staff/purchase-reservations']
-SERVICE_METHODS = ['search_clients', 'loan_requests', 'loans', 'purchase_reservations']
+SERVICE_METHODS = ['client_pendencies', 'search_clients', 'loan_requests', 'loans', 'purchase_reservations']
 
 
 @pytest.fixture
@@ -212,3 +212,66 @@ def test_query_failure_is_normalized():
         service.loans(7, None, None, 50)
     assert (error.value.status_code, error.value.code) == (500, 'desk_query_error')
     assert 'internal database' not in error.value.message
+
+
+PEND = '/api/v1/staff/clients/3/pendencies'
+
+
+def test_pendencies_requires_auth_and_staff_role(api):
+    client, fake = api
+    assert client.get(PEND).status_code == 401
+    for role in ('USER', 'STOCK_KEEPER'):
+        app.dependency_overrides[get_current_user] = lambda role=role: NS(id=7, role_codes=[role])
+        assert client.get(PEND).status_code == 403
+    fake.client_pendencies.assert_not_called()
+
+
+@pytest.mark.parametrize('id', [0, -1, 2147483648, 'abc'])
+def test_pendencies_rejects_invalid_id(api, id):
+    client, fake = api
+    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=['SELLER'])
+    assert client.get(f'/api/v1/staff/clients/{id}/pendencies').status_code == 422
+    fake.client_pendencies.assert_not_called()
+
+
+def test_pendencies_forwards_actor_and_client(api):
+    client, fake = api
+    fake.client_pendencies.return_value = {
+        'client': {'id': 3, 'name': 'Ana', 'email': 'a@x.test', 'is_active': True, 'is_penalized': False,
+                   'has_overdue_loan': False, 'eligible': True},
+        'overdue_loans': []}
+    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=['ADMINISTRATOR'])
+    response = client.get(PEND)
+    assert response.status_code == 200 and response.json()['client']['id'] == 3
+    fake.client_pendencies.assert_called_once_with(7, 3)
+
+
+def test_pendencies_service_denies_inactive_employee_and_missing_client():
+    service, repo = make_service()
+    repo.is_active_employee.return_value = False
+    with pytest.raises(ApplicationError) as error:
+        service.client_pendencies(7, 3)
+    assert error.value.code == 'employee_record_required'
+    repo.client_summary.assert_not_called()
+    repo.is_active_employee.return_value = True
+    repo.client_summary.return_value = None
+    with pytest.raises(ApplicationError) as error:
+        service.client_pendencies(7, 3)
+    assert (error.value.status_code, error.value.code) == (404, 'client_not_found')
+
+
+def test_pendencies_lists_only_overdue_loans_and_never_writes(monkeypatch):
+    service, repo = make_service()
+    monkeypatch.setattr('app.services.staff_desk_service.business_today', lambda: date(2026, 10, 3))
+    book = NS(id=1, title='A', author='X', is_active=True)
+    repo.client_summary.return_value = client_row(has_overdue_loan=True)
+
+    def loan(id, due):
+        return {'Loan': NS(id=id, loan_date=due - timedelta(days=30), due_date=due),
+                'Copy': NS(id=id, barcode=f'C{id}'), 'Book': book, **client_row()}
+    repo.open_loans.return_value = [loan(1, datetime(2026, 10, 1, 12, tzinfo=timezone.utc)),
+                                    loan(2, datetime(2026, 10, 3, 6, tzinfo=timezone.utc))]
+    result = service.client_pendencies(7, 3)
+    assert [(l.id, l.days_late) for l in result.overdue_loans] == [(1, 2)]
+    assert result.client.eligible is False
+    service.db.commit.assert_not_called()

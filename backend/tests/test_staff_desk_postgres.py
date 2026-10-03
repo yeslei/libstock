@@ -226,3 +226,41 @@ def test_borrowed_didactic_copy_is_not_offered_for_pickup(desk):
         db.commit()
     request = http.get(f'{BASE}/loan-requests', params={'client_id': client_id}).json()[0]
     assert request['eligible_copies'] == []
+
+
+def test_pendencies_use_v2_cutoff_and_do_not_write(desk):
+    http, engine, book_id, client_id, seller_id = desk
+    from datetime import time
+    from app.core.business_dates import BUSINESS_ZONE
+    with Session(engine) as db:
+        copy = didactic_copy(db, book_id)
+        now = datetime.now(BUSINESS_ZONE)
+        # vence hoje, em horário já passado: V1 contaria atraso, V2 não
+        due = datetime.combine(now.date(), time(0, 1), BUSINESS_ZONE)
+        db.add(Loan(client_id=client_id, copy_id=copy.id, employee_id=seller_id, loan_date=due - timedelta(days=30),
+                    due_date=due, status=LoanStatus.OPEN))
+        db.commit()
+    body = http.get(f'{BASE}/clients/{client_id}/pendencies').json()
+    assert body['client']['id'] == client_id and body['client']['eligible'] is True
+    assert body['overdue_loans'] == []
+    with Session(engine) as db:
+        late = datetime.now(BUSINESS_ZONE) - timedelta(days=3)
+        db.add(Loan(client_id=client_id, copy_id=commercial_copy(db, book_id).id, employee_id=seller_id,
+                    loan_date=late - timedelta(days=30), due_date=late, status=LoanStatus.OPEN))
+        db.commit()
+    body = http.get(f'{BASE}/clients/{client_id}/pendencies').json()
+    assert [l['status'] for l in body['overdue_loans']] == ['OVERDUE']
+    assert body['client']['has_overdue_loan'] is True and body['client']['eligible'] is False
+    assert body['client']['is_penalized'] is False  # consulta não sincroniza penalidade
+    with Session(engine) as db:
+        assert db.get(Client, client_id).is_penalized is False
+
+
+def test_pendencies_unknown_client_is_404_and_inactive_employee_403(desk):
+    http, engine, _, _, seller_id = desk
+    response = http.get(f'{BASE}/clients/2147483646/pendencies')
+    assert (response.status_code, response.json()['code']) == (404, 'client_not_found')
+    with Session(engine) as db:
+        db.get(Profile, seller_id).is_active = False
+        db.commit()
+    assert http.get(f'{BASE}/clients/1/pendencies').status_code == 403
