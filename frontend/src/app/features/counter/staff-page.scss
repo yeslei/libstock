@@ -1,0 +1,333 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// Estilos comuns das telas do funcionário (referências locais, painel 03 — Funcionário).
+:host {
+  display: block;
+  font-family: $font-staff;
+  color: $staff-text;
+}
+
+.page {
+  max-width: 1060px;
+}
+
+.page__eyebrow {
+  margin: 0;
+  color: $staff-accent;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.page__back {
+  color: $staff-accent;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+h1 {
+  margin: $space-4 0 0;
+  color: $staff-sidebar;
+  font-size: 30px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  margin: 0;
+  color: $staff-sidebar;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+h3 {
+  margin: 0;
+  color: $staff-sidebar;
+  font-size: 17px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.page__intro {
+  margin: $space-2 0 0;
+  color: $staff-muted;
+  font-size: 13px;
+}
+
+.sr-only {
+  @include visually-hidden;
+}
+
+.search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 28px 0 $space-4;
+
+  input {
+    flex: 1 1 18rem;
+    max-width: 760px;
+    min-width: 0;
+    min-height: 46px;
+    padding: 0 13px;
+    border: 1px solid $staff-border;
+    border-radius: 10px;
+    background: #fff;
+    color: $staff-text;
+    font: inherit;
+    font-size: 13px;
+
+    &::placeholder {
+      color: $staff-muted;
+    }
+  }
+}
+
+.btn {
+  @include touch-target(42px);
+  gap: $space-2;
+  padding: 0 24px;
+  border: 1px solid $staff-sidebar;
+  border-radius: 8px;
+  background: #fff;
+  color: $staff-sidebar;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+
+  &--primary {
+    background: $staff-sidebar;
+    color: #fff;
+  }
+
+  &--danger {
+    border-color: $error;
+    background: $error;
+    color: #fff;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex='-1']:focus-visible {
+  @include focus-ring($staff-accent);
+}
+
+[data-feedback] {
+  margin-bottom: $space-4;
+
+  &:empty {
+    display: none;
+  }
+}
+
+.eyebrow {
+  margin: 0 0 $space-4;
+  color: $staff-accent;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card {
+  padding: 22px;
+  border: 1px solid $staff-border;
+  border-radius: 12px;
+  background: #fff;
+
+  &--danger {
+    border-color: #e9c4bf;
+    background: #fae8e5;
+  }
+
+  &--ok {
+    background: $staff-badge-ok;
+  }
+}
+
+.note {
+  margin: 0;
+  color: $staff-muted;
+  font-size: 12px;
+
+  &--danger {
+    color: $error;
+  }
+}
+
+.empty,
+.loading {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-6;
+  border: 1px dashed $staff-border;
+  border-radius: 12px;
+  color: $staff-muted;
+  font-size: 13px;
+}
+
+.loading {
+  border: 0;
+}
+
+.pill {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 1px solid $staff-border;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #e3f0e6;
+  color: $staff-accent;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+
+  &--danger {
+    background: transparent;
+    color: $error;
+    font-weight: 600;
+  }
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid $staff-border;
+  border-radius: 12px;
+  background: #fff;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th {
+    padding: 18px 20px;
+    background: $staff-badge-ok;
+    color: $staff-muted;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  td {
+    padding: 28px 20px;
+    border-top: 1px solid $staff-border;
+    vertical-align: middle;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f8f9f4;
+  }
+
+  tr.row--danger,
+  tbody tr.row--danger:nth-child(even) {
+    background: #fae8e5;
+  }
+}
+
+.row__title {
+  display: block;
+  color: $staff-sidebar;
+  font-weight: 600;
+}
+
+.row__sub {
+  display: block;
+  margin-top: $space-1;
+  color: $staff-muted;
+  font-size: 11px;
+}
+
+.link-btn {
+  @include touch-target(38px);
+  padding: 0 16px;
+  border: 1px solid $staff-sidebar;
+  border-radius: 6px;
+  background: #fff;
+  color: $staff-accent;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    background: $staff-badge-ok;
+  }
+}
+
+.field {
+  display: grid;
+  gap: $space-1;
+  color: $staff-muted;
+  font-size: 11px;
+
+  input,
+  select {
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid $staff-border;
+    border-radius: 10px;
+    background: #fff;
+    color: $staff-text;
+    font: inherit;
+    font-size: 13px;
+  }
+}
+
+.field--error input,
+.field--error select {
+  border-color: $error;
+}
+
+.field__error {
+  color: $error;
+  font-size: 11px;
+}
+
+.chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-2;
+  margin: 0 0 $space-4;
+  padding: $space-1 $space-3;
+  border: 1px solid $staff-border;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+
+  button {
+    min-height: $target-min;
+    border: 0;
+    background: none;
+    color: $staff-accent;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}
