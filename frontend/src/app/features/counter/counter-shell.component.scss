@@ -1,0 +1,120 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+:host {
+  display: block;
+  font-family: $font-staff;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 76px);
+  background: $staff-bg;
+
+  @include from($bp-lg) {
+    flex-direction: row;
+  }
+}
+
+.shell__toggle {
+  @include touch-target;
+  justify-content: flex-start;
+  padding: 0 $space-4;
+  border: 0;
+  background: $staff-sidebar;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring(#fff);
+    outline-offset: -4px;
+  }
+
+  @include from($bp-lg) {
+    display: none;
+  }
+}
+
+.shell__side {
+  display: none;
+  flex: 0 0 auto;
+  background: $staff-sidebar;
+  color: #fff;
+
+  &--open {
+    display: block;
+  }
+
+  @include from($bp-lg) {
+    display: block;
+    width: $staff-sidebar-width;
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+.shell__brand {
+  margin: 0;
+  padding: 30px 30px 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+nav {
+  padding: 52px 0 $space-6;
+}
+
+.shell__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 32px;
+  border-radius: 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  text-decoration: none;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+  }
+
+  &:focus-visible {
+    @include focus-ring(#fff);
+    outline-offset: -3px;
+  }
+
+  &--active {
+    font-weight: 600;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      width: 4px;
+      height: 24px;
+      background: $staff-sidebar-marker;
+    }
+  }
+}
+
+.shell__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: $space-6 $space-4 80px;
+
+  @include from($bp-lg) {
+    padding: 56px 50px 80px;
+  }
+}

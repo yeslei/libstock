@@ -39,19 +39,19 @@ As migrations 0011/0012 já aplicadas foram preservadas. A 0013 é incremental e
 | 1.2.7 | Consulta de disponibilidade | Implementado no recorte | Home/Detalhes consultam disponibilidade real por modalidade. Consulta local não configurada, conforme decisão do usuário |
 | 1.2.8 | Sinalização Venda/Empréstimo/Esgotado | Implementado | Homologar casos mistos e sinalização após destinação/venda/retirada |
 | 1.2.9 | Validação da situação do cliente | Implementado no recorte | Política comum considera usuário/perfil ativo, penalidade e atraso. Gestão de pendências continua em 1.2.3 |
-| 1.2.10 | Registro de empréstimo | Parcial | Solicitação e confirmação pela API existem. Falta tela do funcionário e busca operacional por e-mail/solicitação/exemplar |
+| 1.2.10 | Registro de empréstimo | Implementado no recorte | Solicitação, consulta e confirmação pela tela `/balcao` (Issue #122), com busca por cliente/obra e escolha do exemplar. Falta homologação com navegador e contas reais |
 | 1.2.11 | Cálculo de devolução | Implementado | Um mês de calendário após retirada real; fim de mês e ano bissexto testados |
 | 1.2.12 | Status do exemplar | Implementado no recorte | OPEN aplica BORROWED e devolução aplica AVAILABLE atomicamente; falta homologar telas do balcão |
 | 1.2.13 | Comprovante digital | Pendente | Gerar comprovante persistente após retirada confirmada, com acesso do titular/funcionário e dados aprovados |
-| 1.2.14 | Registro de devolução | Parcial | API transacional existe. Falta tela, identificação do empréstimo e confirmação pelo funcionário |
+| 1.2.14 | Registro de devolução | Implementado no recorte | Aba Devoluções do balcão lista empréstimos ativos e confirma a devolução. Falta homologação com navegador |
 | 1.2.15 | Disponibilidade para venda | Implementado no recorte | Considera vendas em andamento e destinações; revalida antes da conclusão |
 | 1.2.16 | Bloqueio de venda didática | Implementado | API e banco rejeitam didáticos; teste da fila também os exclui |
-| 1.2.17 | Registro de venda | Parcial | Confirmação de venda vinculada à reserva existe. Falta tela operacional; venda direta no balcão requer contrato/fluxo próprio se fizer parte do aceite |
+| 1.2.17 | Registro de venda | Parcial | Confirmação de venda vinculada à reserva existe e tem tela no balcão. Venda direta no balcão requer contrato/fluxo próprio se fizer parte do aceite |
 | 1.2.18 | Estoque após venda | Implementado no recorte | CONFIRMED aplica SOLD e conclui a reserva; teste de falha mantém estoque/reserva anteriores |
 | 1.2.19 | Reserva de compra | Implementado no recorte | Detalhes solicita compra disponível ou entra na espera sem disponibilidade; ambos aparecem em Minhas reservas |
 | 1.2.20 | Validação do cliente para reserva | Implementado | Identidade do token e política comum; campos de identidade/estado/fila rejeitados |
 | 1.2.21 | Registro da reserva | Implementado | PurchaseReservation é a fonte dos estados operacionais; intenção de retirada disponível fica vinculada em PurchaseRequest |
-| 1.2.22 | Fila de reservas | Parcial | FIFO e posição real existem; falta tela do funcionário, mecanismo de atendimento ao repor/devolver exemplar e política de cancelamento/expiração/cliente inelegível |
+| 1.2.22 | Fila de reservas | Parcial | FIFO, posição real e tela do funcionário (consulta e destinação manual) existem; falta atendimento automático ao repor/devolver e política de cancelamento/expiração/cliente inelegível |
 | 1.2.23 | Testes de usuários e acesso | Parcial | Suítes existentes + identidade `/me`, papéis, restauração e respostas fora de ordem. Falta homologação ponta a ponta com contas reais de cada papel |
 | 1.2.24 | Testes de acervo | Parcial | Cadastro/metadados e proteção do exemplar destinado cobertos. Inativação/conversão completas dependem dos fluxos pendentes |
 | 1.2.25 | Testes de empréstimo/devolução | Parcial | Transições, atraso, duplicidade e rollback cobertos. Falta comprovante e teste de navegador integrando a futura tela do funcionário |
@@ -60,8 +60,8 @@ As migrations 0011/0012 já aplicadas foram preservadas. A 0013 é incremental e
 
 ## Ordem sugerida para os devs
 
-1. **P1 — Balcão de empréstimos/devoluções:** criar consultas protegidas de solicitações e empréstimos por e-mail/código, conectar as confirmações existentes e impedir ações do cliente. Aceite: pendente → ativo → devolvido sem SQL manual.
-2. **P1 — Balcão de compras/fila:** listar WAITING/NOTIFIED, destinar ao primeiro da fila e concluir a venda. Aceite: nenhuma venda a outro cliente, nenhuma baixa antes da confirmação e reserva concluída desaparece da área do cliente.
+1. **P1 (entregue na Issue #122, pendente de homologação) — Balcão de empréstimos/devoluções:** criar consultas protegidas de solicitações e empréstimos por e-mail/código, conectar as confirmações existentes e impedir ações do cliente. Aceite: pendente → ativo → devolvido sem SQL manual.
+2. **P1 (entregue na Issue #122, pendente de homologação) — Balcão de compras/fila:** listar WAITING/NOTIFIED, destinar ao primeiro da fila e concluir a venda. Aceite: nenhuma venda a outro cliente, nenhuma baixa antes da confirmação e reserva concluída desaparece da área do cliente.
 3. **P1 — Comprovante digital:** definir conteúdo, persistir após retirada e restringir acesso. A solicitação pendente não gera comprovante de empréstimo ativo.
 4. **P1 — Gestão de acervo:** finalizar inativação, quantidades e conversão com transações, permissões e impedimentos por operação em andamento.
 5. **P1 — Pendências:** aprovar responsáveis e regra de regularização; implementar auditoria e telas. Não apagar automaticamente `is_penalized` ao devolver, pois o motivo da penalidade não está modelado.
@@ -89,6 +89,11 @@ Não entram neste repasse: histórico do cliente, notificações V3, pagamentos 
 | USER | POST `/api/v1/purchase-reservations` | `{book_id}` para espera |
 | USER | GET `/api/v1/loans/me` | Pendentes/ativos/atrasados próprios |
 | USER | GET `/api/v1/purchase-reservations/me` | Reservas de compra próprias em andamento |
+| SELLER/ADMINISTRATOR | GET `/api/v1/staff/clients?q=` | Busca de clientes (mín. 2 caracteres) |
+| SELLER/ADMINISTRATOR | GET `/api/v1/staff/loan-requests` | Solicitações pendentes com exemplares elegíveis |
+| SELLER/ADMINISTRATOR | GET `/api/v1/staff/loans` | Empréstimos ativos e atraso |
+| SELLER/ADMINISTRATOR | GET `/api/v1/staff/purchase-reservations` | Reservas WAITING/NOTIFIED e `can_allocate` |
+| SELLER/ADMINISTRATOR | GET `/api/v1/staff/clients/{id}/pendencies` | Pendências somente leitura (regra V2) |
 | SELLER/ADMINISTRATOR | POST `/api/v1/staff/loan-requests/{id}/confirm-pickup` | `{copy_id}`; devolve ID do Loan |
 | SELLER/ADMINISTRATOR | POST `/api/v1/staff/loans/{id}/confirm-return` | Sem corpo |
 | SELLER/ADMINISTRATOR | POST `/api/v1/staff/books/{id}/allocate-purchase` | Sem corpo; primeiro WAITING |

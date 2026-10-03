@@ -16,6 +16,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Início', route: '/' },
   { label: 'Meus empréstimos', route: '/meus-emprestimos', roles: ['USER'] },
   { label: 'Minhas reservas', route: '/minhas-reservas', roles: ['USER'] },
+  { label: 'Balcão', route: '/balcao', roles: ['SELLER', 'ADMINISTRATOR'] },
 
   {
     label: 'Cadastrar exemplar',

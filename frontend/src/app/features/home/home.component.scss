@@ -65,3 +65,17 @@
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+.home__counter {
+  @include touch-target;
+  padding: 0 $space-5;
+  border: 1px solid $primary;
+  border-radius: $radius-sm;
+  color: $primary;
+  font-weight: 600;
+  text-decoration: none;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}

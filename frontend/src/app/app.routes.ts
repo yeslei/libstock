@@ -15,6 +15,42 @@ export const routes: Routes = [
     loadComponent: () => import('./features/client-tracking/client-tracking.component').then(m => m.ClientTrackingComponent),
   },
   {
+    path: 'balcao', canActivate: [authGuard, roleGuard], data: { roles: ['SELLER', 'ADMINISTRATOR'] },
+    loadComponent: () => import('./features/counter/counter-shell.component').then(m => m.CounterShellComponent),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'painel' },
+      {
+        path: 'painel', title: 'Painel · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-dashboard.component').then(m => m.CounterDashboardComponent),
+      },
+      {
+        path: 'clientes', title: 'Clientes · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterClientsPageComponent),
+      },
+      {
+        path: 'emprestimos', pathMatch: 'full', title: 'Empréstimos · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-loans-home.component').then(m => m.CounterLoansHomeComponent),
+      },
+      {
+        path: 'emprestimos/solicitacoes', title: 'Solicitações de empréstimo · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterPickupsPageComponent),
+      },
+      {
+        path: 'emprestimos/ativos', title: 'Empréstimos ativos · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReturnsPageComponent),
+      },
+      {
+        path: 'devolucoes', title: 'Devoluções · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReturnsPageComponent),
+      },
+      {
+        path: 'vendas', title: 'Vendas · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReservationsPageComponent),
+      },
+      { path: '**', redirectTo: 'painel' },
+    ],
+  },
+  {
     path: '',
     pathMatch: 'full',
     title: 'LibStock — Gestão de acervo',

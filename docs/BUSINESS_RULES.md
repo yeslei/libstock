@@ -858,6 +858,25 @@ O serviço de consulta e sincronização de penalização permanece preparado pa
 
 A reserva ainda não está integrada ao controle de pendências.
 
+## 21. V2 — balcão operacional (Issue #122)
+
+Estado: `APPROVED` para o recorte de telas e consultas solicitado em 03/10/2026; reutiliza as regras da seção 19 sem alterá-las.
+
+- Regra aprovada: a área de balcão é restrita a funcionário ativo com papel `SELLER` ou `ADMINISTRATOR`, no frontend (guards) e no backend (papéis e cadastro de funcionário ativo). `STOCK_KEEPER` e `USER` não acessam.
+- Regra aprovada: as quatro operações (confirmar retirada, devolução, destinar exemplar e confirmar venda) usam apenas os POST V2 de `/api/v1/staff`. Os endpoints transacionais antigos (`/api/v1/loans`, `/api/v1/sales`) não são usados pela interface do balcão.
+- Regra aprovada: a interface exige seleção na lista (sem digitar IDs), confirmação explícita antes de cada alteração, bloqueio de envio duplicado e só mostra sucesso após resposta 2xx do backend; após qualquer resposta a lista é recarregada.
+- Regra aprovada: consultas de balcão são somente leitura e expõem apenas os dados necessários (nome, e-mail, situação de elegibilidade, obra, exemplar, datas).
+- Regra aprovada: os exemplares oferecidos para retirada e a contagem de comerciais livres usam a mesma definição de exemplar livre da confirmação (disponibilidade comum), incluindo exclusão de exemplares destinados e com venda em andamento.
+- Decisão pendente (não alterada): o enunciado "alocar para a primeira reserva elegível" conflita com a regra aprovada de que o primeiro cliente da fila, se inelegível, bloqueia a destinação. A tela segue a regra aprovada: apenas a primeira reserva da fila pode receber exemplar e o bloqueio é explicado. Pular clientes inelegíveis exige decisão de negócio e mudança no backend.
+- Decisão pendente: prazo de retirada da reserva destinada, ausência, cancelamento e expiração. A tela exibe `expires_at` somente se já existir e sinaliza reserva expirada sem oferecer ação; a venda de reserva expirada é recusada pelo backend (`reservation_expired`).
+- Decisão pendente: unificação do prazo de devolução entre o fluxo transacional antigo (15 dias) e a retirada V2 (um mês de calendário). A tela de balcão não exibe prazo antes da retirada e não unifica as regras.
+- Limitação técnica: as consultas retornam no máximo `limit` itens (até 100), sem paginação; a tela avisa quando o limite é atingido. A posição na fila é calculada por reserva na consulta.
+- Regra aprovada: a consulta de pendências do balcão é `GET /api/v1/staff/clients/{id}/pendencies`, somente leitura, com atraso pela regra V2 (calendário de America/Sao_Paulo) e sem sincronizar penalidade.
+- Limitação técnica / decisão pendente: o endpoint V1 `GET /api/v1/clients/{id}/pendencies` permanece como estava (comportamento herdado, não alterado): sincroniza a penalização com regra de atraso por instante e não exige funcionário ativo. A divergência V1/V2 de atraso e de sincronização de penalidade aguarda decisão de unificação; não é classificada como defeito. O balcão não o utiliza.
+- Regra aprovada (indicadores do Painel): `GET /api/v1/staff/dashboard`, somente leitura, mesmo guard de `/staff`. Definições exatas: empréstimos ativos = empréstimos `OPEN`; devoluções hoje = empréstimos com `returned_at` na data atual de America/Sao_Paulo (00:00 inclusive a 00:00 seguinte exclusive); reservas aguardando = reservas de compra `WAITING`; pendências = clientes distintos com empréstimo `OPEN` em atraso pela regra V2 (vencimento antes do início do dia de negócio atual; vencer hoje não é atraso). O cálculo de atraso é o mesmo de `has_overdue_loan`, compartilhado no repository.
+- Decisão pendente (escopo atualizado em 03/10/2026): o empréstimo direto (`POST /api/v1/loans`) e a venda direta (`POST /api/v1/sales`) devem coexistir com os fluxos V2 sob a decisão do responsável de entrega incremental. Suas regras atuais não são alteradas e divergem da V2 (prazo de 15 dias corridos contra um mês de calendário; atraso por instante contra calendário de São Paulo). A unificação exige decisão de negócio. Essas telas aguardam a leitura dos frames do Figma e ainda não foram implementadas no balcão.
+- Fora do escopo: venda direta no balcão sem reserva, comprovante digital, cancelamento de reservas, notificações e gestão manual de penalidade pela interface.
+
 ## Política operacional de promoção de release — Issues #113 e #120
 
 - Status: `APPROVED` — promoção por PR, aprovação automática e merge normal

@@ -1,0 +1,122 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+:host {
+  display: block;
+  font-family: $font-staff;
+}
+
+.dash {
+  max-width: 1055px;
+}
+
+h1 {
+  margin: 0;
+  color: $staff-sidebar;
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.dash__intro {
+  margin: $space-3 0 0;
+  color: $staff-muted;
+  font-size: 14px;
+}
+
+.dash__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 245px));
+  gap: 25px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  &--access {
+    margin-top: 28px;
+  }
+
+  &--indicators {
+    margin-top: 64px;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid $staff-border;
+  border-radius: 14px;
+  background: #fff;
+  color: $staff-sidebar;
+  text-decoration: none;
+
+  &--access {
+    min-height: 135px;
+    padding: 23px 19px;
+
+    &:hover {
+      border-color: $staff-accent;
+    }
+
+    &:focus-visible {
+      @include focus-ring($staff-accent);
+    }
+  }
+
+  &--indicator {
+    min-height: 120px;
+    padding: 21px 19px;
+  }
+}
+
+.card__title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.card__text {
+  margin-top: 16px;
+  color: $staff-muted;
+  font-size: 12px;
+}
+
+.card__link {
+  margin-top: auto;
+  padding-top: 20px;
+  color: $staff-accent;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.card__value {
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.card__label {
+  margin-top: 20px;
+  color: $staff-muted;
+  font-size: 13px;
+}
+
+.dash__feedback {
+  margin-top: 40px;
+}
+
+.dash__retry {
+  @include touch-target;
+  margin-top: $space-2;
+  padding: 0 $space-4;
+  border: 1px solid $staff-sidebar;
+  border-radius: 8px;
+  background: #fff;
+  color: $staff-sidebar;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring($staff-accent);
+  }
+}

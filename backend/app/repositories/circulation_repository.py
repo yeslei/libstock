@@ -1,18 +1,11 @@
 from sqlalchemy import select, text
-from app.models.domain import Copy, Employee, Loan, Profile, PurchaseReservation, ReservationStatus, Sale, SaleItem, SaleStatus
+from app.models.domain import Copy, Loan, PurchaseReservation, ReservationStatus, Sale, SaleItem, SaleStatus
 from app.models.loan_request import LoanRequest
-from app.models.user import User
 from app.repositories.client_request_repository import ClientRequestRepository
 from app.repositories.inventory_availability import free_copies_statement
 
 
 class CirculationRepository(ClientRequestRepository):
-    def is_active_employee(self, actor_id):
-        return self.db.scalar(select(Employee.id).join(Profile, Profile.id == Employee.id)
-            .join(User, User.id == Employee.id).where(
-                Employee.id == actor_id, Profile.is_active.is_(True), User.is_active.is_(True),
-            )) is not None
-
     def set_audit_actor(self, actor_id):
         self.db.execute(text("SELECT set_config('libstock.employee_id', :id, true)"), {'id': str(actor_id)})
 

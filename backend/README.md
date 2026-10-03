@@ -191,8 +191,29 @@ Funcionário ativo, `SELLER` ou `ADMINISTRATOR`:
 
 Empréstimo começa na retirada real, com devolução em um mês de calendário. Clientes penalizados/inativos/com atraso são bloqueados para novas operações; a devolução permanece permitida. A venda exige reserva NOTIFIED e exemplar comercial ativo destinado ao cliente. A baixa SOLD e a conclusão FULFILLED acontecem na mesma transação.
 
-Estados são projeções dos models existentes; NOTIFIED não dispara notificações. Prazo de retirada só é mostrado quando expires_at já existe. A API não implementa ainda cancelamento, expiração automática, prioridade ou telas operacionais do balcão.
+Estados são projeções dos models existentes; NOTIFIED não dispara notificações. Prazo de retirada só é mostrado quando expires_at já existe. A API não implementa ainda cancelamento, expiração automática nem prioridade de fila. As telas operacionais do balcão (`/balcao` no frontend) consomem os endpoints abaixo.
 
 As transições são auditadas e falhas provocam rollback. Sem autenticação: 401; papel/cadastro inelegível: 403; recurso inexistente: 404; conflito operacional: 409; corpo/ID inválido: 422. Erros internos retornam código estável sem revelar SQL.
+
+### Consultas de balcão V2 (somente leitura)
+
+Todos os GET abaixo ficam sob `/api/v1/staff`, exigem `SELLER` ou `ADMINISTRATOR` e funcionário com cadastro ativo. Sem token: 401; usuário inativo: 403 `user_inactive` (autenticação); perfil/funcionário inativo ou ausente: 403 `employee_record_required`; `USER` e `STOCK_KEEPER`: 403 `permission_denied`. `q` é busca parcial sem diferenciar maiúsculas (máx. 100 caracteres; `%` e `_` são literais); `limit` vai de 1 a 100; `client_id` precisa ser inteiro positivo (422 caso contrário). Ordenação determinística. Nenhuma consulta altera dados.
+
+| Endpoint | Parâmetros | Resposta (200) |
+| --- | --- | --- |
+| GET `/api/v1/staff/clients` | `q` obrigatório (mín. 2 caracteres após aparar, senão 422 `search_term_too_short`), `limit` (padrão 20) | Lista de `{id, name, email, is_active, is_penalized, has_overdue_loan, eligible}`, ordenada por nome. Sem dados administrativos (papéis, hash, telefone) |
+| GET `/api/v1/staff/loan-requests` | `q` (cliente/e-mail/obra/autor), `client_id`, `limit` (padrão 50) | Solicitações sem retirada confirmada (`loan_id IS NULL`): `{id, client, book, pickup_date, due_date, created_at, eligible_copies[{id, barcode, condition}]}`, por data de retirada e id. `eligible_copies` usa a mesma definição de exemplar livre da confirmação (didático, ativo, AVAILABLE, sem venda em andamento e não destinado); vazia se a obra está inativa |
+| GET `/api/v1/staff/loans` | `q` (também código de barras), `client_id`, `limit` | Empréstimos OPEN: `{id, client, book, copy_id, copy_barcode, loan_date, due_date, status ACTIVE/OVERDUE, days_late}`, por vencimento e id. Atraso pelo calendário de America/Sao_Paulo, igual ao acompanhamento do cliente |
+| GET `/api/v1/staff/purchase-reservations` | `q`, `client_id`, `status` (`WAITING`/`NOTIFIED`), `limit` | Reservas WAITING/NOTIFIED: `{id, client, book, status, queue_position, requested_at, pickup_date, notified_at, expires_at, expired, allocated_copy_id, allocated_copy_barcode, free_commercial_copies, can_allocate, allocation_blocked_reason}`. `queue_position` conta WAITING anteriores da obra (nulo em NOTIFIED). `expires_at` só existe se persistido; `expired` apenas o compara com agora |
+
+`client` é `{id, name, email, is_active, is_penalized, has_overdue_loan, eligible}`; `eligible` usa o mesmo predicado de `client_eligibility.py` aplicado nas confirmações. `can_allocate` é verdadeiro somente para a primeira reserva WAITING da obra com cliente elegível e exemplar comercial livre; caso contrário `allocation_blocked_reason` é `NOT_FIRST_IN_QUEUE`, `CLIENT_INELIGIBLE`, `NO_FREE_COPY` ou `BOOK_INACTIVE`. Cliente inelegível na frente da fila continua bloqueando a destinação (sem salto automático).
+
+GET `/api/v1/staff/clients/{client_id}/pendencies` (mesmos papéis e guard; 404 `client_not_found`; `client_id` inteiro positivo): somente leitura, devolve `{client: {id, name, email, is_active, is_penalized, has_overdue_loan, eligible}, overdue_loans: [mesmo item de /staff/loans com status OVERDUE e days_late]}`. Atraso pela regra V2 (data de negócio em America/Sao_Paulo; vencer hoje não é atraso). Não grava nada nem sincroniza penalidade.
+
+GET `/api/v1/staff/dashboard` (mesmos papéis e guard; sem parâmetros): somente leitura, devolve `{active_loans, returns_today, waiting_reservations, pendencies}`, inteiros. `active_loans` = empréstimos `OPEN`; `returns_today` = empréstimos com `returned_at` dentro da data atual de America/Sao_Paulo (de 00:00 inclusive até 00:00 do dia seguinte, exclusive); `waiting_reservations` = reservas de compra `WAITING` (reservas `NOTIFIED` não contam); `pendencies` = clientes distintos com ao menos um empréstimo `OPEN` em atraso pela regra V2 (mesma condição de `has_overdue_loan`: `due_date` anterior ao início do dia de negócio atual).
+
+O endpoint legado `GET /api/v1/clients/{id}/pendencies` não é usado pelo balcão: ele sincroniza a penalização automática (escreve num GET), usa `due_date < now()` e não exige funcionário ativo. Comportamento herdado, não alterado.
+
+Erros de consulta inesperados retornam 500 `desk_query_error` sem detalhes de SQL.
 
 Relatório técnico, matriz completa da V2 e roteiro de testes: [V2_REVIEW.md](../docs/V2_REVIEW.md).
