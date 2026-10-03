@@ -6,6 +6,7 @@ import { Subject, of, throwError } from 'rxjs';
 import { routes } from '../../app.routes';
 import { CounterService, StaffClient, StaffLoan, StaffLoanRequest, StaffPurchaseReservation } from './counter.service';
 import { ClientsPanelComponent } from './clients-panel.component';
+import { businessToday } from './business-date';
 import { CounterContext } from './counter-context.service';
 import { CounterClientsPageComponent } from './counter-pages';
 import { PickupsPanelComponent } from './pickups-panel.component';
@@ -156,6 +157,36 @@ describe('Balcão: retiradas', () => {
     root.querySelectorAll('button').forEach((b) => {
       if (b.textContent?.trim() === 'Confirmar retirada') expect(b.disabled).toBeTrue();
     });
+  });
+
+  it('segue o frame: título, busca por e-mail, "Sem pendências" e linha da obra com exemplar e data', () => {
+    const today = businessToday();
+    const { root } = setup(PickupsPanelComponent, (s) => s.listLoanRequests.and.returnValue(of([
+      loanRequest({ pickup_date: today, eligible_copies: [{ id: 91, barcode: '00101', condition: null }] }),
+    ])));
+    expect(root.querySelector('h1')?.textContent).toBe('Solicitações de empréstimo');
+    expect(root.querySelector('.page__back')?.textContent).toContain('← Empréstimos');
+    expect((root.querySelector('#pickup-q') as HTMLInputElement).placeholder).toBe('Buscar cliente por e-mail cadastrado');
+    expect(root.querySelector('.eyebrow')?.textContent).toBe('RETIRADAS DE HOJE');
+    const card = root.querySelector('.request')!;
+    expect(card.querySelector('h3')?.textContent).toBe('Ana Souza');
+    expect(card.querySelector('.request__client')?.textContent).toContain('ana@x.dev');
+    expect(card.querySelector('.request__client')?.textContent).toContain('Sem pendências');
+    expect(card.querySelector('.request__book')?.textContent).toContain('Dom Casmurro');
+    expect(card.querySelector('.request__book')?.textContent).toContain('Exemplar #00101');
+    expect(card.querySelector('.request__book')?.textContent).toMatch(/Retirada: \d{2}\/\d{2}\/\d{4}/);
+    expect(card.querySelector('select')).toBeNull();  // exemplar único: nada a escolher
+    expect((button(root, 'Confirmar retirada')).disabled).toBeFalse();
+  });
+
+  it('separa as retiradas de hoje das demais solicitações pendentes e informa a pendência do cliente', () => {
+    const today = businessToday();
+    const { root } = setup(PickupsPanelComponent, (s) => s.listLoanRequests.and.returnValue(of([
+      loanRequest({ id: 1, pickup_date: '2000-01-01' }),
+      loanRequest({ id: 2, pickup_date: today, client: client({ eligible: false, has_overdue_loan: true }) }),
+    ])));
+    expect(Array.from(root.querySelectorAll('.eyebrow')).map((e) => e.textContent)).toEqual(['RETIRADAS DE HOJE', 'OUTRAS SOLICITAÇÕES']);
+    expect(root.querySelector('.request__client')?.textContent).toContain('Empréstimo em atraso');
   });
 
   it('aplica o filtro de cliente vindo da aba de clientes', () => {

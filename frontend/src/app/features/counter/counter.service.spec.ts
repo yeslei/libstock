@@ -19,6 +19,25 @@ describe('CounterService', () => {
   });
   afterEach(() => http.verify());
 
+  it('lê os indicadores do painel pelo endpoint somente leitura', () => {
+    let result: unknown;
+    service.getDashboard().subscribe((value) => (result = value));
+    const request = http.expectOne('/api/v1/staff/dashboard');
+    expect(request.request.method).toBe('GET');
+    request.flush({ active_loans: 3, returns_today: 2, waiting_reservations: 1, pendencies: 4 });
+    expect(result).toEqual({ active_loans: 3, returns_today: 2, waiting_reservations: 1, pendencies: 4 });
+  });
+
+  it('propaga o erro de domínio do painel (funcionário inativo)', () => {
+    let error: ApiError | undefined;
+    service.getDashboard().subscribe({ error: (e) => (error = e) });
+    http.expectOne('/api/v1/staff/dashboard').flush(
+      { code: 'employee_record_required', detail: 'Cadastro de funcionário ativo necessário.' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    expect(error?.status).toBe(403);
+  });
+
   it('busca clientes por termo aparado no endpoint de balcão', () => {
     service.searchClients('  ana  ').subscribe();
     const request = http.expectOne((r) => r.url === '/api/v1/staff/clients');
