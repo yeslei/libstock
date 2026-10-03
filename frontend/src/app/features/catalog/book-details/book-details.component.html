@@ -1,0 +1,71 @@
+<main class="book-details">
+  <a class="back" routerLink="/">← Voltar ao início</a>
+  @let view = state();
+  @switch (view.status) {
+    @case ('loading') { <p role="status"><app-spinner /> Carregando livro…</p> }
+    @case ('error') { <app-alert [message]="view.message" /> }
+    @case ('loaded') {
+      @let book = view.data;
+      <div class="book-layout">
+        @if (book.cover_url && !coverFailed()) {
+          <img class="cover" [src]="book.cover_url" [alt]="'Capa de ' + book.title" width="290" height="450" (error)="coverFailed.set(true)" />
+        } @else { <div class="cover cover--empty" aria-label="Capa não disponível">Capa não disponível</div> }
+        <section class="book-content" aria-labelledby="book-title">
+          <h1 id="book-title">{{ book.title }}</h1>
+          <p class="author">{{ book.author }}</p>
+          <p class="metadata">{{ book.genres.join(' · ') || 'Categoria não informada' }} <span aria-hidden="true"> · </span> ISBN {{ book.isbn || 'não informado' }}</p>
+          <div class="availability">
+            <h2>Disponibilidade</h2>
+            <details class="modality">
+              <summary><span>Empréstimo <small>{{ book.availability.loan.available_count }} exemplar(es) disponíveis</small></span><span class="chevron" aria-hidden="true">⌄</span></summary>
+              <div class="modality-content">
+                @if (book.availability.loan.available) {
+                  @if (error(); as message) { <app-alert [message]="message" /> }
+                  <form (submit)="submit($event, book)">
+                    <div class="dates">
+                      <label for="pickup-date">Data de retirada<input id="pickup-date" type="date" required [min]="today()" [max]="'9998-12-31'" [value]="pickupDate()" (input)="pickupDate.set($any($event.target).value)" [disabled]="submitting() || requested()" /></label>
+                      <label for="due-date">Devolução prevista<input id="due-date" type="date" [value]="dueDate()" readonly aria-describedby="due-hint" /><small id="due-hint">Calculada automaticamente: 1 mês após a retirada.</small></label>
+                    </div>
+                    <button class="primary" type="submit" [disabled]="submitting() || requested()" [attr.aria-busy]="submitting()">{{ submitting() ? 'Enviando…' : requested() ? 'Solicitação enviada' : 'Confirmar solicitação' }}</button>
+                    <p class="hint">A solicitação fica pendente de confirmação da retirada.</p>
+                    @if (requested()) { <a routerLink="/meus-emprestimos">Acompanhar em Meus empréstimos →</a> }
+                  </form>
+                } @else { <p>Não há exemplares disponíveis para empréstimo no momento.</p> }
+              </div>
+            </details>
+            <details class="modality">
+              <summary><span>Venda <small>{{ book.availability.sale.available_count }} exemplar(es) disponíveis para compra</small></span><span class="chevron" aria-hidden="true">⌄</span></summary>
+              <div class="modality-content">
+                @if (book.availability.sale.price !== null) { <p>A partir de {{ book.availability.sale.price | currency:'BRL':'symbol':'1.2-2' }}</p> }
+                @if (book.availability.sale.available) {
+                  @if (purchaseError(); as message) { <app-alert [message]="message" /> }
+                  <form class="purchase-form" (submit)="submitPurchase($event, book)">
+                    <div class="dates">
+                      <label for="purchase-date">Data pretendida de retirada<input id="purchase-date" type="date" required [min]="today()" max="9998-12-31" [value]="purchaseDate()" (input)="purchaseDate.set($any($event.target).value)" [disabled]="purchasing() || purchaseRequested()" /></label>
+                      <div><p>A compra será finalizada presencialmente no balcão.</p><p class="hint">Na retirada, informe seu e-mail cadastrado.</p></div>
+                    </div>
+                    <button class="primary" type="submit" [disabled]="purchasing() || purchaseRequested()" [attr.aria-busy]="purchasing()">{{ purchasing() ? 'Enviando…' : purchaseRequested() ? 'Solicitação enviada' : 'Confirmar solicitação de compra' }}</button>
+                  </form>
+                } @else {
+                  <p>Não há exemplares disponíveis para venda no momento.</p>
+                  @if (book.availability.sale.can_reserve) {
+                    @if (purchaseError(); as message) { <app-alert [message]="message" /> }
+                    <button class="primary" type="button" (click)="reservePurchase(book)" [disabled]="purchasing() || purchaseRequested()">{{ purchasing() ? 'Reservando…' : purchaseRequested() ? 'Reserva enviada' : 'Reservar compra' }}</button>
+                  }
+                }
+                @if (purchaseRequested()) { <p><a routerLink="/minhas-reservas">Acompanhar em Minhas reservas →</a></p> }
+              </div>
+            </details>
+            <details class="modality">
+              <summary><span>Consulta local <small>{{ book.availability.local_consultation.configured ? (book.availability.local_consultation.available ? 'Disponível na biblioteca' : 'Indisponível') : 'Consulta local não configurada' }}</small></span><span class="chevron" aria-hidden="true">⌄</span></summary>
+              <div class="modality-content"><p>Entre em contato com a biblioteca para informações sobre consulta local.</p></div>
+            </details>
+          </div>
+        </section>
+      </div>
+    }
+  }
+</main>
+@if (snackbar(); as message) {
+  <div class="snackbar" role="status" aria-live="polite"><span>{{ message }}</span><button type="button" aria-label="Fechar mensagem" (click)="snackbar.set(null)">×</button></div>
+}

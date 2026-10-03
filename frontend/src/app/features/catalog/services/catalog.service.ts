@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { CatalogBook, Genre, PagedBooks } from '../models/catalog.model';
+import { CatalogBook, CatalogBookDetail, Genre, PagedBooks } from '../models/catalog.model';
 
 export const CATALOG_API = '/api/v1/catalog';
 export type CatalogSearchCriterion = 'title' | 'author' | 'isbn' | 'barcode';
@@ -15,6 +15,10 @@ export type CatalogSearchCriterion = 'title' | 'author' | 'isbn' | 'barcode';
 @Injectable({ providedIn: 'root' })
 export class CatalogService {
   private readonly http = inject(HttpClient);
+
+  getBook(id: number): Observable<CatalogBookDetail> {
+    return this.http.get<CatalogBookDetail>(`${CATALOG_API}/books/${id}`);
+  }
 
   getFeaturedBooks(): Observable<CatalogBook[]> {
     return this.http.get<CatalogBook[]>(`${CATALOG_API}/featured-books`);

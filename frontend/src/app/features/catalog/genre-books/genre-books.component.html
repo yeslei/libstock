@@ -17,10 +17,7 @@
           <p class="genre__count">{{ state.data.total }} livro(s)</p>
           <ul class="genre__list">
             @for (book of state.data.items; track book.id) {
-              <li class="genre__item">
-                <strong>{{ book.title }}</strong>
-                <span>{{ book.author }}</span>
-              </li>
+              <li><app-catalog-book-card [book]="book" /></li>
             }
           </ul>
         }

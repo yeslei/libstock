@@ -31,6 +31,23 @@ export interface CatalogBook {
   readonly offers: BookOffer[];
 }
 
+export interface ModalityAvailability {
+  readonly can_reserve?: boolean;
+  readonly available: boolean | null;
+  readonly available_count: number | null;
+  readonly configured: boolean;
+  readonly price: string | null;
+}
+
+export interface CatalogBookDetail extends CatalogBook {
+  readonly isbn: string | null;
+  readonly availability: {
+    readonly loan: ModalityAvailability;
+    readonly sale: ModalityAvailability;
+    readonly local_consultation: ModalityAvailability;
+  };
+}
+
 export interface PagedBooks {
   /** Vem do backend para a tela ter o nome exibível, não só o slug da URL. */
   readonly genre: Genre;
@@ -40,12 +57,4 @@ export interface PagedBooks {
   readonly page_size: number;
 }
 
-/**
- * Estado de carregamento como união discriminada, seguindo o padrão de
- * `FormState` em `core/models/auth.model.ts`: flags soltas permitiriam
- * combinações inválidas como "carregando e com erro" ao mesmo tempo.
- */
-export type LoadState<T> =
-  | { status: 'loading' }
-  | { status: 'loaded'; data: T }
-  | { status: 'error'; message: string };
+export type { LoadState } from '../../../core/models/load-state.model';

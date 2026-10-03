@@ -1,14 +1,15 @@
 import { AsyncPipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
-import { catchError, map, of, startWith } from 'rxjs';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subscription, catchError, map, of, startWith, shareReplay } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { CatalogCapability, capabilitiesFor } from '../models/catalog-capabilities';
-import { BookOffer, CatalogBook, Genre, LoadState } from '../models/catalog.model';
+import { CatalogBook, Genre, LoadState } from '../models/catalog.model';
+import { CatalogBookCardComponent } from '../components/catalog-book-card/catalog-book-card.component';
 import { CatalogAdminService } from '../services/catalog-admin.service';
 import { CatalogSearchCriterion, CatalogService } from '../services/catalog.service';
 
@@ -22,7 +23,7 @@ import { CatalogSearchCriterion, CatalogService } from '../services/catalog.serv
 @Component({
   selector: 'app-catalog-home',
   standalone: true,
-  imports: [AsyncPipe, NgTemplateOutlet, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [AsyncPipe, NgTemplateOutlet, RouterLink, AlertComponent, SpinnerComponent, CatalogBookCardComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-home.component.html',
   styleUrl: './catalog-home.component.scss',
@@ -32,6 +33,9 @@ export class CatalogHomeComponent {
   private readonly catalogAdmin = inject(CatalogAdminService);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private searchSubscription?: Subscription;
 
   private readonly user = toSignal(this.auth.user$, { initialValue: null });
 
@@ -54,6 +58,7 @@ export class CatalogHomeComponent {
         message: 'Não foi possível carregar as categorias.',
       }),
     ),
+    shareReplay({ bufferSize: 1, refCount: false }),
   );
 
   protected readonly books$ = this.catalog.getFeaturedBooks().pipe(
@@ -65,11 +70,24 @@ export class CatalogHomeComponent {
         message: 'Não foi possível carregar os livros em destaque.',
       }),
     ),
+    shareReplay({ bufferSize: 1, refCount: false }),
   );
 
   protected readonly searchCriterion = signal<CatalogSearchCriterion>('title');
   protected readonly searchValue = signal('');
   protected readonly searchState = signal<LoadState<CatalogBook[]> | null>(null);
+
+  constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const q = params.get('q')?.trim() ?? '';
+      this.searchSubscription?.unsubscribe();
+      if (!q) { this.searchValue.set(''); this.searchState.set(null); return; }
+      const criterion = params.get('criterion') ?? 'title';
+      this.searchCriterion.set(['title', 'author', 'isbn', 'barcode'].includes(criterion) ? criterion as CatalogSearchCriterion : 'title');
+      this.searchValue.set(q);
+      this.searchBooks();
+    });
+  }
 
   protected setSearchCriterion(value: string): void {
     this.searchCriterion.set(value as CatalogSearchCriterion);
@@ -80,13 +98,14 @@ export class CatalogHomeComponent {
   }
 
   protected searchBooks(): void {
+    this.searchSubscription?.unsubscribe();
     const value = this.searchValue().trim();
     if (!value) {
       this.searchState.set({ status: 'error', message: 'Digite um termo para buscar.' });
       return;
     }
     this.searchState.set({ status: 'loading' });
-    this.catalog
+    this.searchSubscription = this.catalog
       .searchBooks(this.searchCriterion(), value)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -100,31 +119,14 @@ export class CatalogHomeComponent {
   }
 
   protected clearSearch(): void {
+    this.searchSubscription?.unsubscribe();
     this.searchValue.set('');
     this.searchState.set(null);
+    void this.router.navigate(['/'], { queryParams: {} });
   }
 
   protected isHidden(book: CatalogBook): boolean {
     return this.unfeatured().has(book.id);
-  }
-
-  // ---- Selos da vitrine (US02) --------------------------------------------
-
-  protected offerLabel(offer: BookOffer): string {
-    if (!offer.available) {
-      return 'Esgotado';
-    }
-    return offer.destination === 'COMMERCIAL' ? 'Venda' : 'Empréstimo';
-  }
-
-  protected offerPrice(offer: BookOffer): string | null {
-    if (offer.destination !== 'COMMERCIAL' || offer.price === null) {
-      return null;
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(Number(offer.price));
   }
 
   /** US04: gestor tira o título do destaque direto da vitrine. */

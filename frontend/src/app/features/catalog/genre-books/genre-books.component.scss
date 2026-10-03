@@ -2,7 +2,7 @@
 @use 'mixins' as *;
 
 .genre {
-  max-width: 720px;
+  max-width: $client-content-max;
   margin: 0 auto;
   padding: $space-8 $space-4;
 }
@@ -36,8 +36,8 @@
 }
 
 .genre__list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: $space-3;
   margin: $space-4 0 0;
   padding: 0;

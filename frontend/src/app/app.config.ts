@@ -1,6 +1,9 @@
+import { registerLocaleData } from '@angular/common';
+import localePt from '@angular/common/locales/pt';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   ApplicationConfig,
+  LOCALE_ID,
   inject,
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
@@ -13,8 +16,11 @@ import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { AuthService } from './core/services/auth.service';
 
+registerLocaleData(localePt);
+
 export const appConfig: ApplicationConfig = {
   providers: [
+    { provide: LOCALE_ID, useValue: 'pt-BR' },
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(
@@ -25,8 +31,8 @@ export const appConfig: ApplicationConfig = {
     // A ordem importa: o errorInterceptor é o mais externo, então normaliza o
     // erro que sobrar *depois* de o authInterceptor ter tentado o refresh.
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
-    // O access token vive só em memória; a sessão é recuperada no boot pelo
-    // cookie HttpOnly de refresh. Sem isto, todo reload cairia no login.
-    provideAppInitializer(() => inject(AuthService).restoreSession()),
+    // A vitrine pública renderiza imediatamente. Guards privados aguardam
+    // a recuperação da sessão pelo cookie HttpOnly antes de decidir o acesso.
+    provideAppInitializer(() => { void inject(AuthService).restoreSession(); }),
   ],
 };
