@@ -1,19 +1,21 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
+import { businessToday } from './business-date';
 import { DeskPanel } from './desk-panel';
 import { StaffLoanRequest } from './counter.service';
 
 @Component({
   selector: 'app-pickups-panel',
   standalone: true,
-  imports: [DatePipe, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './pickups-panel.component.html',
-  styleUrl: './desk-panel.scss',
+  styleUrl: './pickups-panel.component.scss',
 })
 export class PickupsPanelComponent extends DeskPanel<StaffLoanRequest> {
   protected readonly loadError = 'Não foi possível carregar as solicitações de empréstimo.';
@@ -29,7 +31,8 @@ export class PickupsPanelComponent extends DeskPanel<StaffLoanRequest> {
   }
 
   protected copyFor(request: StaffLoanRequest) {
-    const id = this.selected()[request.id];
+    // Com um único exemplar elegível não há o que escolher: ele já é o exemplar da retirada.
+    const id = this.selected()[request.id] ?? (request.eligible_copies.length === 1 ? request.eligible_copies[0].id : undefined);
     return request.eligible_copies.find((copy) => copy.id === id) ?? null;
   }
 
@@ -52,5 +55,21 @@ export class PickupsPanelComponent extends DeskPanel<StaffLoanRequest> {
       run: () => this.service.confirmPickup(request.id, copy.id),
       success: (result) => `Retirada confirmada. Empréstimo #${result.id} registrado para ${request.client.name}.`,
     });
+  }
+
+  protected pendencyLabel(request: StaffLoanRequest): string {
+    if (request.client.eligible) return 'Sem pendências';
+    const reasons = this.ineligibleReasons(request.client).join(', ');
+    return reasons.charAt(0).toUpperCase() + reasons.slice(1);
+  }
+
+  /** Retiradas previstas para hoje (calendário de São Paulo) primeiro; as demais pendentes ficam em seção própria. */
+  protected groups(requests: readonly StaffLoanRequest[]) {
+    const today = businessToday();
+    const result = [
+      { title: 'RETIRADAS DE HOJE', items: requests.filter((r) => r.pickup_date === today) },
+      { title: 'OUTRAS SOLICITAÇÕES', items: requests.filter((r) => r.pickup_date !== today) },
+    ];
+    return result.filter((group) => group.items.length > 0);
   }
 }

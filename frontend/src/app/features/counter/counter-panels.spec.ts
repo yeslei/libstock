@@ -1,6 +1,6 @@
 import { Provider, Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
@@ -44,7 +44,7 @@ function setup<T>(component: Type<T>, configure: (service: Spies) => void = () =
     'listPurchaseReservations', 'allocatePurchase', 'confirmSale',
   ]) as unknown as Spies;
   configure(service);
-  TestBed.configureTestingModule({ imports: [component], providers: [{ provide: CounterService, useValue: service }, ...extra] });
+  TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]), { provide: CounterService, useValue: service }, ...extra] });
   const fixture = TestBed.createComponent(component);
   fixture.detectChanges();
   return { fixture, service, root: fixture.nativeElement as HTMLElement };

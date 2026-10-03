@@ -18,12 +18,19 @@ export const routes: Routes = [
     path: 'balcao', canActivate: [authGuard, roleGuard], data: { roles: ['SELLER', 'ADMINISTRATOR'] },
     loadComponent: () => import('./features/counter/counter-shell.component').then(m => m.CounterShellComponent),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'clientes' },
+      { path: '', pathMatch: 'full', redirectTo: 'painel' },
+      {
+        path: 'painel', title: 'Painel · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-dashboard.component').then(m => m.CounterDashboardComponent),
+      },
       {
         path: 'clientes', title: 'Clientes · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterClientsPageComponent),
       },
-      { path: 'emprestimos', pathMatch: 'full', redirectTo: 'emprestimos/solicitacoes' },
+      {
+        path: 'emprestimos', pathMatch: 'full', title: 'Empréstimos · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-loans-home.component').then(m => m.CounterLoansHomeComponent),
+      },
       {
         path: 'emprestimos/solicitacoes', title: 'Solicitações de empréstimo · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterPickupsPageComponent),
@@ -40,7 +47,7 @@ export const routes: Routes = [
         path: 'vendas', title: 'Vendas · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReservationsPageComponent),
       },
-      { path: '**', redirectTo: 'clientes' },
+      { path: '**', redirectTo: 'painel' },
     ],
   },
   {
