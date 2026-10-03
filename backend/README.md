@@ -210,6 +210,8 @@ Todos os GET abaixo ficam sob `/api/v1/staff`, exigem `SELLER` ou `ADMINISTRATOR
 
 GET `/api/v1/staff/clients/{client_id}/pendencies` (mesmos papéis e guard; 404 `client_not_found`; `client_id` inteiro positivo): somente leitura, devolve `{client: {id, name, email, is_active, is_penalized, has_overdue_loan, eligible}, overdue_loans: [mesmo item de /staff/loans com status OVERDUE e days_late]}`. Atraso pela regra V2 (data de negócio em America/Sao_Paulo; vencer hoje não é atraso). Não grava nada nem sincroniza penalidade.
 
+GET `/api/v1/staff/dashboard` (mesmos papéis e guard; sem parâmetros): somente leitura, devolve `{active_loans, returns_today, waiting_reservations, pendencies}`, inteiros. `active_loans` = empréstimos `OPEN`; `returns_today` = empréstimos com `returned_at` dentro da data atual de America/Sao_Paulo (de 00:00 inclusive até 00:00 do dia seguinte, exclusive); `waiting_reservations` = reservas de compra `WAITING` (reservas `NOTIFIED` não contam); `pendencies` = clientes distintos com ao menos um empréstimo `OPEN` em atraso pela regra V2 (mesma condição de `has_overdue_loan`: `due_date` anterior ao início do dia de negócio atual).
+
 O endpoint legado `GET /api/v1/clients/{id}/pendencies` não é usado pelo balcão: ele sincroniza a penalização automática (escreve num GET), usa `due_date < now()` e não exige funcionário ativo. Comportamento herdado, não alterado.
 
 Erros de consulta inesperados retornam 500 `desk_query_error` sem detalhes de SQL.
