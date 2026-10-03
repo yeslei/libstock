@@ -192,4 +192,36 @@ describe('CounterService', () => {
       expect(error?.detail).toBe('Exemplares didáticos não podem ser vendidos.');
     });
   });
+
+  describe('empréstimo direto', () => {
+    it('registra em POST /api/v1/loans/ apenas com cliente e exemplar, sem prazo', () => {
+      let result: unknown;
+      service.registerLoan(3, 9).subscribe((value) => (result = value));
+      const request = http.expectOne('/api/v1/loans/');
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual({ client_id: 3, copy_id: 9 });
+      const created = { id: 1, client_id: 3, copy_id: 9, employee_id: 2, loan_date: '2026-10-03T12:00:00Z', due_date: '2026-10-18T12:00:00Z', returned_at: null, status: 'OPEN' };
+      request.flush(created, { status: 201, statusText: 'Created' });
+      expect(result).toEqual(created);
+    });
+
+    it('propaga o código e a mensagem do erro de domínio do cliente', () => {
+      let error: ApiError | undefined;
+      service.registerLoan(3, 9).subscribe({ error: (e) => (error = e) });
+      http.expectOne('/api/v1/loans/').flush(
+        { detail: 'Cliente possui pendência ativa e não pode realizar a operação.', code: 'client_has_pending' },
+        { status: 409, statusText: 'Conflict' },
+      );
+      expect(error?.status).toBe(409);
+      expect(error?.code).toBe('client_has_pending');
+    });
+
+    it('propaga o conflito de exemplar indisponível', () => {
+      let error: ApiError | undefined;
+      service.registerLoan(3, 9).subscribe({ error: (e) => (error = e) });
+      http.expectOne('/api/v1/loans/').flush({ detail: 'Exemplar não está disponível para empréstimo.' }, { status: 409, statusText: 'Conflict' });
+      expect(error?.status).toBe(409);
+      expect(error?.detail).toBe('Exemplar não está disponível para empréstimo.');
+    });
+  });
 });

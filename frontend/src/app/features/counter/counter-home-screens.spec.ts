@@ -31,7 +31,7 @@ describe('Balcão: painel', () => {
     const cards = Array.from(root.querySelectorAll('a.card--access'));
     expect(cards.map((c) => c.querySelector('.card__title')?.textContent)).toEqual([
       'Consultar acervo', 'Registrar devolução', 'Vendas', 'Empréstimo']);
-    expect(cards.map((c) => c.getAttribute('href'))).toEqual(['/balcao/acervo', '/balcao/devolucoes', '/balcao/vendas', '/balcao/emprestimos']);
+    expect(cards.map((c) => c.getAttribute('href'))).toEqual(['/balcao/acervo', '/balcao/devolucoes', '/balcao/vendas', '/balcao/emprestimos/novo']);
     expect(cards[0].textContent).toContain('Buscar obras e disponibilidade');
     expect(cards[0].textContent).toContain('Acessar');
   });
@@ -75,7 +75,7 @@ describe('Balcão: empréstimos / início', () => {
     due_date: '2026-10-01T12:00:00Z', status, days_late: status === 'OVERDUE' ? 2 : 0,
   });
 
-  it('mostra os dois cartões com contagens calculadas a partir do backend', () => {
+  it('mostra os três cartões, o de novo empréstimo sem contagem, com contagens calculadas a partir do backend', () => {
     const today = businessToday();
     const { root } = setup(CounterLoansHomeComponent, (s) => {
       s.getDashboard.and.returnValue(of(dashboard));
@@ -87,8 +87,8 @@ describe('Balcão: empréstimos / início', () => {
     const badges = Array.from(root.querySelectorAll('.card__badge')).map((b) => b.textContent?.trim());
     expect(badges).toEqual(['2 aguardando hoje', '32 ativos · 1 atrasados']);
     const links = Array.from(root.querySelectorAll('a.card__action'));
-    expect(links.map((a) => a.textContent?.trim())).toEqual(['Ver solicitações →', 'Ver empréstimos →']);
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/balcao/emprestimos/solicitacoes', '/balcao/emprestimos/ativos']);
+    expect(links.map((a) => a.textContent?.trim())).toEqual(['Ver solicitações →', 'Ver empréstimos →', 'Novo empréstimo →']);
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/balcao/emprestimos/solicitacoes', '/balcao/emprestimos/ativos', '/balcao/emprestimos/novo']);
   });
 
   it('não afirma quantos estão atrasados quando a lista de empréstimos foi truncada', () => {
