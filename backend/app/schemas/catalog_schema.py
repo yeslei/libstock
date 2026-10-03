@@ -67,6 +67,25 @@ class CatalogBookResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ModalityAvailability(BaseModel):
+    can_reserve: bool = False
+    available: bool | None
+    available_count: int | None
+    configured: bool = True
+    price: Decimal | None = None
+
+
+class BookAvailability(BaseModel):
+    loan: ModalityAvailability
+    sale: ModalityAvailability
+    local_consultation: ModalityAvailability
+
+
+class CatalogBookDetailResponse(CatalogBookResponse):
+    isbn: str | None
+    availability: BookAvailability
+
+
 class CatalogSearchParams(BaseModel):
     title: str | None = None
     author: str | None = None

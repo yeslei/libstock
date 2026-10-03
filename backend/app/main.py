@@ -9,6 +9,10 @@ from app.controllers.catalog_controller import router as catalog_router
 from app.controllers.employee_controller import router as employee_router
 from app.controllers.copy_controller import router as copy_router
 from app.controllers.user_controller import router as user_router
+from app.controllers.loan_request_controller import router as loan_request_router
+from app.controllers.purchase_request_controller import router as purchase_request_router
+from app.controllers.client_tracking_controller import router as client_tracking_router
+from app.controllers.circulation_controller import router as circulation_router
 from app.core.config import get_settings
 from app.core.exceptions import ApplicationError
 
@@ -64,3 +68,8 @@ app.include_router(copy_router)
 app.include_router(book_router)
 app.include_router(catalog_router)
 app.include_router(admin_catalog_router)
+app.include_router(loan_request_router)
+app.include_router(purchase_request_router)
+app.include_router(client_tracking_router)
+
+app.include_router(circulation_router)

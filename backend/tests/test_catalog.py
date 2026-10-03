@@ -322,8 +322,9 @@ def test_slugify_preserva_a_letra_base_do_acento(nome, esperado):
     assert slugify(nome) == esperado
 
 
-def _copy(destination, status=CopyStatus.AVAILABLE, price=None, is_active=True):
+def _copy(destination, status=CopyStatus.AVAILABLE, price=None, is_active=True, copy_id=1):
     return SimpleNamespace(
+        id=copy_id,
         destination=destination,
         status=status,
         sale_price=price,
@@ -335,12 +336,12 @@ def test_ofertas_agregam_venda_e_emprestimo_do_mesmo_livro():
     book = SimpleNamespace(
         copies=[
             _copy(DestinationType.DIDACTIC),
-            _copy(DestinationType.COMMERCIAL, price=Decimal("40.00")),
-            _copy(DestinationType.COMMERCIAL, price=Decimal("25.00")),
+            _copy(DestinationType.COMMERCIAL, price=Decimal("40.00"), copy_id=2),
+            _copy(DestinationType.COMMERCIAL, price=Decimal("25.00"), copy_id=3),
         ]
     )
 
-    offers = CatalogService._offers_for(book)
+    offers = CatalogService._offers_for(book, {1, 2, 3}, set())
 
     # Venda primeiro, e pelo menor preço entre os exemplares.
     assert offers[0].destination == DestinationType.COMMERCIAL
@@ -356,7 +357,7 @@ def test_livro_sem_exemplar_livre_fica_esgotado_e_nao_some():
         copies=[_copy(DestinationType.COMMERCIAL, status=CopyStatus.SOLD, price=Decimal("30"))]
     )
 
-    offers = CatalogService._offers_for(book)
+    offers = CatalogService._offers_for(book, set(), set())
 
     assert len(offers) == 1
     assert offers[0].available is False
@@ -374,7 +375,7 @@ def test_exemplar_de_venda_emprestado_habilita_reserva_de_compra():
         ]
     )
 
-    offers = CatalogService._offers_for(book)
+    offers = CatalogService._offers_for(book, set(), {1})
 
     assert offers[0].available is False
     assert offers[0].can_reserve is True
@@ -383,7 +384,7 @@ def test_exemplar_de_venda_emprestado_habilita_reserva_de_compra():
 def test_exemplar_inativo_nao_gera_oferta():
     book = SimpleNamespace(copies=[_copy(DestinationType.DIDACTIC, is_active=False)])
 
-    assert CatalogService._offers_for(book) == []
+    assert CatalogService._offers_for(book, {1}, set()) == []
 
 
 # ---- Cadastro de funcionário (RF06) --------------------------------------
