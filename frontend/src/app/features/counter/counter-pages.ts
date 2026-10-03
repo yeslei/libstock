@@ -5,12 +5,11 @@ import { ClientNavigation, ClientsPanelComponent, DeskTab } from './clients-pane
 import { CounterContext } from './counter-context.service';
 import { PickupsPanelComponent } from './pickups-panel.component';
 import { ReservationsPanelComponent } from './reservations-panel.component';
-import { ReturnsPanelComponent } from './returns-panel.component';
 
 /** Destino de cada atalho da consulta de clientes dentro da área do funcionário. */
 const DESTINATIONS: Readonly<Record<DeskTab, string>> = {
   retiradas: '/balcao/emprestimos/solicitacoes',
-  devolucoes: '/balcao/devolucoes',
+  devolucoes: '/balcao/emprestimos/ativos',
   reservas: '/balcao/vendas',
 };
 
@@ -39,17 +38,6 @@ export class CounterClientsPageComponent {
   template: `<app-pickups-panel [client]="context.client()" (clearClient)="context.client.set(null)" />`,
 })
 export class CounterPickupsPageComponent {
-  protected readonly context = inject(CounterContext);
-}
-
-@Component({
-  selector: 'app-counter-returns-page',
-  standalone: true,
-  imports: [ReturnsPanelComponent],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<app-returns-panel [client]="context.client()" (clearClient)="context.client.set(null)" />`,
-})
-export class CounterReturnsPageComponent {
   protected readonly context = inject(CounterContext);
 }
 

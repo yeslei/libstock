@@ -48,8 +48,8 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-active-loans.component').then(m => m.CounterActiveLoansComponent),
       },
       {
-        path: 'devolucoes', title: 'Devoluções · Balcão · LibStock',
-        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReturnsPageComponent),
+        path: 'devolucoes', title: 'Registrar devolução · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-returns.component').then(m => m.CounterReturnsComponent),
       },
       {
         path: 'vendas', title: 'Vendas · Balcão · LibStock',
