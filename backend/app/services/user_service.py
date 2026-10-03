@@ -39,14 +39,17 @@ class UserService:
             raise InactiveUserError()
         return user
 
+    def get_user(self, user_id: int) -> User:
+        user = self.user_repository.get_user_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError()
+        return user
+
     def list_users(self, role_code: str | None = None) -> list[User]:
         return self.user_repository.list_all(role_code)
 
     def get_admin_user(self, user_id: int) -> User:
-        user = self.user_repository.find_by_id(user_id)
-        if user is None:
-            raise UserNotFoundError()
-        return user
+        return self.get_user(user_id)
 
     def update_user(self, target_id: int, data: UserUpdate, *, actor_id: int) -> User:
         user = self.user_repository.find_by_id(target_id)
