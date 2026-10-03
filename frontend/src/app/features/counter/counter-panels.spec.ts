@@ -335,7 +335,7 @@ describe('Balcão: clientes e navegação', () => {
     click(fixture, button(root, 'Solicitações'));
     expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/emprestimos/solicitacoes');
     click(fixture, button(root, 'Reservas'));
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/vendas');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/reservas');
   });
 });
 

@@ -10,7 +10,7 @@ import { ReservationsPanelComponent } from './reservations-panel.component';
 const DESTINATIONS: Readonly<Record<DeskTab, string>> = {
   retiradas: '/balcao/emprestimos/solicitacoes',
   devolucoes: '/balcao/emprestimos/ativos',
-  reservas: '/balcao/vendas',
+  reservas: '/balcao/reservas',
 };
 
 @Component({
