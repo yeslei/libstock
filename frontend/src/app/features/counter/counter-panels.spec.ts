@@ -1,11 +1,13 @@
-import { Type } from '@angular/core';
+import { Provider, Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
 import { CounterService, StaffClient, StaffLoan, StaffLoanRequest, StaffPurchaseReservation } from './counter.service';
 import { ClientsPanelComponent } from './clients-panel.component';
-import { CounterComponent } from './counter.component';
+import { CounterContext } from './counter-context.service';
+import { CounterClientsPageComponent } from './counter-pages';
 import { PickupsPanelComponent } from './pickups-panel.component';
 import { ReservationsPanelComponent } from './reservations-panel.component';
 import { ReturnsPanelComponent } from './returns-panel.component';
@@ -36,13 +38,13 @@ type Spies = {
   [K in keyof CounterService]: jasmine.Spy;
 };
 
-function setup<T>(component: Type<T>, configure: (service: Spies) => void = () => undefined) {
+function setup<T>(component: Type<T>, configure: (service: Spies) => void = () => undefined, extra: Provider[] = []) {
   const service = jasmine.createSpyObj<CounterService>('CounterService', [
     'searchClients', 'getClientPendencies', 'listLoanRequests', 'confirmPickup', 'listLoans', 'confirmReturn',
     'listPurchaseReservations', 'allocatePurchase', 'confirmSale',
   ]) as unknown as Spies;
   configure(service);
-  TestBed.configureTestingModule({ imports: [component], providers: [{ provide: CounterService, useValue: service }] });
+  TestBed.configureTestingModule({ imports: [component], providers: [{ provide: CounterService, useValue: service }, ...extra] });
   const fixture = TestBed.createComponent(component);
   fixture.detectChanges();
   return { fixture, service, root: fixture.nativeElement as HTMLElement };
@@ -330,38 +332,43 @@ describe('Balcão: clientes e navegação', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('Permissão insuficiente.');
   });
 
-  it('abre a aba escolhida já filtrada pelo cliente e permite remover o filtro', () => {
-    const { fixture, root, service } = setup(CounterComponent, (s) => {
-      s.searchClients.and.returnValue(of([client()]));
-      s.listLoans.and.returnValue(of([]));
-    });
+  it('abre a tela escolhida guardando o cliente como filtro', () => {
+    const router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    const { fixture, root } = setup(CounterClientsPageComponent, (s) => s.searchClients.and.returnValue(of([client()])),
+      [{ provide: Router, useValue: router }]);
     search(fixture, root, 'ana');
     click(fixture, button(root, 'Empréstimos'));
-    expect(root.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('Devoluções');
+    expect(TestBed.inject(CounterContext).client()?.id).toBe(3);
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/balcao/devolucoes');
+    click(fixture, button(root, 'Solicitações'));
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/emprestimos/solicitacoes');
+    click(fixture, button(root, 'Reservas'));
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/vendas');
+  });
+
+  it('filtra empréstimos pelo cliente escolhido e permite remover o filtro', () => {
+    const { fixture, root, service } = setup(ReturnsPanelComponent, (s) => s.listLoans.and.returnValue(of([])));
+    let cleared = 0;
+    fixture.componentInstance.clearClient.subscribe(() => cleared++);
+    fixture.componentRef.setInput('client', client());
+    fixture.detectChanges();
     expect(service.listLoans).toHaveBeenCalledWith({ q: '', clientId: 3 });
     expect(root.querySelector('.chip')?.textContent).toContain('Ana Souza');
     click(fixture, button(root, 'Remover filtro'));
-    expect(service.listLoans.calls.mostRecent().args[0]).toEqual({ q: '', clientId: undefined });
-    expect(root.querySelector('.chip')).toBeNull();
-  });
-
-  it('navega entre abas por clique e por setas do teclado', () => {
-    const { fixture, root, service } = setup(CounterComponent, (s) => s.listLoanRequests.and.returnValue(of([])));
-    const tabs = root.querySelectorAll<HTMLElement>('[role="tab"]');
-    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
-    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
-    fixture.detectChanges();
-    expect(tabs[1].getAttribute('aria-selected')).toBe('true');
-    expect(service.listLoanRequests).toHaveBeenCalled();
-    expect(root.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe('tab-retiradas');
+    expect(cleared).toBe(1);
   });
 });
 
-describe('Rota do balcão', () => {
+describe('Rotas do balcão', () => {
+  const counter = routes.find((r) => r.path === 'balcao');
+
   it('é protegida por autenticação e restrita a SELLER e ADMINISTRATOR', () => {
-    const route = routes.find((r) => r.path === 'balcao');
-    expect(route?.canActivate?.length).toBe(2);
-    expect(route?.data?.['roles']).toEqual(['SELLER', 'ADMINISTRATOR']);
+    expect(counter?.canActivate?.length).toBe(2);
+    expect(counter?.data?.['roles']).toEqual(['SELLER', 'ADMINISTRATOR']);
+  });
+
+  it('declara as telas do funcionário como rotas filhas do layout', () => {
+    const paths = counter?.children?.map((r) => r.path);
+    expect(paths).toEqual(jasmine.arrayContaining(['clientes', 'emprestimos/solicitacoes', 'emprestimos/ativos', 'devolucoes', 'vendas']));
   });
 });
-

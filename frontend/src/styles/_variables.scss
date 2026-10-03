@@ -79,3 +79,16 @@ $client-green: #133325;
 $client-hero: #f6f2e8;
 $client-border: #d6d9cf;
 $client-content-max: 1285px;
+
+// Referência UX V2: área do funcionário (frames "Funcionário / ..." do Figma).
+$staff-sidebar: #133325;
+$staff-sidebar-width: 250px;
+$staff-sidebar-marker: #bfd9bf;
+$staff-bg: #f6f2e8;
+$staff-border: #d6d9cf;
+$staff-text: #1a1f1b;
+$staff-muted: #636b63;
+$staff-accent: #2e6345;
+$staff-badge-ok: #f0f5ed;
+$staff-badge-warn: #fcf5db;
+$font-staff: 'Inter', $font-sans;
