@@ -72,6 +72,8 @@ class BookCreate(BaseModel):
     author: str | None = Field(default=None, max_length=255)
     genre: str | None = Field(default=None, max_length=100)
     cover_url: str | None = Field(default=None, max_length=2048)
+    publication_year: int | None = Field(default=None, ge=1000, le=2100)
+    publisher: str | None = Field(default=None, max_length=150)
     initial_copy: InitialCopyCreate
 
     model_config = ConfigDict(extra="forbid")
@@ -81,7 +83,7 @@ class BookCreate(BaseModel):
     def validate_isbn(cls, value: str) -> str:
         return normalize_isbn(value)
 
-    @field_validator("title", "author", "genre", "cover_url", mode="before")
+    @field_validator("title", "author", "genre", "cover_url", "publisher", mode="before")
     @classmethod
     def normalize_optional_text(cls, value: object) -> object:
         if isinstance(value, str):
@@ -149,6 +151,9 @@ class BookMetadataResponse(BaseModel):
     title: str = Field(max_length=255)
     author: str = Field(max_length=255)
     genre: str | None = Field(default=None, max_length=100)
+    cover_url: str | None = Field(default=None, max_length=2048)
+    publisher: str | None = Field(default=None, max_length=150)
+    publication_year: int | None = Field(default=None, ge=1000, le=2100)
 
 class BookCreateResponse(BookCreate):
     id: int

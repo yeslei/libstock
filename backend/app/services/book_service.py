@@ -82,6 +82,7 @@ class BookService:
         self.settings = settings or get_settings()
 
     async def fetch_google_books_data(self, isbn: str) -> dict[str, str]:
+        """Consulta o Google Books. Só devolve sugestões; quem decide é o chamador."""
         try:
             async with httpx.AsyncClient(timeout=GOOGLE_BOOKS_TIMEOUT_SECONDS) as client:
                 params = {"q": f"isbn:{isbn}"}
@@ -140,6 +141,26 @@ class BookService:
             )
             if genre:
                 external_data["genre"] = genre
+
+        publisher = volume_info.get("publisher")
+        if isinstance(publisher, str) and publisher.strip():
+            external_data["publisher"] = publisher.strip()[:150]
+
+        published_date = volume_info.get("publishedDate")
+        if isinstance(published_date, str):
+            year_match = re.match(r"\s*(\d{4})", published_date)
+            if year_match and 1000 <= int(year_match.group(1)) <= 2100:
+                external_data["publication_year"] = year_match.group(1)
+
+        image_links = volume_info.get("imageLinks")
+        if isinstance(image_links, dict):
+            for key in ("thumbnail", "smallThumbnail"):
+                link = image_links.get(key)
+                if isinstance(link, str) and link.strip():
+                    cover = link.strip().replace("http://", "https://", 1)
+                    if cover.startswith("https://") and len(cover) <= 2048:
+                        external_data["cover_url"] = cover
+                        break
         return external_data
 
     async def lookup_metadata(self, isbn: str) -> BookMetadataResponse:
@@ -153,9 +174,55 @@ class BookService:
                 title=external_data["title"],
                 author=external_data["author"],
                 genre=external_data.get("genre"),
+                cover_url=external_data.get("cover_url"),
+                publisher=external_data.get("publisher"),
+                publication_year=(
+                    int(external_data["publication_year"])
+                    if external_data.get("publication_year")
+                    else None
+                ),
             )
         except ValidationError as exc:
             raise GoogleBooksInvalidResponseError() from exc
+
+    # Campos que a consulta externa pode preencher quando o funcionário os deixou vazios.
+    # Categorias nunca vêm da consulta externa (Issue #176): o vocabulário do Google Books
+    # não é o do acervo.
+    _EXTERNAL_FILL_FIELDS = ("title", "author", "cover_url", "publisher", "publication_year")
+
+    async def _complete_with_external_data(self, book_data: BookCreate) -> BookCreate:
+        """Os dados informados prevalecem; o Google Books só preenche campos vazios (Issue #176)."""
+        empty = [
+            field
+            for field in self._EXTERNAL_FILL_FIELDS
+            if getattr(book_data, field) is None
+        ]
+        if not empty:
+            return book_data
+        try:
+            external = await self.fetch_google_books_data(book_data.isbn)
+        except (
+            GoogleBooksNotFoundError,
+            GoogleBooksUnavailableError,
+            GoogleBooksRateLimitError,
+            GoogleBooksInvalidResponseError,
+        ):
+            # Sem a base externa, o cadastro manual continua valendo se tiver título e autor.
+            if not book_data.title or not book_data.author:
+                raise
+            return book_data
+
+        merged = book_data.model_dump()
+        for field in empty:
+            value = external.get(field)
+            if value:
+                merged[field] = int(value) if field == "publication_year" else value
+        try:
+            return BookCreate.model_validate(merged)
+        except ValidationError as exc:
+            if not book_data.title or not book_data.author:
+                raise GoogleBooksInvalidResponseError() from exc
+            return book_data
 
     async def create_book(self, book_data: BookCreate, *, employee_id: int) -> BookResponse:
         try:
@@ -166,26 +233,7 @@ class BookService:
             if self.repository.find_copy_by_barcode(book_data.initial_copy.barcode) is not None:
                 raise DuplicateBarcodeError()
 
-            persisted_data = book_data
-            try:
-                metadata = await self.lookup_metadata(book_data.isbn)
-                merged_data = book_data.model_dump()
-                merged_data["title"] = metadata.title
-                merged_data["author"] = metadata.author
-                if metadata.genre:
-                    merged_data["genre"] = metadata.genre
-                try:
-                    persisted_data = BookCreate.model_validate(merged_data)
-                except ValidationError as exc:
-                    raise GoogleBooksInvalidResponseError() from exc
-            except (
-                GoogleBooksNotFoundError,
-                GoogleBooksUnavailableError,
-                GoogleBooksRateLimitError,
-                GoogleBooksInvalidResponseError,
-            ):
-                if not book_data.title or not book_data.author:
-                    raise
+            persisted_data = await self._complete_with_external_data(book_data)
 
             if not persisted_data.title or not persisted_data.author:
                 raise GoogleBooksInvalidResponseError()
