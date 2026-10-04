@@ -41,10 +41,16 @@
                       @case ('WAITING') {
                         <p class="dates">Você está em {{ item.queue_position }}º lugar na fila de compra.</p>
                         <p class="guidance">Quando um exemplar comercial ficar disponível, sua posição poderá avançar.</p>
+                        <p class="actions"><button type="button" class="cancel" [disabled]="submitting()" (click)="ask(item)">Cancelar reserva</button></p>
                       }
                       @case ('NOTIFIED') {
-                        <p class="dates">{{ item.copy_barcode ? 'Exemplar #' + item.copy_barcode : 'Exemplar aguardando identificação no balcão' }} · Disponível desde {{ item.available_since | date:'dd/MM/yyyy':'-0300' }}{{ item.expires_at ? ' · Retire até ' + (item.expires_at | date:'dd/MM/yyyy':'-0300') : '' }}.</p>
-                        <p class="guidance">Dirija-se ao balcão{{ item.expires_at ? ' até ' + (item.expires_at | date:'dd/MM/yyyy':'-0300') : '' }} para finalizar a compra. Informe seu e-mail cadastrado.</p>
+                        <p class="dates">{{ item.copy_barcode ? 'Exemplar #' + item.copy_barcode : 'Exemplar aguardando identificação no balcão' }} · Disponível desde {{ item.available_since | date:'dd/MM/yyyy':'-0300' }}{{ item.expires_at ? (item.expired ? ' · Prazo de retirada encerrado em ' : ' · Retire até ') + (item.expires_at | date:'dd/MM/yyyy':'-0300') : '' }}.</p>
+                        @if (item.expired) {
+                          <p class="guidance guidance--overdue">O prazo de retirada terminou. O exemplar será liberado para a fila e esta reserva será encerrada.</p>
+                        } @else {
+                          <p class="guidance">Dirija-se ao balcão{{ item.expires_at ? ' até ' + (item.expires_at | date:'dd/MM/yyyy':'-0300') : '' }} para finalizar a compra. Informe seu e-mail cadastrado.</p>
+                          <p class="actions"><button type="button" class="cancel" [disabled]="submitting()" (click)="ask(item)">Cancelar reserva</button></p>
+                        }
                       }
                     }
                   </div>
@@ -57,4 +63,10 @@
       }
     }
   }
+  @if (confirming(); as pending) {
+    <app-confirm-dialog title="Cancelar reserva?" confirmLabel="Cancelar reserva" [busy]="submitting()"
+      [details]="[pending.title, pending.status === 'NOTIFIED' ? 'O exemplar destinado a você será liberado e você perderá a reserva.' : 'Você sairá da fila de compra e perderá sua posição.']"
+      (confirmed)="cancel()" (cancelled)="dismissConfirm()" />
+  }
 </main>
+<app-snackbar />

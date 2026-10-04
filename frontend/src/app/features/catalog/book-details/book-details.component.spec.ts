@@ -7,7 +7,7 @@ import { CatalogBookDetail } from '../models/catalog.model';
 import { ClientTrackingService } from '../../client-tracking/client-tracking.service';
 import { ClientRequestsService, LoanRequestResponse } from '../../client-tracking/client-requests.service';
 import { BookDetailsComponent } from './book-details.component';
-import { todayInSaoPaulo } from './loan-dates';
+import { pickupDeadline, todayInSaoPaulo } from './loan-dates';
 
 describe('BookDetailsComponent', () => {
   let fixture: ComponentFixture<BookDetailsComponent>;
@@ -119,6 +119,33 @@ describe('BookDetailsComponent', () => {
     await Promise.resolve(); await Promise.resolve(); fixture.detectChanges();
     expect(requests.requestPurchase).toHaveBeenCalledWith(42, todayInSaoPaulo());
     expect(root().querySelector('.snackbar')!.textContent).toContain('Solicitação de compra realizada com sucesso.');
+    fixture.destroy();
+  });
+
+  it('limita a data de retirada da compra ao prazo e recusa data posterior sem chamar o backend', async () => {
+    const data = { ...detail, availability: { ...detail.availability, sale: { ...detail.availability.sale, available: true, available_count: 1 } } };
+    catalog.getBook.and.returnValue(of(data));
+    fixture.destroy(); fixture = TestBed.createComponent(BookDetailsComponent); fixture.detectChanges();
+    const input = root().querySelector<HTMLInputElement>('#purchase-date')!;
+    expect(input.max).toBe(pickupDeadline());
+    input.value = '9998-01-01'; input.dispatchEvent(new Event('input')); fixture.detectChanges();
+    root().querySelector('form.purchase-form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await Promise.resolve(); await Promise.resolve(); fixture.detectChanges();
+    expect(requests.requestPurchase).not.toHaveBeenCalled();
+    expect(root().textContent).toContain('A data de retirada não pode passar de');
+    fixture.destroy();
+  });
+
+  it('informa que a solicitação entrou no fim da fila quando a reserva nasce aguardando', async () => {
+    const data = { ...detail, availability: { ...detail.availability, sale: { ...detail.availability.sale, available: true, available_count: 1 } } };
+    catalog.getBook.and.returnValue(of(data));
+    fixture.destroy(); fixture = TestBed.createComponent(BookDetailsComponent); fixture.detectChanges();
+    requests.requestPurchase.and.returnValue(of({ id: 2, book_id: 42, pickup_date: todayInSaoPaulo(), status: 'PENDING', created_at: '', reservation_status: 'WAITING' }));
+    const input = root().querySelector<HTMLInputElement>('#purchase-date')!;
+    input.value = todayInSaoPaulo(); input.dispatchEvent(new Event('input')); fixture.detectChanges();
+    root().querySelector('form.purchase-form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await Promise.resolve(); await Promise.resolve(); fixture.detectChanges();
+    expect(root().querySelector('.snackbar')!.textContent).toContain('fim da fila de compra');
     fixture.destroy();
   });
 

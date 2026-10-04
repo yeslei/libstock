@@ -59,7 +59,7 @@ class StaffClientPendencies(BaseModel):
     overdue_loans: list[StaffLoan]
 
 
-AllocationBlock = Literal['NOT_FIRST_IN_QUEUE', 'CLIENT_INELIGIBLE', 'NO_FREE_COPY', 'BOOK_INACTIVE']
+AllocationBlock = Literal['NOT_FIRST_ELIGIBLE', 'CLIENT_INELIGIBLE', 'NO_FREE_COPY', 'BOOK_INACTIVE']
 
 
 class StaffPurchaseReservation(BaseModel):

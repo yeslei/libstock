@@ -42,4 +42,12 @@ describe('Client V2 API contracts', () => {
     expect(reservation.request.body).toEqual({ book_id: 42 });
     purchase.flush({}); reservation.flush({});
   });
+
+  it("cancels only the own reservation through the /me-scoped route without a body", () => {
+    TestBed.inject(ClientTrackingService).cancelReservation(7).subscribe();
+    const request = http.expectOne("/api/v1/purchase-reservations/7/cancel");
+    expect(request.request.method).toBe("POST");
+    expect(request.request.body).toEqual({});
+    request.flush({ id: 7 });
+  });
 });

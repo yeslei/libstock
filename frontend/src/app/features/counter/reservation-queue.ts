@@ -2,9 +2,9 @@ import { AllocationBlock, StaffPurchaseReservation } from './counter.service';
 
 /** Motivos de bloqueio da destinação, conforme `allocation_blocked_reason` devolvido pelo backend. */
 export const BLOCK_TEXT: Readonly<Record<AllocationBlock, string>> = {
-  NOT_FIRST_IN_QUEUE: 'Aguardando a vez: só a primeira reserva da fila recebe exemplar.',
+  NOT_FIRST_ELIGIBLE: 'Aguardando a vez: há reserva elegível à frente na fila.',
   CLIENT_INELIGIBLE:
-    'O primeiro da fila está inelegível (inativo, penalizado ou em atraso). A destinação fica bloqueada até a situação ser regularizada; o sistema não pula a fila.',
+    'Cliente inelegível (inativo, penalizado ou em atraso). Mantém a posição na fila, mas o exemplar vai para a próxima reserva elegível.',
   NO_FREE_COPY: 'Não há exemplar comercial livre para destinar.',
   BOOK_INACTIVE: 'Obra inativa.',
 };

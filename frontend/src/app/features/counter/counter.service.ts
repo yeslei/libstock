@@ -49,7 +49,7 @@ export interface StaffLoan {
 }
 
 export type AllocationBlock =
-  | 'NOT_FIRST_IN_QUEUE'
+  | 'NOT_FIRST_ELIGIBLE'
   | 'CLIENT_INELIGIBLE'
   | 'NO_FREE_COPY'
   | 'BOOK_INACTIVE';
@@ -267,5 +267,19 @@ export class CounterService {
 
   confirmSale(reservationId: number): Observable<CirculationResult> {
     return this.http.post<CirculationResult>(`${STAFF}/purchase-reservations/${reservationId}/confirm-sale`, {});
+  }
+
+  /** Cancela qualquer reserva WAITING/NOTIFIED (SELLER e ADMINISTRATOR); o motivo é opcional e vai para a auditoria. */
+  cancelReservation(reservationId: number, reason?: string): Observable<CirculationResult> {
+    const text = reason?.trim();
+    return this.http.post<CirculationResult>(
+      `${STAFF}/purchase-reservations/${reservationId}/cancel`,
+      text ? { reason: text } : {},
+    );
+  }
+
+  /** Efetiva a expiração das reservas destinadas com prazo vencido, liberando os exemplares. */
+  expireDueReservations(): Observable<{ readonly expired: number }> {
+    return this.http.post<{ readonly expired: number }>(`${STAFF}/purchase-reservations/expire`, {});
   }
 }

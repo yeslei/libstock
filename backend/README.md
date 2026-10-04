@@ -74,7 +74,7 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `GET` | `/api/v1/me/eligibility` | Bearer (`USER`) | Situação do próprio cliente: `{eligible, reasons[{code, message}]}` com `inactive`, `penalized` e `overdue_loan` (regra V2, data de negócio de São Paulo); somente leitura, não sincroniza penalidade; 401 sem sessão, 403 sem o papel ou sem cadastro de cliente |
 | `GET` | `/api/v1/catalog/genres/{slug}/books` | Pública | Livros da categoria, paginados (`page`, `page_size` até 48); `q` (até 100 caracteres) filtra por título ou autor dentro da categoria |
 | `POST` | `/api/v1/loan-requests` | Bearer (`USER`) | Solicitação pendente de empréstimo |
-| `POST` | `/api/v1/purchase-requests` | Bearer (`USER`) | Solicitação pendente de compra com retirada no balcão |
+| `POST` | `/api/v1/purchase-requests` | Bearer (`USER`) | Solicitação pendente de compra com retirada no balcão; `pickup_date` limitada ao prazo (422 `pickup_date_after_deadline`); com fila `WAITING` entra no fim da fila (`reservation_status`) |
 
 Os dois POSTs recebem `{ "book_id": 42, "pickup_date": "2026-10-31" }`.
 Retornam HTTP 201 com `id`, `book_id`, `pickup_date`, `status` e `created_at`;
@@ -186,7 +186,7 @@ Cliente ativo com papel `USER`:
 | Método/endpoint | Contrato |
 | --- | --- |
 | GET `/api/v1/loans/me` | Aguardando retirada, ativos e atrasados do usuário autenticado |
-| GET `/api/v1/purchase-reservations/me` | WAITING/NOTIFIED do usuário, posição atual e exemplar destinado |
+| GET `/api/v1/purchase-reservations/me` | WAITING/NOTIFIED do usuário, posição atual, exemplar destinado, `expires_at` (prazo de retirada) e `expired` (somente leitura, não grava) |
 | POST `/api/v1/purchase-reservations` | Corpo `{ "book_id": 1 }`; cria WAITING sem exemplar comercial livre |
 
 `client_id`, estado e posição enviados pelo cliente são rejeitados. Consultas `/me` ignoram IDs de terceiros em query string. Todos os IDs transacionais novos devem estar entre 1 e 2^63−1.
@@ -197,8 +197,11 @@ Funcionário ativo, `SELLER` ou `ADMINISTRATOR`:
 | --- | --- |
 | POST `/api/v1/staff/loan-requests/{id}/confirm-pickup` | Corpo `{ "copy_id": 1 }`; devolve `{ "id": loan_id }` |
 | POST `/api/v1/staff/loans/{id}/confirm-return` | Sem corpo; devolve `{ "id": loan_id }` |
-| POST `/api/v1/staff/books/{id}/allocate-purchase` | Sem corpo; atende primeiro WAITING e devolve `{ "id": reservation_id }` |
-| POST `/api/v1/staff/purchase-reservations/{id}/confirm-sale` | Sem corpo; conclui venda e devolve `{ "id": sale_id }` |
+| POST `/api/v1/staff/books/{id}/allocate-purchase` | Sem corpo; destina o exemplar livre à primeira reserva WAITING elegível da obra (inelegíveis mantêm a posição), define `expires_at` (fim do 5º dia corrido em America/Sao_Paulo) e devolve `{ "id": reservation_id }`; 404 `reservation_not_found` (sem fila), 409 `no_eligible_reservation`, 409 `purchase_unavailable` |
+| POST `/api/v1/staff/purchase-reservations/{id}/confirm-sale` | Sem corpo; conclui venda e devolve `{ "id": sale_id }`; reserva vencida: 409 `reservation_expired` e a expiração é efetivada |
+| POST `/api/v1/staff/purchase-reservations/{id}/cancel` | `SELLER`/`ADMINISTRATOR`; corpo opcional `{ "reason": "..." }` (até 255); cancela WAITING/NOTIFIED e libera o exemplar; devolve `{ "id" }`; 404 `reservation_not_found`; 409 `reservation_not_cancellable` (`details.status`: `FULFILLED`, `CANCELLED` ou `EXPIRED`); auditoria com o funcionário |
+| POST `/api/v1/staff/purchase-reservations/expire` | `SELLER`/`ADMINISTRATOR`; sem corpo; efetiva a expiração das reservas NOTIFIED vencidas (libera os exemplares) e devolve `{ "expired": n }` |
+| POST `/api/v1/purchase-reservations/{id}/cancel` | `USER`; cancela a própria reserva WAITING/NOTIFIED e devolve `{ "id" }`; reserva de outro cliente ou inexistente: 404 `reservation_not_found`; estado final: 409 `reservation_not_cancellable`; 403 `client_required` |
 
 Empréstimo começa na retirada real, com devolução em um mês de calendário. Clientes penalizados/inativos/com atraso são bloqueados para novas operações; a devolução permanece permitida. A venda exige reserva NOTIFIED e exemplar comercial ativo destinado ao cliente. A baixa SOLD e a conclusão FULFILLED acontecem na mesma transação.
 
@@ -229,7 +232,7 @@ Todos os GET abaixo ficam sob `/api/v1/staff`, exigem `SELLER` ou `ADMINISTRATOR
 | GET `/api/v1/staff/loans` | `q` (também código de barras), `client_id`, `limit` | Empréstimos OPEN: `{id, client, book, copy_id, copy_barcode, loan_date, due_date, status ACTIVE/OVERDUE, days_late}`, por vencimento e id. Atraso pelo calendário de America/Sao_Paulo, igual ao acompanhamento do cliente |
 | GET `/api/v1/staff/purchase-reservations` | `q`, `client_id`, `status` (`WAITING`/`NOTIFIED`), `limit` | Reservas WAITING/NOTIFIED: `{id, client, book, status, queue_position, requested_at, pickup_date, notified_at, expires_at, expired, allocated_copy_id, allocated_copy_barcode, free_commercial_copies, can_allocate, allocation_blocked_reason}`. `queue_position` conta WAITING anteriores da obra (nulo em NOTIFIED). `expires_at` só existe se persistido; `expired` apenas o compara com agora |
 
-`client` é `{id, name, email, is_active, is_penalized, has_overdue_loan, eligible}`; `eligible` usa o mesmo predicado de `client_eligibility.py` aplicado nas confirmações. `can_allocate` é verdadeiro somente para a primeira reserva WAITING da obra com cliente elegível e exemplar comercial livre; caso contrário `allocation_blocked_reason` é `NOT_FIRST_IN_QUEUE`, `CLIENT_INELIGIBLE`, `NO_FREE_COPY` ou `BOOK_INACTIVE`. Cliente inelegível na frente da fila continua bloqueando a destinação (sem salto automático).
+`client` é `{id, name, email, is_active, is_penalized, has_overdue_loan, eligible}`; `eligible` usa o mesmo predicado de `client_eligibility.py` aplicado nas confirmações. `can_allocate` é verdadeiro somente para a primeira reserva WAITING elegível da obra (inelegíveis mantêm a posição, mas são puladas), com obra ativa e exemplar comercial livre (ou liberável: reserva NOTIFIED vencida ainda não gravada); caso contrário `allocation_blocked_reason` é `BOOK_INACTIVE`, `CLIENT_INELIGIBLE`, `NOT_FIRST_ELIGIBLE` ou `NO_FREE_COPY`. A consulta não grava: reserva NOTIFIED vencida aparece com `expired = true` até que uma escrita da obra ou `POST /staff/purchase-reservations/expire` efetive a expiração. `expires_at` é definido na destinação (23:59:59.999 do 5º dia corrido em America/Sao_Paulo).
 
 GET `/api/v1/staff/books` (`q` por título, autor ou ISBN com ou sem hífens, `limit` padrão 50): somente leitura, devolve `{id, title, author, isbn, genre, is_active, total_copies, didactic_copies, commercial_copies}`, por título e id. As contagens consideram exemplares ativos e não vendidos. `GET /api/v1/staff/books/{id}` (id inteiro positivo; 404 `book_not_found`) devolve o mesmo item e `copies[{id, barcode, destination, status, condition, sale_price, is_active, free, allocated_for_purchase}]`, onde `free` usa a definição comum de exemplar livre. Mesmos papéis e guard.
 

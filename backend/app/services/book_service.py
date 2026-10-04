@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 
 import httpx
 from pydantic import ValidationError
@@ -7,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.business_dates import BUSINESS_ZONE
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
@@ -277,7 +279,7 @@ class BookService:
             if changes.is_active is not None:
                 # Trava a obra e os exemplares antes de decidir o ramo, usando o valor
                 # travado: duas mudanças de situação concorrentes não decidem sobre dado velho.
-                self.repository.lock_book_for_inactivation(book_id)
+                self.repository.lock_book_for_inactivation(book_id, datetime.now(BUSINESS_ZONE))
                 if changes.is_active is False and book.is_active:
                     self._ensure_no_active_operations(book_id, can_view_clients)
                 elif changes.is_active is True and not book.is_active:

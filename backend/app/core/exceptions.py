@@ -273,6 +273,15 @@ class BookInactiveError(ApplicationError):
         )
 
 
+class CopyReservedError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O exemplar está destinado a uma reserva de compra dentro do prazo de retirada.",
+            "copy_reserved",
+            409,
+        )
+
+
 class CopyNotFoundError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Exemplar não encontrado.", "copy_not_found", 404)

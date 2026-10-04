@@ -109,8 +109,8 @@
                   @if (purchaseError(); as message) { <app-alert [message]="message" />@if (duplicateLink(errorCode()); as link) { <p><a [routerLink]="link">Acompanhar em Minhas reservas →</a></p> } }
                   <form class="purchase-form" (submit)="submitPurchase($event, book)">
                     <div class="dates">
-                      <label for="purchase-date">Data pretendida de retirada<input id="purchase-date" type="date" required [min]="today()" max="9998-12-31" [value]="purchaseDate()" (input)="purchaseDate.set($any($event.target).value)" [disabled]="purchasing() || purchaseRequested()" /></label>
-                      <div><p>A compra será finalizada presencialmente no balcão.</p><p class="hint">Na retirada, informe seu e-mail cadastrado.</p></div>
+                      <label for="purchase-date">Data pretendida de retirada<input id="purchase-date" type="date" required [min]="today()" [max]="purchaseMax()" [value]="purchaseDate()" (input)="purchaseDate.set($any($event.target).value)" [disabled]="purchasing() || purchaseRequested()" /></label>
+                      <div><p>A compra será finalizada presencialmente no balcão.</p><p class="hint">Na retirada, informe seu e-mail cadastrado. A retirada deve ocorrer em até 5 dias corridos.</p></div>
                     </div>
                     <button class="primary" type="submit" [disabled]="purchasing() || purchaseRequested()" [attr.aria-busy]="purchasing()">{{ purchasing() ? 'Enviando…' : purchaseRequested() ? 'Solicitação enviada' : 'Confirmar solicitação de compra' }}</button>
                   </form>

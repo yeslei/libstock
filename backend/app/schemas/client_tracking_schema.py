@@ -17,6 +17,7 @@ class TrackingItem(BaseModel):
     queue_position: int | None = None
     available_since: datetime | None = None
     expires_at: datetime | None = None
+    expired: bool = False
 
 
 class ReservePurchaseCreate(BaseModel):
@@ -39,3 +40,12 @@ class PickupConfirmation(BaseModel):
 
 class CirculationResponse(BaseModel):
     id: int
+
+
+class CancelReservationRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    reason: str | None = Field(default=None, max_length=255)
+
+
+class ExpireReservationsResponse(BaseModel):
+    expired: int

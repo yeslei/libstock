@@ -51,12 +51,12 @@ As migrations 0011/0012 já aplicadas foram preservadas. A 0013 é incremental e
 | 1.2.19 | Reserva de compra | Implementado no recorte | Detalhes solicita compra disponível ou entra na espera sem disponibilidade; ambos aparecem em Minhas reservas |
 | 1.2.20 | Validação do cliente para reserva | Implementado | Identidade do token e política comum; campos de identidade/estado/fila rejeitados |
 | 1.2.21 | Registro da reserva | Implementado | PurchaseReservation é a fonte dos estados operacionais; intenção de retirada disponível fica vinculada em PurchaseRequest |
-| 1.2.22 | Fila de reservas | Parcial | FIFO, posição real e tela do funcionário (consulta e destinação manual) existem; falta atendimento automático ao repor/devolver e política de cancelamento/expiração/cliente inelegível |
+| 1.2.22 | Fila de reservas | Parcial | FIFO, posição real e tela do funcionário (consulta e destinação manual) existem; prazo, expiração, cancelamento e primeiro elegível entregues na Issue #150; falta apenas atendimento automático ao repor/devolver |
 | 1.2.23 | Testes de usuários e acesso | Parcial | Suítes existentes + identidade `/me`, papéis, restauração e respostas fora de ordem. Falta homologação ponta a ponta com contas reais de cada papel |
 | 1.2.24 | Testes de acervo | Parcial | Cadastro/metadados e proteção do exemplar destinado cobertos. Inativação/conversão completas dependem dos fluxos pendentes |
 | 1.2.25 | Testes de empréstimo/devolução | Parcial | Transições, atraso, duplicidade e rollback cobertos. Falta comprovante e teste de navegador integrando a futura tela do funcionário |
 | 1.2.26 | Testes de vendas | Parcial | Venda vinculada à reserva, concorrência, bloqueios e rollback cobertos. Tela/venda direta dependem do contrato restante |
-| 1.2.27 | Testes de consulta/reserva | Parcial | Modalidades, reserva, identidade, FIFO e posição testados. Faltam cancelamento, expiração e recuperação de dados legados |
+| 1.2.27 | Testes de consulta/reserva | Parcial | Modalidades, reserva, identidade, FIFO e posição testados. Cancelamento e expiração testados na Issue #150; falta recuperação de dados legados |
 
 ## Ordem sugerida para os devs
 
@@ -65,7 +65,7 @@ As migrations 0011/0012 já aplicadas foram preservadas. A 0013 é incremental e
 3. **P1 — Comprovante digital:** definir conteúdo, persistir após retirada e restringir acesso. A solicitação pendente não gera comprovante de empréstimo ativo.
 4. **P1 — Gestão de acervo:** finalizar inativação, quantidades e conversão com transações, permissões e impedimentos por operação em andamento.
 5. **P1 — Pendências:** aprovar responsáveis e regra de regularização; implementar auditoria e telas. Não apagar automaticamente `is_penalized` ao devolver, pois o motivo da penalidade não está modelado.
-6. **P2 — Ciclo completo da fila:** decidir prazo de retirada, ausência, cancelamento e primeiro cliente inelegível. Hoje esse cliente bloqueia a destinação; não há salto automático nem expiração agendada.
+6. **Resolvido (Issue #150) — Ciclo completo da fila:** prazo de retirada de 5 dias corridos, expiração preguiçosa, cancelamento (cliente e balcão) e destinação à primeira reserva elegível foram aprovados e implementados (BUSINESS_RULES, seção 19). Pendente: notificação e expiração agendada (as reservas criadas por solicitação de compra com exemplar disponível também recebem o prazo).
 7. **P2 — Homologação/escala:** testes completos no navegador, paginação de consultas/listas, posições da fila em lote (hoje há uma consulta de posição por reserva WAITING) e revisão de acessibilidade/responsividade das telas operacionais.
 
 Não entram neste repasse: histórico do cliente, notificações V3, pagamentos online ou prioridade complexa de fila. Consulta local continua explicitamente não configurada.

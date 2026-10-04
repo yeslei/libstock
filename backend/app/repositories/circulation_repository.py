@@ -1,5 +1,5 @@
 from sqlalchemy import select, text
-from app.models.domain import Copy, Loan, PurchaseReservation, ReservationStatus, Sale, SaleItem, SaleStatus
+from app.models.domain import AuditLog, Client, Copy, Loan, PurchaseReservation, ReservationStatus, Sale, SaleItem, SaleStatus
 from app.models.loan_request import LoanRequest
 from app.repositories.client_request_repository import ClientRequestRepository
 from app.repositories.inventory_availability import free_copies_statement
@@ -20,10 +20,22 @@ class CirculationRepository(ClientRequestRepository):
         statement = select(PurchaseReservation).where(PurchaseReservation.id == reservation_id)
         return self.db.scalar((statement.with_for_update() if lock else statement).execution_options(populate_existing=True))
 
-    def first_waiting(self, book_id):
-        return self.db.scalar(select(PurchaseReservation).where(
+    def waiting_queue(self, book_id):
+        """WAITING reservations of the book in queue order, locked; ineligible ones keep their position."""
+        return self.db.scalars(select(PurchaseReservation).where(
             PurchaseReservation.book_id == book_id, PurchaseReservation.status == ReservationStatus.WAITING,
-        ).order_by(PurchaseReservation.queue_position, PurchaseReservation.id).limit(1).with_for_update())
+        ).order_by(PurchaseReservation.queue_position, PurchaseReservation.id).with_for_update()
+            .execution_options(populate_existing=True)).all()
+
+    def client_exists(self, client_id):
+        return self.db.scalar(select(Client.id).where(Client.id == client_id)) is not None
+
+    def record_cancellation(self, reservation_id, actor_user_id, actor_role, reason):
+        """Explicit audit entry with the actor (a client has no employee id, so it goes in new_value)."""
+        self.db.add(AuditLog(employee_id=actor_user_id if actor_role == 'STAFF' else None,
+                             entity_type='purchase_reservations', entity_id=str(reservation_id), operation='CANCEL',
+                             new_value={'actor_user_id': actor_user_id, 'actor_role': actor_role, 'reason': reason}))
+        self.db.flush()
 
     def lock_free_copy(self, book_id, destination, copy_id=None):
         statement = free_copies_statement(book_id).where(Copy.destination == destination)
