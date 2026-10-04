@@ -30,7 +30,8 @@ describe('BookDetailsComponent', () => {
     params.next(convertToParamMap({ id: '42' }));
     catalog = jasmine.createSpyObj('CatalogService', ['getBook']);
     requests = jasmine.createSpyObj('ClientRequestsService', ['requestLoan', 'requestPurchase', 'reservePurchase']);
-    tracking = jasmine.createSpyObj('ClientTrackingService', ['getLoans']);
+    tracking = jasmine.createSpyObj('ClientTrackingService', ['getLoans', 'getEligibility']);
+    tracking.getEligibility.and.returnValue(of({ eligible: true, reasons: [] }));
     tracking.getLoans.and.returnValue(of([]));
     catalog.getBook.and.returnValue(of(detail));
     auth = { user$: new BehaviorSubject({ name: 'Maria Silva', email: 'maria@email.com', role_codes: ['USER'] }), currentUser: { id: 1 }, restoreSession: () => Promise.resolve() };
@@ -159,6 +160,50 @@ describe('BookDetailsComponent', () => {
     await click('Voltar');
     expect(requests.reservePurchase).not.toHaveBeenCalled();
     expect(root().textContent).toContain('Disponibilidade');
+  });
+
+  it('mostra "Situação do cliente: apto" na confirmação da reserva', async () => {
+    rerender(reservable);
+    await click('Reservar compra');
+    expect(tracking.getEligibility).toHaveBeenCalledTimes(1);
+    expect(root().textContent).toContain('Situação do cliente: apto — conta ativa e sem pendências');
+    expect(button('Confirmar reserva').disabled).toBeFalse();
+  });
+
+  it('mostra os motivos e bloqueia a confirmação quando o cliente está inapto', async () => {
+    rerender(reservable);
+    tracking.getEligibility.and.returnValue(of({ eligible: false, reasons: [
+      { code: 'penalized', message: 'Cliente com penalidade ativa.' }, { code: 'overdue_loan', message: 'Há empréstimo em atraso.' },
+    ] }));
+    await click('Reservar compra');
+    expect(root().textContent).toContain('Situação do cliente: inapto');
+    expect(root().textContent).toContain('Cliente com penalidade ativa.');
+    expect(root().textContent).toContain('Há empréstimo em atraso.');
+    expect(root().querySelector('[role="alert"].situation--blocked')).not.toBeNull();
+    expect(button('Confirmar reserva').disabled).toBeTrue();
+    expect(requests.reservePurchase).not.toHaveBeenCalled();
+  });
+
+  it('mostra a verificação em andamento e a falha da consulta sem impedir o envio', async () => {
+    rerender(reservable);
+    const pending = new Subject<any>();
+    tracking.getEligibility.and.returnValue(pending);
+    await click('Reservar compra');
+    expect(root().textContent).toContain('Verificando situação do cliente');
+    pending.error({ status: 500 });
+    fixture.detectChanges();
+    expect(root().textContent).toContain('Não foi possível verificar a situação do cliente agora.');
+    expect(button('Confirmar reserva').disabled).toBeFalse();
+  });
+
+  it('o bloqueio por pendência lista os motivos da elegibilidade, inclusive penalidade sem atraso', async () => {
+    rerender(reservable);
+    requests.reservePurchase.and.returnValue(throwError(() => domainBlock));
+    // a confirmação vê o cliente apto; ao enviar, o backend recusa e a nova consulta traz o motivo
+    tracking.getEligibility.and.returnValues(of({ eligible: true, reasons: [] }), of({ eligible: false, reasons: [{ code: 'penalized', message: 'Cliente com penalidade ativa.' }] }));
+    await click('Reservar compra'); await click('Confirmar reserva');
+    expect(root().textContent).toContain('Reserva bloqueada por pendência');
+    expect(root().textContent).toContain('Cliente com penalidade ativa.');
   });
 
   it('registra a reserva só após a API, bloqueia duplo envio e mostra a posição retornada', async () => {
