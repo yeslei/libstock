@@ -16,6 +16,8 @@ Term = Annotated[str | None, Query(max_length=100)]
 ClientFilter = Annotated[int | None, Query(gt=0, le=2**31 - 1)]
 Limit = Annotated[int, Query(ge=1, le=100)]
 staff_only = require_roles('SELLER', 'ADMINISTRATOR')
+# Issue #169: o estoquista usa o balcão restrito ao acervo; só as consultas de obra liberam STOCK_KEEPER.
+catalog_reader = require_roles('SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR')
 
 
 def get_staff_desk_service(db: Session = Depends(get_db)):
@@ -60,13 +62,13 @@ def list_purchase_reservations(q: Term = None, client_id: ClientFilter = None,
 
 @router.get('/books', response_model=list[StaffCatalogBook])
 def list_catalog_books(q: Term = None, limit: Limit = 50,
-                       user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
+                       user: User = Depends(catalog_reader), service=Depends(get_staff_desk_service)):
     return service.catalog_books(user.id, q, limit)
 
 
 @router.get('/books/{book_id}', response_model=StaffCatalogBookDetail)
 def get_catalog_book(book_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
-                     user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
+                     user: User = Depends(catalog_reader), service=Depends(get_staff_desk_service)):
     return service.catalog_book(user.id, book_id)
 
 
