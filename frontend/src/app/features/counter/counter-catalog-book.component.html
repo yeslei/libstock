@@ -18,6 +18,32 @@
           @if (flow.feedback(); as f) { <app-alert [message]="f.message" [variant]="f.kind" /> }
         </div>
 
+        @if (blocked(); as b) {
+          <section class="blocked" aria-labelledby="bloqueio-titulo" data-blocked>
+            <h2 id="bloqueio-titulo">{{ b.title }}</h2>
+            <div class="blocked__alert" role="alert">
+              <p><strong>{{ b.headline }}</strong></p>
+              <p>{{ b.note }}</p>
+            </div>
+            @if (b.lines.length) {
+              <article class="card">
+                <h3>{{ b.sectionTitle }}</h3>
+                <ul class="blocked__lines">
+                  @for (line of b.lines; track $index) { <li>{{ line }}</li> }
+                </ul>
+              </article>
+            }
+            <div class="actions">
+              @if (b.kind === 'book') {
+                <a class="btn btn--primary" routerLink="/balcao/emprestimos/ativos">Consultar empréstimos</a>
+                <a class="btn" routerLink="/balcao/reservas">Consultar reservas</a>
+              } @else {
+                <button class="btn btn--primary" type="button" (click)="dismissBlocked()">Voltar aos exemplares</button>
+              }
+            </div>
+          </section>
+        }
+
         <div class="stack">
           <article class="card" aria-labelledby="dados-titulo">
             <h2 id="dados-titulo">Dados da obra</h2>
@@ -77,6 +103,7 @@
                       <th scope="col">Código</th>
                       <th scope="col">Finalidade</th>
                       <th scope="col">Status</th>
+                      @if (canDeleteCopy) { <th scope="col">Ações</th> }
                     </tr>
                   </thead>
                   <tbody>
@@ -85,6 +112,13 @@
                         <td>{{ copy.barcode }}</td>
                         <td>{{ destinationLabel(copy.destination) }}</td>
                         <td><span class="pill">{{ copyStatusLabel(copy) }}</span></td>
+                        @if (canDeleteCopy) {
+                          <td>
+                            @let reason = deleteCopyBlockReason(s.data, copy);
+                            <button class="btn btn--danger" type="button" [disabled]="flow.submitting() || !!reason" [attr.title]="reason" [attr.aria-describedby]="reason ? 'excluir-motivo-' + copy.id : null" (click)="askDeleteCopy(s.data, copy)">Excluir exemplar</button>
+                            @if (reason) { <span class="hint" [id]="'excluir-motivo-' + copy.id">{{ reason }}</span> }
+                          </td>
+                        }
                       </tr>
                     }
                   </tbody>

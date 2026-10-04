@@ -24,6 +24,8 @@ export interface PendingAction<R = unknown> {
   readonly confirmLabel: string;
   readonly run: () => Observable<R>;
   readonly success: (result: R) => string;
+  /** Trata o erro por conta própria (ex.: tela de bloqueio); retornar true suprime o alerta genérico. */
+  readonly onError?: (error: unknown) => boolean;
 }
 
 /**
@@ -64,13 +66,15 @@ export class ActionFlow {
         next: (result) => this.finish({ kind: 'success', message: action.success(result) }, true),
         error: (error) =>
           this.finish(
-            { kind: 'error', message: errorMessage(error, 'Não foi possível concluir a operação. Tente novamente.') },
+            action.onError?.(error)
+              ? null
+              : { kind: 'error', message: errorMessage(error, 'Não foi possível concluir a operação. Tente novamente.') },
             false,
           ),
       });
   }
 
-  private finish(feedback: Feedback, succeeded: boolean): void {
+  private finish(feedback: Feedback | null, succeeded: boolean): void {
     this.confirming.set(null);
     this.feedback.set(feedback);
     this.after(succeeded);
