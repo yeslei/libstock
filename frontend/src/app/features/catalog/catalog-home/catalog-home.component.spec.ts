@@ -94,6 +94,7 @@ describe('CatalogHomeComponent', () => {
 });
 
 describe('CatalogHomeComponent (conteúdo da referência)', () => {
+  let current: ComponentFixture<CatalogHomeComponent>;
   async function render(genres: unknown, books: unknown): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       imports: [CatalogHomeComponent],
@@ -102,19 +103,20 @@ describe('CatalogHomeComponent (conteúdo da referência)', () => {
         { provide: ActivatedRoute, useValue: { queryParamMap: new BehaviorSubject(convertToParamMap({})) } },
         { provide: AuthService, useValue: { user$: new BehaviorSubject<User | null>(null) } },
         { provide: CatalogAdminService, useValue: { setBookFeatured: () => of(void 0) } },
-        { provide: CatalogService, useValue: { getFeaturedGenres: () => genres, getFeaturedBooks: () => books, searchBooks: () => of([]) } },
+        { provide: CatalogService, useValue: { getFeaturedGenres: () => genres, getFeaturedBooks: () => books, searchBooks: () => of([]), getAllGenres: () => of([{ id: 1, name: 'Romance', slug: 'romance' }, { id: 9, name: 'Poesia', slug: 'poesia' }]) } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(CatalogHomeComponent);
+    current = fixture;
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('mostra o texto do hero e leva "Explorar livros" às categorias', async () => {
+  it('mostra o texto do hero e leva "Explorar livros" ao acervo completo', async () => {
     const root = await render(of([]), of([]));
     expect(root.textContent).toContain('Consulte o acervo, solicite empréstimos ou compras e acompanhe tudo pelo LibStock.');
     const explore = Array.from(root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Explorar livros')!;
-    expect(explore.getAttribute('href')).toBe('/#categorias');
+    expect(explore.getAttribute('href')).toBe('/acervo');
     expect(root.querySelector('#categorias')).not.toBeNull();
   });
 
@@ -133,6 +135,17 @@ describe('CatalogHomeComponent (conteúdo da referência)', () => {
     expect(root.textContent).toContain('Venda disponível');
     expect(root.textContent).toContain('Esgotado');
     expect(root.querySelector('a[href="/livros/7"]')).not.toBeNull();
+  });
+
+  it('"Ver todos" leva ao acervo completo e "Mais" abre todas as categorias', async () => {
+    const root = await render(of([{ id: 1, name: 'Romance', slug: 'romance' }]), of([]));
+    expect(Array.from(root.querySelectorAll('a')).find((a) => a.textContent?.includes('Ver todos'))!.getAttribute('href')).toBe('/acervo');
+    const more = root.querySelector<HTMLButtonElement>('button.chip--more')!;
+    expect(more.textContent!.trim()).toBe('Mais');
+    more.click();
+    current.detectChanges();
+    const chips = Array.from(root.querySelectorAll('.chip')).map((c) => c.textContent!.trim());
+    expect(chips).toEqual(['Romance', 'Poesia', 'Menos']);
   });
 
   it('mostra carregando, vazio e erro nas categorias e nos livros em destaque', async () => {

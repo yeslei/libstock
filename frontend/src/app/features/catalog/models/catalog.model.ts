@@ -65,3 +65,10 @@ export interface PagedBooks {
 }
 
 export type { LoadState } from '../../../core/models/load-state.model';
+
+export interface PagedCatalog {
+  readonly items: CatalogBook[];
+  readonly total: number;
+  readonly page: number;
+  readonly page_size: number;
+}

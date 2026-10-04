@@ -4,7 +4,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, catchError, map, of, startWith, switchMap, takeUntil } from 'rxjs';
 import { ClientRequestsService } from '../../client-tracking/client-requests.service';
-import { ClientTrackingService, TrackingItem } from '../../client-tracking/client-tracking.service';
+import { ClientTrackingService, Eligibility, TrackingItem } from '../../client-tracking/client-tracking.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ApiError } from '../../../core/models/auth.model';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
@@ -22,6 +22,8 @@ export interface BlockedState {
   readonly message: string;
   /** Empréstimos em atraso lidos de `GET /loans/me`; vazio quando a pendência não vem de um empréstimo. */
   readonly overdue: readonly TrackingItem[];
+  /** Motivos de `GET /me/eligibility`; vazio se a consulta falhar. */
+  readonly reasons: readonly string[];
 }
 
 const BLOCKED_COPY: Record<RequestKind, { title: string; heading: string; retry: string }> = {
@@ -63,6 +65,12 @@ export class BookDetailsComponent {
   protected readonly reserveStep = signal<'idle' | 'confirm' | 'done'>('idle');
   protected readonly queuePosition = signal<number | null>(null);
   protected readonly blocked = signal<BlockedState | null>(null);
+  /** Situação do cliente na confirmação da reserva: consulta em andamento, resultado ou falha. */
+  protected readonly eligibility = signal<LoadState<Eligibility>>({ status: 'loading' });
+  protected readonly reservationBlocked = computed(() => {
+    const situation = this.eligibility();
+    return situation.status === 'loaded' && !situation.data.eligible;
+  });
   protected readonly blockedCopy = computed(() => { const b = this.blocked(); return b ? BLOCKED_COPY[b.kind] : null; });
   protected readonly state = toSignal(this.route.paramMap.pipe(
     switchMap((params) => {
@@ -74,6 +82,7 @@ export class BookDetailsComponent {
       this.coverFailed.set(false);
       this.purchaseDate.set(''); this.purchaseRequested.set(false); this.purchaseError.set(null);
       this.reserveStep.set('idle'); this.queuePosition.set(null); this.blocked.set(null);
+      this.eligibility.set({ status: 'loading' });
       const id = Number(params.get('id'));
       if (!Number.isSafeInteger(id) || id <= 0) return of<LoadState<CatalogBookDetail>>({ status: 'error', message: 'Livro não encontrado.' });
       return this.catalog.getBook(id).pipe(
@@ -122,7 +131,11 @@ export class BookDetailsComponent {
   /** Mostra o bloqueio e, só para leitura, quais empréstimos em atraso o originam. */
   private showBlocked(kind: RequestKind, message: string): void {
     const version = this.bookVersion;
-    this.blocked.set({ kind, message, overdue: [] });
+    this.blocked.set({ kind, message, overdue: [], reasons: [] });
+    this.tracking.getEligibility().pipe(catchError(() => of<Eligibility | null>(null)), takeUntil(this.bookChanged), takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
+      if (version !== this.bookVersion || !result) return;
+      this.blocked.update((current) => current && { ...current, reasons: result.reasons.map((reason) => reason.message) });
+    });
     this.tracking.getLoans().pipe(catchError(() => of<TrackingItem[]>([])), takeUntil(this.bookChanged), takeUntilDestroyed(this.destroyRef)).subscribe((items) => {
       if (version !== this.bookVersion) return;
       this.blocked.update((current) => current && { ...current, overdue: items.filter((item) => item.status === 'OVERDUE') });
@@ -148,7 +161,18 @@ export class BookDetailsComponent {
     const proceed = await this.ensureSession(book, () => this.purchasing.set(false));
     if (!proceed) return;
     this.purchasing.set(false);
+    this.loadEligibility();
     this.reserveStep.set('confirm');
+  }
+
+  /** Consulta somente leitura; o backend continua decidindo no envio. */
+  private loadEligibility(): void {
+    const version = this.bookVersion;
+    this.eligibility.set({ status: 'loading' });
+    this.tracking.getEligibility().pipe(takeUntil(this.bookChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (data) => { if (version === this.bookVersion) this.eligibility.set({ status: 'loaded', data }); },
+      error: () => { if (version === this.bookVersion) this.eligibility.set({ status: 'error', message: 'Não foi possível verificar a situação do cliente agora.' }); },
+    });
   }
 
   protected confirmReservation(book: CatalogBookDetail): void {

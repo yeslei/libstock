@@ -17,9 +17,18 @@ export interface TrackingItem {
   expires_at: string | null;
 }
 
+export type EligibilityReasonCode = 'inactive' | 'penalized' | 'overdue_loan';
+
+export interface Eligibility {
+  eligible: boolean;
+  reasons: { code: EligibilityReasonCode; message: string }[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ClientTrackingService {
   private readonly http = inject(HttpClient);
   getLoans() { return this.http.get<TrackingItem[]>('/api/v1/loans/me'); }
+  /** Situação de elegibilidade do próprio cliente (somente leitura). */
+  getEligibility() { return this.http.get<Eligibility>('/api/v1/me/eligibility'); }
   getReservations() { return this.http.get<TrackingItem[]>('/api/v1/purchase-reservations/me'); }
 }
