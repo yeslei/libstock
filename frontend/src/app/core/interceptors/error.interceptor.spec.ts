@@ -34,6 +34,10 @@ describe('errorInterceptor', () => {
     expect(fail(500, { detail: 'x', code: 'copy_delete_persistence_error' }).detail).toContain('Nada foi alterado');
   });
 
+  it('mapeia obra inativa em empréstimo e venda diretos', () => {
+    expect(fail(409, { detail: 'x', code: 'book_inactive' }).detail).toBe('A obra deste exemplar está inativa e não aceita novas operações.');
+  });
+
   it('mapeia a inativação bloqueada e preserva código, status e os dados estruturados', () => {
     const details = { counts: { open_loans: 1 }, links: [{ type: 'open_loan' }] };
     const error = fail(409, { detail: 'x', code: 'book_has_active_operations', details });

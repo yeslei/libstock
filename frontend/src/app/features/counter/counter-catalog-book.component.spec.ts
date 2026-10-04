@@ -66,6 +66,9 @@ function confirmDialog(ctx: Ctx) {
   ctx.fixture.detectChanges();
 }
 
+const deleteButtonsOf = (root: HTMLElement) =>
+  Array.from(root.querySelectorAll('tbody tr')).map((row) => row.querySelector('button') as HTMLButtonElement | null);
+
 describe('Balcão: detalhes da obra', () => {
   it('mostra dados da obra e exemplares reais, sem ações de escrita para o vendedor', () => {
     const { root, counter, button } = setup(of(detail()));
@@ -430,6 +433,36 @@ describe('Balcão: detalhes da obra', () => {
       expect(ctx.root.textContent).not.toContain('Exemplar #00101 excluído');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
       ctx.button('Voltar aos exemplares')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
+    });
+
+    it('mostra os vínculos sem nome de cliente quando o backend o omite', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.books.update.and.returnValue(throwError(() => ({
+        status: 409, code: 'book_has_active_operations', detail: 'x',
+        details: { counts: { open_loans: 1 }, links: [{ type: 'open_loan', copy_barcode: '00102' }] },
+      })));
+      ctx.button('Editar obra')!.click();
+      ctx.fixture.detectChanges();
+      ctx.button('Inativar obra')!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      expect(Array.from(ctx.root.querySelectorAll('[data-blocked] li')).map((li) => li.textContent)).toEqual([
+        'Empréstimos em aberto: 1', 'Exemplar #00102 · empréstimo ativo',
+      ]);
+    });
+
+    it('salvar a categoria limpa um bloqueio anterior', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.copies.delete.and.returnValue(throwError(() => ({ status: 409, code: 'copy_not_available', detail: 'x', details: { reasons: [{ message: 'm' }] } })));
+      ctx.books.update.and.returnValue(of({}) as never);
+      deleteButtonsOf(ctx.root)[0]!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      expect(ctx.root.querySelector('[data-blocked]')).not.toBeNull();
+      edit(ctx, 'Ficção');
+      ctx.button('Salvar alteração')!.click();
       ctx.fixture.detectChanges();
       expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
     });
