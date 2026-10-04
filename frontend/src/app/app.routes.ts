@@ -28,6 +28,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-catalog.component').then(m => m.CounterCatalogComponent),
       },
       {
+        path: 'acervo/:id/exemplares/novo', title: 'Novo exemplar · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-copy-create.component').then(m => m.CounterCopyCreateComponent),
+      },
+      {
         path: 'acervo/:id', title: 'Obra · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-catalog-book.component').then(m => m.CounterCatalogBookComponent),
       },

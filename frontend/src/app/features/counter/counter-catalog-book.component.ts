@@ -14,12 +14,14 @@ import { ActionFlow, copyStatusLabel, destinationLabel, toLoadState } from './de
 
 /** Papéis que o backend autoriza em `PATCH /api/v1/books/{id}`. No balcão, apenas ADMINISTRATOR chega à tela. */
 const EDIT_ROLES = ['STOCK_KEEPER', 'MANAGER', 'ADMINISTRATOR'];
+/** Papéis que o backend autoriza em `POST /api/v1/copies/`. */
+const COPY_ROLES = ['STOCK_KEEPER', 'ADMINISTRATOR'];
 const GENRE_MAX = 100;
 
 /**
  * Frames "Funcionário / Acervo / Detalhes da obra" e "Exemplares": dados da obra e exemplares em leitura.
  * Categoria e inativação usam o endpoint existente de obras e só aparecem para os papéis autorizados.
- * Edição/conversão/exclusão de exemplar e reativação não têm endpoint nem regra aprovada (BUSINESS_RULES, seção 21).
+ * Inclusão de exemplar tem tela própria (/exemplares/novo). Edição/conversão/exclusão de exemplar e reativação não têm endpoint nem regra aprovada (BUSINESS_RULES, seção 21).
  */
 @Component({
   selector: 'app-counter-catalog-book',
@@ -38,6 +40,7 @@ export class CounterCatalogBookComponent {
 
   protected readonly state = signal<LoadState<StaffCatalogBookDetail>>({ status: 'loading' });
   protected readonly canEdit = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => EDIT_ROLES.includes(role));
+  protected readonly canAddCopy = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => COPY_ROLES.includes(role));
   protected readonly editing = signal(false);
   protected readonly genre = signal('');
   protected readonly genreMax = GENRE_MAX;
@@ -89,18 +92,32 @@ export class CounterCatalogBookComponent {
     });
   }
 
+  /** Situação lida dos exemplares carregados; o backend não bloqueia a inativação por esses vínculos. */
+  protected deactivationSituation(book: StaffCatalogBookDetail): string[] {
+    const active = book.copies.filter((copy) => copy.is_active);
+    const borrowed = active.filter((copy) => copy.status === 'BORROWED');
+    const reserved = active.filter((copy) => copy.allocated_for_purchase);
+    const lines = [book.total_copies === 1 ? '1 exemplar vinculado' : `${book.total_copies} exemplares vinculados`];
+    if (!borrowed.length && !reserved.length) {
+      lines.push('Nenhum exemplar emprestado ou reservado para venda');
+      return lines;
+    }
+    for (const copy of borrowed) lines.push(`Exemplar ${copy.barcode} emprestado`);
+    for (const copy of reserved) lines.push(`Exemplar ${copy.barcode} reservado para venda`);
+    lines.push('O sistema não impede a inativação nestes casos');
+    return lines;
+  }
+
   protected askDeactivate(book: StaffCatalogBookDetail): void {
     if (!this.canEdit || !book.is_active) return;
     this.flow.ask({
-      title: 'Inativar obra?',
-      details: [
-        `Obra: ${book.title}`,
-        'A obra deixa de aparecer no acervo ativo. Não há reativação por esta tela.',
-      ],
-      confirmLabel: 'Inativar obra',
+      title: `Inativar ${book.title}?`,
+      intro: 'A obra deixa de aparecer no acervo ativo e não aceita novos exemplares. Os registros anteriores são preservados. Não há reativação por esta tela. Confira a situação dos exemplares antes de confirmar.',
+      detailsTitle: 'Situação verificada',
+      details: this.deactivationSituation(book),
+      confirmLabel: 'Confirmar inativação',
       run: () => this.books.update(book.id, { is_active: false }),
-      success: () => `Obra “${book.title}” inativada.`,
+      success: () => `${book.title} foi inativada. O histórico foi preservado.`,
     });
   }
 }
-

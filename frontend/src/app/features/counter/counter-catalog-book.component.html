@@ -50,8 +50,21 @@
             </article>
           }
 
+          @if (!s.data.is_active) {
+            <article class="card" aria-labelledby="situacao-titulo">
+              <h2 id="situacao-titulo">Situação da obra</h2>
+              <p>Status: Inativa</p>
+              <p>Exemplares vinculados: {{ s.data.total_copies }}</p>
+              <p>Disponibilidade operacional: indisponível</p>
+              <a class="btn btn--primary" routerLink="/balcao/acervo">Voltar ao acervo</a>
+            </article>
+          }
+
           <article class="card" aria-labelledby="exemplares-titulo">
             <h2 id="exemplares-titulo">Exemplares de “{{ s.data.title }}”</h2>
+            @if (canAddCopy && s.data.is_active) {
+              <a class="btn btn--primary" [routerLink]="['/balcao/acervo', s.data.id, 'exemplares', 'novo']">Novo exemplar</a>
+            }
             <p class="note">A obra guarda os dados bibliográficos. Cada exemplar possui código, finalidade e status próprios.</p>
             @if (!s.data.copies.length) {
               <p class="empty" role="status">Nenhum exemplar cadastrado para esta obra.</p>
@@ -82,7 +95,7 @@
         </div>
 
         @if (flow.confirming(); as c) {
-          <app-confirm-dialog [title]="c.title" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="flow.submitting()" (confirmed)="flow.confirm()" (cancelled)="flow.cancel()" />
+          <app-confirm-dialog [title]="c.title" [intro]="c.intro ?? ''" [detailsTitle]="c.detailsTitle ?? ''" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="flow.submitting()" (confirmed)="flow.confirm()" (cancelled)="flow.cancel()" />
         }
       }
     }

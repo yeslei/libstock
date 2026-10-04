@@ -85,6 +85,16 @@ describe('Balcão: detalhes da obra', () => {
     expect(button('Inativar obra')).toBeUndefined();
     expect(root.querySelector('input')).toBeNull();
     expect(root.textContent).not.toContain('Excluir exemplar');
+    expect(root.textContent).not.toContain('Novo exemplar');
+  });
+
+  it('oferece Novo exemplar apenas a papéis autorizados e a obras ativas', () => {
+    const admin = setup(of(detail()), ['ADMINISTRATOR']);
+    const link = Array.from(admin.root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Novo exemplar');
+    expect(link?.getAttribute('href')).toBe('/balcao/acervo/7/exemplares/novo');
+    TestBed.resetTestingModule();
+    const inactive = setup(of(detail({ is_active: false })), ['ADMINISTRATOR']);
+    expect(inactive.root.textContent).not.toContain('Novo exemplar');
   });
 
   it('mostra carregamento, depois erro de domínio com nova tentativa', () => {
@@ -206,10 +216,67 @@ describe('Balcão: detalhes da obra', () => {
       ctx.counter.getCatalogBook.and.returnValue(of(detail({ is_active: false })));
       confirmDialog(ctx);
       expect(ctx.books.update).toHaveBeenCalledOnceWith(7, { is_active: false });
-      expect(ctx.root.textContent).toContain('Obra “Dom Casmurro” inativada.');
+      expect(ctx.root.textContent).toContain('Dom Casmurro foi inativada. O histórico foi preservado.');
+      expect(ctx.root.textContent).toContain('Situação da obra');
+      expect(ctx.root.textContent).toContain('Disponibilidade operacional: indisponível');
+      expect(ctx.root.querySelector('a[href="/balcao/acervo"].btn')?.textContent).toContain('Voltar ao acervo');
       expect(ctx.root.textContent).toContain('Status da obra: Inativa');
       expect(ctx.button('Inativar obra')).toBeUndefined();
       expect(ctx.root.textContent).toContain('A reativação ainda não está disponível.');
+    });
+
+    it('o modal de inativação mostra a situação real dos exemplares e a ressalva do sistema', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.button('Editar obra')!.click();
+      ctx.fixture.detectChanges();
+      ctx.button('Inativar obra')!.click();
+      ctx.fixture.detectChanges();
+      const dialog = ctx.root.querySelector('dialog')!;
+      expect(dialog.querySelector('h2')?.textContent).toBe('Inativar Dom Casmurro?');
+      expect(dialog.textContent).toContain('Situação verificada');
+      expect(Array.from(dialog.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+        '4 exemplares vinculados', 'Exemplar 00102 emprestado', 'Exemplar 00104 reservado para venda',
+        'O sistema não impede a inativação nestes casos',
+      ]);
+      expect(dialog.textContent).toContain('Confirmar inativação');
+    });
+
+    it('o modal informa quando não há empréstimo nem reserva', () => {
+      const ctx = setup(of(detail({ copies: [copy()], total_copies: 1 })), admin);
+      ctx.button('Editar obra')!.click();
+      ctx.fixture.detectChanges();
+      ctx.button('Inativar obra')!.click();
+      ctx.fixture.detectChanges();
+      expect(Array.from(ctx.root.querySelectorAll('dialog li')).map((li) => li.textContent)).toEqual([
+        '1 exemplar vinculado', 'Nenhum exemplar emprestado ou reservado para venda',
+      ]);
+    });
+
+    it('mostra o erro de domínio da inativação sem inventar bloqueio nem anunciar sucesso', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.books.update.and.returnValue(throwError(() => ({ status: 409, detail: 'Obra não pode ser inativada.' })));
+      ctx.button('Editar obra')!.click();
+      ctx.fixture.detectChanges();
+      ctx.button('Inativar obra')!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      expect(ctx.root.querySelector('[role="alert"]')?.textContent).toContain('Obra não pode ser inativada.');
+      expect(ctx.root.textContent).not.toContain('foi inativada');
+      expect(ctx.root.textContent).not.toContain('Vínculos encontrados');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+    });
+
+    it('bloqueia duplo envio da inativação', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.books.update.and.returnValue(new Subject<unknown>() as never);
+      ctx.button('Editar obra')!.click();
+      ctx.fixture.detectChanges();
+      ctx.button('Inativar obra')!.click();
+      ctx.fixture.detectChanges();
+      const submit = ctx.root.querySelector('.confirm__submit') as HTMLButtonElement;
+      submit.click();
+      submit.click();
+      expect(ctx.books.update).toHaveBeenCalledTimes(1);
     });
 
     it('oferece edição também a STOCK_KEEPER, papel autorizado pelo backend', () => {

@@ -1,0 +1,94 @@
+<section class="page" aria-labelledby="novo-exemplar-titulo">
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo</a>
+        <p class="loading" role="status"><app-spinner /> Carregando obra…</p>
+      }
+      @case ('error') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo</a>
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        <a class="page__back" [routerLink]="['/balcao/acervo', s.data.id]">← Acervo / {{ s.data.title }}</a>
+        @if (included(); as done) {
+          <h1 id="novo-exemplar-titulo">Exemplar incluído</h1>
+          <div data-feedback>
+            <app-alert variant="success" [message]="'Exemplar ' + done.copy.barcode + ' cadastrado.'">
+              @if (done.after !== null) {
+                <span>A quantidade da obra foi atualizada de {{ done.before }} para {{ done.after }} {{ done.after === 1 ? 'exemplar' : 'exemplares' }}.</span>
+              }
+            </app-alert>
+          </div>
+          <div class="stack">
+            <article class="card" aria-labelledby="incluido-titulo">
+              <h2 id="incluido-titulo">Exemplar incluído</h2>
+              <p>{{ s.data.title }} · {{ done.copy.barcode }}</p>
+              <p>Finalidade: {{ destinationLabel(done.copy.destination) }} · Status: {{ done.copy.status === 'AVAILABLE' ? 'Disponível' : done.copy.status }}</p>
+            </article>
+            <div class="actions">
+              <a class="btn btn--primary" [routerLink]="['/balcao/acervo', s.data.id]">Ver exemplares</a>
+              <button class="btn" type="button" (click)="addAnother()">Adicionar outro</button>
+            </div>
+          </div>
+        } @else {
+          <h1 id="novo-exemplar-titulo">Novo exemplar</h1>
+          @if (!canCreate) {
+            <app-alert message="Você não tem permissão para incluir exemplares." />
+          } @else if (!s.data.is_active) {
+            <app-alert message="A obra está inativa e não aceita novos exemplares." />
+          } @else {
+            <div data-feedback tabindex="-1">
+              @if (failure(); as message) { <app-alert [message]="message" /> }
+            </div>
+            <form class="stack" novalidate (submit)="$event.preventDefault(); submit(s.data)">
+              <article class="card" aria-labelledby="obra-selecionada-titulo">
+                <h2 id="obra-selecionada-titulo">Obra selecionada</h2>
+                <p>{{ s.data.title }} · {{ s.data.author }}</p>
+                <p>Quantidade atual: {{ s.data.total_copies === 1 ? '1 exemplar' : s.data.total_copies + ' exemplares' }}</p>
+              </article>
+
+              <div class="field" [class.field--error]="barcodeError()">
+                <label for="copy-barcode">Código do exemplar *</label>
+                <input id="copy-barcode" type="text" autocomplete="off" [value]="barcode()" (input)="setBarcode($event)"
+                  [attr.aria-invalid]="barcodeError() ? 'true' : null" aria-describedby="copy-barcode-help" />
+                <span id="copy-barcode-help">Informe um código único para identificar esta cópia.</span>
+                @if (barcodeError(); as message) { <span class="field__error" role="alert">{{ message }}</span> }
+              </div>
+
+              <div class="field" [class.field--error]="destinationError()">
+                <label for="copy-destination">Finalidade *</label>
+                <select id="copy-destination" [value]="destination()" (change)="setDestination($event)" [attr.aria-invalid]="destinationError() ? 'true' : null">
+                  <option value="">Selecione</option>
+                  <option value="DIDACTIC">Empréstimo</option>
+                  <option value="COMMERCIAL">Venda</option>
+                </select>
+                @if (destinationError(); as message) { <span class="field__error" role="alert">{{ message }}</span> }
+              </div>
+
+              @if (destination() === 'COMMERCIAL') {
+                <div class="field" [class.field--error]="priceError()">
+                  <label for="copy-price">Preço de venda (R$) *</label>
+                  <input id="copy-price" type="text" inputmode="decimal" autocomplete="off" [value]="price()" (input)="setPrice($event)" [attr.aria-invalid]="priceError() ? 'true' : null" />
+                  @if (priceError(); as message) { <span class="field__error" role="alert">{{ message }}</span> }
+                </div>
+              }
+
+              <p class="note">O status de uma nova cópia é definido pelo sistema. Emprestado, Reservado e Vendido resultam das operações.</p>
+              @if (duplicateShown()) {
+                <app-alert message="Seus dados foram mantidos. Corrija somente o código. Nenhum exemplar foi incluído." />
+              }
+
+              <div class="actions">
+                <button class="btn btn--primary" type="submit" [disabled]="submitting() || duplicateShown()" [attr.aria-busy]="submitting()">
+                  @if (submitting()) { <app-spinner [size]="16" /> Salvando… } @else { Salvar exemplar }
+                </button>
+                <a class="btn" [routerLink]="['/balcao/acervo', s.data.id]">Cancelar</a>
+              </div>
+            </form>
+          }
+        }
+      }
+    }
+  }
+</section>

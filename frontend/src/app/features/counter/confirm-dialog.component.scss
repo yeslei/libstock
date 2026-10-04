@@ -20,6 +20,18 @@ h2 {
   font-size: 1.125rem;
 }
 
+.confirm__intro {
+  margin: 0 0 $space-3;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+.confirm__details-title {
+  margin: 0 0 $space-2;
+  color: $client-green;
+  font-size: 1rem;
+}
+
 .confirm__details {
   margin: 0 0 $space-6;
   padding-left: $space-5;
