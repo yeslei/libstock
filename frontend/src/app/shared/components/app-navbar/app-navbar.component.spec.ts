@@ -100,10 +100,13 @@ describe('AppNavbarComponent', () => {
     expect(focus).toHaveBeenCalled();
   });
 
-  it('remove a aba Explorar acervo', () => {
+  it('leva "Explorar acervo" às categorias da home sem marcá-lo como página atual', () => {
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('a[href="/explorar"]')).toBeNull();
-    expect(fixture.nativeElement.textContent).not.toContain('Explorar acervo');
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('a[href="/explorar"]')).toBeNull();
+    const link = Array.from(root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Explorar acervo')!;
+    expect(link.getAttribute('href')).toBe('/#categorias');
+    expect(link.hasAttribute('aria-current')).toBeFalse();
   });
 
 });
