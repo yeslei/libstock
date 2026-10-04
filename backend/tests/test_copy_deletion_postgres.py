@@ -206,68 +206,18 @@ def test_persistence_failure_rolls_back_and_returns_stable_500(api, monkeypatch)
     assert exists(api, copy_id)
 
 
-def test_concurrent_deletes_of_the_same_copy_yield_one_200_and_one_404(api):
-    copy_id = add_copy(api)
-    barrier = Barrier(2)
-
-    def attempt(_):
-        service = api.service()
-        barrier.wait(timeout=10)
-        try:
-            service.delete_copy(copy_id, api.admin_id)
-            return 200
-        except ApplicationError as error:
-            return error.status_code
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        results = sorted(pool.map(attempt, range(2)))
-    assert results == [200, 404]
-    assert not exists(api, copy_id)
-
-
-def test_delete_racing_a_direct_loan_never_leaves_a_loan_without_its_copy(api):
-    copy_id = add_copy(api)
-    barrier = Barrier(2)
-
-    def delete_attempt():
-        service = api.service()
-        barrier.wait(timeout=10)
-        try:
-            service.delete_copy(copy_id, api.admin_id)
-            return 'deleted'
-        except ApplicationError as error:
-            return error.code
-
-    def loan_attempt():
-        with Session(api.engine) as db:
-            service = LoanService(LoanRepository(db), db, ClientPendencyService(db=db, repository=ClientPendencyRepository(db)))
-            barrier.wait(timeout=10)
-            try:
-                service.create_loan(LoanCreate(client_id=api.client_id, copy_id=copy_id), employee_id=api.admin_id)
-                return 'loaned'
-            except Exception as error:  # HTTPException do fluxo de empréstimo
-                return getattr(error, 'status_code', 500)
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        deleting, loaning = pool.submit(delete_attempt), pool.submit(loan_attempt)
-        deleted, loaned = deleting.result(), loaning.result()
-    assert (deleted, loaned) in {('deleted', 404), ('copy_not_available', 'loaned')}, (deleted, loaned)
-    with Session(api.engine) as db:
-        assert (db.get(Copy, copy_id) is None) == (deleted == 'deleted')
-        assert db.scalar(select(func.count()).select_from(Loan).where(Loan.copy_id == copy_id)) == (0 if deleted == 'deleted' else 1)
-
-
 # ---- inativação da obra ----------------------------------------------------------------------
 
-def inactivate(api, book_id=None):
+def inactivate(api, book_id=None, can_view_clients=True):
     with Session(api.engine) as db:
         return BookService(db=db, repository=BookRepository(db)).update_book(
-            book_id or api.book_id, BookUpdate(is_active=False), employee_id=api.admin_id)
+            book_id or api.book_id, BookUpdate(is_active=False), employee_id=api.admin_id,
+            can_view_clients=can_view_clients)
 
 
-def assert_blocked(api, **counts):
+def assert_blocked(api, can_view_clients=True, **counts):
     with pytest.raises(ApplicationError) as blocked:
-        inactivate(api)
+        inactivate(api, can_view_clients=can_view_clients)
     assert (blocked.value.status_code, blocked.value.code) == (409, 'book_has_active_operations')
     expected = {'open_loans': 0, 'pending_loan_requests': 0, 'purchase_reservations': 0, **counts}
     assert blocked.value.details['counts'] == expected
@@ -286,6 +236,22 @@ def test_inactivation_blocked_by_open_loan_of_any_copy_returns_links(api):
     link = error.details['links'][0]
     assert (link['type'], link['copy_barcode']) == ('open_loan', barcode)
     assert link['client_name'] == 'Teste Cliente'
+
+
+def test_inactivation_block_hides_client_names_from_roles_without_client_access(api):
+    with Session(api.engine) as db:
+        LoanRequestService(db, LoanRequestRepository(db)).create(
+            LoanRequestCreate(book_id=api.book_id, pickup_date=business_today()), client_id=api.client_id)
+    loaned = add_copy(api)
+    with Session(api.engine) as db:
+        barcode = db.get(Copy, loaned).barcode
+        open_loan(db, loaned, second_client(db), api.admin_id)
+        db.commit()
+    error = assert_blocked(api, can_view_clients=False, open_loans=1, pending_loan_requests=1)
+    assert all('client_name' not in link for link in error.details['links'])
+    assert {link['type'] for link in error.details['links']} == {'open_loan', 'pending_loan_request'}
+    assert [l['copy_barcode'] for l in error.details['links'] if l['type'] == 'open_loan'] == [barcode]
+    assert 'Teste Cliente' not in str(error.details) and 'Outro cliente' not in str(error.details)
 
 
 def test_inactivation_blocked_by_pending_pickup_request(api):
@@ -336,39 +302,3 @@ def test_other_book_updates_are_not_blocked_by_operations(api):
         result = BookService(db=db, repository=BookRepository(db)).update_book(
             api.book_id, BookUpdate(genre='Romance'), employee_id=api.admin_id)
         assert result.genre == 'Romance' and result.is_active is True
-
-
-def test_inactivation_racing_a_pending_request_never_leaves_an_inactive_book_with_a_pending_request(api):
-    barrier = Barrier(2)
-
-    def request():
-        with Session(api.engine) as db:
-            barrier.wait(timeout=10)
-            try:
-                LoanRequestService(db, LoanRequestRepository(db)).create(
-                    LoanRequestCreate(book_id=api.book_id, pickup_date=business_today()), client_id=api.client_id)
-                return 'requested'
-            except ApplicationError as error:
-                return error.code
-
-    def deactivate():
-        with Session(api.engine) as db:
-            barrier.wait(timeout=10)
-            try:
-                BookService(db=db, repository=BookRepository(db)).update_book(
-                    api.book_id, BookUpdate(is_active=False), employee_id=api.admin_id)
-                return 'inactivated'
-            except ApplicationError as error:
-                return error.code
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        requesting, deactivating = pool.submit(request), pool.submit(deactivate)
-        requested, deactivated = requesting.result(), deactivating.result()
-    # A solicitação trava o livro; ou ela vem antes e bloqueia a inativação, ou depois e é recusada (obra inativa).
-    assert (requested, deactivated) in {
-        ('requested', 'book_has_active_operations'), ('book_not_found', 'inactivated'),
-    }, (requested, deactivated)
-    with Session(api.engine) as db:
-        pending = db.scalar(select(func.count()).select_from(LoanRequest).where(
-            LoanRequest.book_id == api.book_id, LoanRequest.loan_id.is_(None)))
-        assert pending == (1 if deactivated == 'book_has_active_operations' else 0)

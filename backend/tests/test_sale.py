@@ -33,6 +33,7 @@ def _copy(
 ):
     return SimpleNamespace(
         id=copy_id,
+        book_id=1,
         status=status_,
         is_active=is_active,
         destination=destination_,
