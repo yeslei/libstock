@@ -36,8 +36,8 @@ describe('AppNavbarComponent', () => {
     expect(text()).not.toContain('Cadastrar exemplar');
   });
 
-  it('mostra o balcão apenas para vendedor e administrador', () => {
-    for (const [role, visible] of [['SELLER', true], ['ADMINISTRATOR', true], ['STOCK_KEEPER', false], ['USER', false]] as const) {
+  it('mostra o balcão para vendedor, estoquista e administrador, e oculta do cliente', () => {
+    for (const [role, visible] of [['SELLER', true], ['ADMINISTRATOR', true], ['STOCK_KEEPER', true], ['USER', false]] as const) {
       user$.next({ id: 9, name: 'Conta', email: 'c@x.dev', role_codes: [role], created_at: '' });
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('a[href="/balcao"]') !== null).withContext(role).toBe(visible);
