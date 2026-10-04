@@ -34,6 +34,12 @@ describe('errorInterceptor', () => {
     expect(fail(500, { detail: 'x', code: 'copy_delete_persistence_error' }).detail).toContain('Nada foi alterado');
   });
 
+  it('mapeia exemplar comercial sem preço na venda direta', () => {
+    expect(fail(409, { detail: 'x', code: 'copy_without_price' }).detail).toBe(
+      'Este exemplar comercial não tem preço de venda cadastrado e não pode ser vendido.',
+    );
+  });
+
   it('mapeia obra inativa em empréstimo e venda diretos', () => {
     expect(fail(409, { detail: 'x', code: 'book_inactive' }).detail).toBe('A obra deste exemplar está inativa e não aceita novas operações.');
   });

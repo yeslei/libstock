@@ -143,19 +143,21 @@ export const LIST_LIMIT = 50;
 export const CLIENT_SEARCH_LIMIT = 20;
 export const COPY_LOOKUP_LIMIT = 20;
 
-/** Item pedido a `POST /api/v1/sales/`; o preço enviado é o do exemplar retornado pelo backend. */
+/** Item pedido a `POST /api/v1/sales/`: só o exemplar; o preço é sempre o cadastrado, definido pelo backend. */
 export interface SaleItemRequest {
   readonly copy_id: number;
-  /** Decimal em texto, exatamente como a API o entregou (sem conversão para ponto flutuante). */
-  readonly unit_price: string;
 }
 
-/** Resposta de `POST /api/v1/sales/`: a venda nasce PENDING; nenhum endpoint a confirma ou cancela. */
+/** Resposta de `POST /api/v1/sales/`: a venda direta nasce CONFIRMED e o exemplar passa a SOLD. */
 export interface SaleRegistration {
   readonly id: number;
   readonly client_id: number | null;
+  readonly employee_id?: number;
+  readonly sale_date?: string;
   readonly status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  /** Decimal serializado como texto; calculado pelo backend a partir do preço do exemplar. */
   readonly total_amount: string | number;
+  readonly items?: readonly { readonly id: number; readonly copy_id: number; readonly unit_price: string | number }[];
 }
 
 /** Resposta de `POST /api/v1/loans/`: prazo e datas calculados pelo backend (o frontend não calcula prazo). */
@@ -230,9 +232,9 @@ export class CounterService {
     return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, { params: params({ q: q.trim(), limit: COPY_LOOKUP_LIMIT }) });
   }
 
-  /** Registra a venda direta (PENDING). Endpoint existente de `/api/v1/sales`, permitido a SELLER e ADMINISTRATOR. */
-  registerSale(copyId: number, unitPrice: string | number): Observable<SaleRegistration> {
-    const items: SaleItemRequest[] = [{ copy_id: copyId, unit_price: String(unitPrice) }];
+  /** Registra a venda direta, confirmada no ato (SELLER e ADMINISTRATOR). Não envia preço: vale o do exemplar. */
+  registerSale(copyId: number): Observable<SaleRegistration> {
+    const items: SaleItemRequest[] = [{ copy_id: copyId }];
     return this.http.post<SaleRegistration>('/api/v1/sales/', { items });
   }
 
