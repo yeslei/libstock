@@ -32,7 +32,7 @@ type Spies = { [K in keyof CounterService]: jasmine.Spy };
 
 function create<T>(component: Type<T>, configure: (service: Spies) => void, inputs: Record<string, unknown> = {}) {
   const service = jasmine.createSpyObj<CounterService>('CounterService', [
-    'listPurchaseReservations', 'allocatePurchase', 'confirmSale',
+    'listPurchaseReservations', 'allocatePurchase', 'confirmSale', 'cancelReservation', 'expireDueReservations',
   ]) as unknown as Spies;
   configure(service);
   TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]), { provide: CounterService, useValue: service }] });
@@ -95,7 +95,7 @@ describe('Balcão: lista de reservas de compra', () => {
     expect(root.querySelector('h1')?.textContent).toBe('Reservas de compra');
     expect(root.querySelector('h2')?.textContent).toBe('Dom Casmurro · Fila de compra');
     expect(root.textContent).toContain('Maria Silva · Disponível para retirada · Exemplar C-055');
-    expect(root.textContent).toContain('Prazo de retirada: 06/10/2026');
+    expect(root.textContent).toContain('Retirar até 06/10/2026');
     expect(root.textContent).toContain('1ª · Ana Santos · Aguardando disponibilidade');
     const attend = link(root, 'Atender Maria Silva')!;
     expect(attend.getAttribute('href')).toBe('/balcao/reservas/31?cliente=3');
@@ -147,12 +147,12 @@ describe('Balcão: lista de reservas de compra', () => {
     expect(service.listPurchaseReservations).toHaveBeenCalledTimes(2);
   });
 
-  it('explica o bloqueio do primeiro inelegível sem saltar a fila nem oferecer a destinação', () => {
+  it('explica o bloqueio do primeiro inelegível mantendo a posição e sem oferecer a destinação a ele', () => {
     const { root } = create(CounterReservationsComponent, (s) => s.listPurchaseReservations.and.returnValue(of([
       waiting({ can_allocate: false, allocation_blocked_reason: 'CLIENT_INELIGIBLE', client: client({ eligible: false, has_overdue_loan: true }) }),
-      waiting({ id: 33, queue_position: 2, can_allocate: false, allocation_blocked_reason: 'NOT_FIRST_IN_QUEUE' }),
+      waiting({ id: 33, queue_position: 2, can_allocate: false, allocation_blocked_reason: 'NOT_FIRST_ELIGIBLE' }),
     ])));
-    expect(root.textContent).toContain('não pula a fila');
+    expect(root.textContent).toContain('Mantém a posição na fila');
     expect(root.textContent).not.toContain('Destinar exemplar a');
   });
 
@@ -208,7 +208,7 @@ describe('Balcão: atender reserva', () => {
     expect(root.querySelector('h2')?.textContent).toBe('Reserva de Maria Silva');
     expect(root.textContent).toContain('maria@x.dev · conta ativa · sem pendências');
     expect(root.textContent).toContain('Exemplar C-055 · Comercial · destinado à venda');
-    expect(root.textContent).toContain('Prazo de retirada: 06/10/2026');
+    expect(root.textContent).toContain('Retirar até 06/10/2026');
   });
 
   it('exige o código e recusa um código diferente do exemplar destinado, sem avançar', () => {
@@ -352,5 +352,77 @@ describe('Balcão: atender reserva', () => {
   it('sem o filtro de cliente na URL consulta todas as reservas', () => {
     const { service } = create(CounterReservationAttendComponent, (s) => s.listPurchaseReservations.and.returnValue(of([notified()])), { id: '31' });
     expect(service.listPurchaseReservations).toHaveBeenCalledOnceWith({ clientId: null });
+  });
+});
+
+describe('Reservas de compra: cancelamento, prazo e expiração (Issue #150)', () => {
+  const dialog = (root: HTMLElement) => root.querySelector('dialog');
+  const confirmButton = (root: HTMLElement) => dialog(root)!.querySelector('.confirm__submit') as HTMLButtonElement;
+
+  it('cancela a reserva somente após confirmar, bloqueia o envio duplo e só mostra sucesso após o 2xx', () => {
+    const response = new Subject<{ id: number }>();
+    const { fixture, root, service } = create(CounterReservationsComponent, (s) => {
+      s.listPurchaseReservations.and.returnValue(of([waiting()]));
+      s.cancelReservation.and.returnValue(response);
+    });
+    press(fixture, button(root, 'Cancelar reserva de Ana Santos'));
+    expect(service.cancelReservation).not.toHaveBeenCalled();
+    expect(dialog(root)!.textContent).toContain('Cancelar reserva?');
+    press(fixture, confirmButton(root));
+    press(fixture, confirmButton(root));
+    expect(service.cancelReservation).toHaveBeenCalledOnceWith(32);
+    expect(snackbarMessage()).not.toContain('cancelada');
+    response.next({ id: 32 });
+    response.complete();
+    fixture.detectChanges();
+    expect(snackbarMessage()).toContain('Reserva de Ana Santos para “Dom Casmurro” cancelada.');
+    expect(service.listPurchaseReservations).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancelar a reserva destinada avisa que o exemplar será liberado', () => {
+    const { fixture, root } = create(CounterReservationsComponent, (s) => s.listPurchaseReservations.and.returnValue(of([notified()])));
+    press(fixture, button(root, 'Cancelar reserva de Maria Silva'));
+    expect(dialog(root)!.textContent).toContain('O exemplar destinado será liberado');
+  });
+
+  it('mostra a recusa de estado final sem sucesso e recarrega', () => {
+    const { fixture, root, service } = create(CounterReservationsComponent, (s) => {
+      s.listPurchaseReservations.and.returnValue(of([waiting()]));
+      s.cancelReservation.and.returnValue(throwError(() => ({ detail: 'Esta reserva já foi encerrada e não pode ser cancelada. Atualize a lista.', code: 'reservation_not_cancellable', status: 409 })));
+    });
+    press(fixture, button(root, 'Cancelar reserva de Ana Santos'));
+    press(fixture, confirmButton(root));
+    expect(snackbarMessage()).toContain('já foi encerrada');
+    expect(snackbarVariant()).toBe('warning');
+    expect(service.listPurchaseReservations).toHaveBeenCalledTimes(2);
+  });
+
+  it('a inelegível à frente mantém a posição e a elegível seguinte recebe o botão de destinar', () => {
+    const { root } = create(CounterReservationsComponent, (s) => s.listPurchaseReservations.and.returnValue(of([
+      waiting({ id: 30, can_allocate: false, allocation_blocked_reason: 'CLIENT_INELIGIBLE', client: client({ id: 8, name: 'Bia Lima', eligible: false, is_penalized: true }) }),
+      waiting({ id: 33, queue_position: 2 }),
+    ])));
+    expect(root.textContent).toContain('1ª · Bia Lima');
+    expect(root.textContent).not.toContain('Destinar exemplar a Bia Lima');
+    expect(root.textContent).toContain('Destinar exemplar a Ana Santos');
+  });
+
+  it('oferece liberar exemplares vencidos somente quando há reserva vencida e mostra a quantidade após o 2xx', () => {
+    const { fixture, root, service } = create(CounterReservationsComponent, (s) => {
+      s.listPurchaseReservations.and.returnValue(of([notified({ expired: true, expires_at: '2026-09-01T12:00:00Z' })]));
+      s.expireDueReservations.and.returnValue(of({ expired: 1 }));
+    });
+    expect(root.textContent).toContain('Há reservas com prazo de retirada vencido');
+    press(fixture, button(root, 'Liberar exemplares vencidos'));
+    expect(service.expireDueReservations).not.toHaveBeenCalled();
+    press(fixture, confirmButton(root));
+    expect(service.expireDueReservations).toHaveBeenCalledTimes(1);
+    expect(snackbarMessage()).toContain('1 reserva vencida foi encerrada.');
+  });
+
+  it('sem reserva vencida não oferece a liberação', () => {
+    const { root } = create(CounterReservationsComponent, (s) => s.listPurchaseReservations.and.returnValue(of([notified({ expires_at: '2099-01-01T12:00:00Z' })])));
+    expect(root.textContent).not.toContain('Liberar exemplares vencidos');
+    expect(root.textContent).toContain('Retirar até 01/01/2099');
   });
 });
