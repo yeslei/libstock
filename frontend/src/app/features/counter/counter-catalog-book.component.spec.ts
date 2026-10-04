@@ -104,6 +104,16 @@ describe('Balcão: detalhes da obra', () => {
     expect(root.querySelectorAll('tbody tr button').length).toBe(8);
   });
 
+  it('estoquista consulta a obra e inclui exemplar, sem editar, inativar, converter nem excluir (Issue #169)', () => {
+    const { root, button } = setup(of(detail({ is_active: true })), ['STOCK_KEEPER']);
+    const link = Array.from(root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Novo exemplar');
+    expect(link?.getAttribute('href')).toBe('/balcao/acervo/7/exemplares/novo');
+    for (const label of ['Editar obra', 'Inativar obra', 'Reativar obra']) expect(button(label)).withContext(label).toBeUndefined();
+    expect(root.querySelector('thead')?.textContent).not.toContain('Ações');
+    expect(root.querySelectorAll('tbody tr button').length).toBe(0);
+    expect(root.querySelectorAll('tbody tr').length).toBe(4);
+  });
+
   it('oferece Novo exemplar apenas a papéis autorizados e a obras ativas', () => {
     const admin = setup(of(detail()), ['ADMINISTRATOR']);
     const link = Array.from(admin.root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Novo exemplar');
@@ -302,9 +312,10 @@ describe('Balcão: detalhes da obra', () => {
       expect(ctx.books.update).toHaveBeenCalledTimes(1);
     });
 
-    it('oferece edição também a STOCK_KEEPER, papel autorizado pelo backend', () => {
+    it('oculta a edição da obra do STOCK_KEEPER, que só cadastra (Issue #169)', () => {
       const keeper = setup(of(detail()), ['STOCK_KEEPER']);
-      expect(keeper.button('Editar obra')).toBeDefined();
+      expect(keeper.button('Editar obra')).toBeUndefined();
+      expect(keeper.root.querySelector('#book-genre')).toBeNull();
     });
 
     it('mostra a inativação bloqueada com os vínculos devolvidos pelo 409 e não anuncia sucesso', () => {
@@ -361,7 +372,7 @@ describe('Balcão: detalhes da obra', () => {
       TestBed.resetTestingModule();
       expect(deleteButtons(setup(of(detail()), ['SELLER']).root).length).toBe(4);
       TestBed.resetTestingModule();
-      expect(deleteButtons(setup(of(detail()), ['STOCK_KEEPER']).root).length).toBe(4);
+      expect(deleteButtons(setup(of(detail()), ['STOCK_KEEPER']).root).every((b) => b === null)).toBeTrue();
       TestBed.resetTestingModule();
       const { root } = setup(of(detail()), admin);
       expect(root.querySelector('thead')?.textContent).toContain('Ações');
@@ -517,6 +528,8 @@ describe('Balcão: detalhes da obra', () => {
     const inactive = (over: Partial<StaffCatalogBookDetail> = {}) => detail({ is_active: false, ...over });
 
     it('oferece Reativar obra a SELLER e ADMINISTRATOR, e não a quem não administra o acervo', () => {
+      expect(setup(of(inactive()), ['STOCK_KEEPER']).button('Reativar obra')).toBeUndefined();
+      TestBed.resetTestingModule();
       expect(setup(of(inactive()), ['SELLER']).button('Reativar obra')).toBeDefined();
       TestBed.resetTestingModule();
       expect(setup(of(inactive()), ['ADMINISTRATOR']).button('Reativar obra')).toBeDefined();
@@ -604,6 +617,8 @@ describe('Balcão: detalhes da obra', () => {
       expect(rowButton(root, 3, 'Editar')!.title).toBe('Exemplar reservado para venda: não pode ser editado.');
       TestBed.resetTestingModule();
       expect(setup(of(detail()), ['USER']).root.textContent).not.toContain('Editar exemplar');
+      TestBed.resetTestingModule();
+      expect(rowButton(setup(of(detail()), ['STOCK_KEEPER']).root, 0, 'Editar')).toBeUndefined();
     });
 
     it('abre o painel "Editando exemplar" com o código imutável e os dados atuais', () => {
