@@ -3,14 +3,15 @@ import unittest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.domain import Book
+from app.models.domain import Book, BookGenre, Genre
 from app.repositories.book_repository import BookRepository
 
 
 class BookRepositoryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine("sqlite:///:memory:")
-        Book.__table__.create(self.engine)
+        for table in (Book.__table__, Genre.__table__, BookGenre.__table__):
+            table.create(self.engine)
         self.db = Session(self.engine)
         self.db.add_all(
             [

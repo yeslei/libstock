@@ -194,6 +194,7 @@ def test_roles_autorizadas_cadastram_obra(role):
         "genre": "Tecnologia",
         "cover_url": None,
         "is_active": True,
+        "genres": [],
         "initial_copy": {
             "id": 2,
             "book_id": 1,

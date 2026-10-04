@@ -45,6 +45,7 @@ class BookResponseTests(unittest.TestCase):
                 "genre": None,
                 "cover_url": None,
                 "is_active": True,
+                "genres": [],
                 "initial_copy": None,
             },
         )

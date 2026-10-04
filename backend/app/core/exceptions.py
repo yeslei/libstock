@@ -156,8 +156,14 @@ class DuplicateGenreError(ApplicationError):
 
 
 class GenreNotFoundError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Gênero não encontrado.", "genre_not_found", 404)
+    def __init__(self, missing_ids: list[int] | None = None) -> None:
+        # Na associação de categorias à obra (Issue #174), `details.missing_ids` lista os ids inexistentes.
+        super().__init__(
+            "Gênero não encontrado.",
+            "genre_not_found",
+            404,
+            {"missing_ids": missing_ids} if missing_ids else None,
+        )
 
 
 class UserNotFoundError(ApplicationError):

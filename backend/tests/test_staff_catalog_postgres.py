@@ -40,7 +40,7 @@ def test_catalog_list_counts_and_searches_by_title_author_and_isbn(desk):  # noq
         found = http.get(f'{BASE}/books', params={'q': term}).json()
         assert [b['id'] for b in found] == [book_id], term
     book = found[0]
-    assert set(book) == {'id', 'title', 'author', 'isbn', 'genre', 'is_active', 'total_copies', 'didactic_copies',
+    assert set(book) == {'id', 'title', 'author', 'isbn', 'genre', 'genres', 'is_active', 'total_copies', 'didactic_copies',
                          'commercial_copies'}
     assert (book['total_copies'], book['didactic_copies'], book['commercial_copies'], book['genre']) == (2, 1, 1, 'Romance')
     assert http.get(f'{BASE}/books', params={'q': '%%'}).json() == []  # curinga é literal

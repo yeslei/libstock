@@ -1,13 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.domain import (
     Book,
+    BookGenre,
     Copy,
     CopyStatus,
     Employee,
+    Genre,
     Loan,
     LoanStatus,
     Profile,
@@ -78,8 +80,35 @@ class BookRepository:
     def find_copy_by_barcode(self, barcode: str) -> Copy | None:
         return self.db.scalar(select(Copy).where(Copy.barcode == barcode))
 
+    def find_genres_by_ids(self, genre_ids: list[int]) -> list[Genre]:
+        if not genre_ids:
+            return []
+        return list(self.db.scalars(select(Genre).where(Genre.id.in_(genre_ids))))
+
+    def lock_book_row(self, book_id: int) -> None:
+        """Serializa a sincronização de categorias da mesma obra (a chave de book_genres é composta)."""
+        self.db.execute(select(Book.id).where(Book.id == book_id).with_for_update())
+
+    def set_book_genres(self, book: Book, genres: list[Genre]) -> bool:
+        """Faz book_genres refletir exatamente `genres`. Devolve se algo mudou (diferença mínima)."""
+        wanted = {genre.id for genre in genres}
+        current = set(self.db.scalars(select(BookGenre.genre_id).where(BookGenre.book_id == book.id)))
+        removed, added = current - wanted, wanted - current
+        if not removed and not added:
+            return False
+        if removed:
+            self.db.execute(
+                delete(BookGenre).where(BookGenre.book_id == book.id, BookGenre.genre_id.in_(removed))
+            )
+        for genre_id in sorted(added):
+            self.db.add(BookGenre(book_id=book.id, genre_id=genre_id))
+        self.db.flush()
+        # A coleção `book.genres` já carregada na sessão ficou velha.
+        self.db.expire(book, ["genres"])
+        return True
+
     def create_book(self, book_data: BookCreate) -> Book:
-        db_book = Book(**book_data.model_dump(exclude={"initial_copy"}))
+        db_book = Book(**book_data.model_dump(exclude={"initial_copy", "genre_ids"}))
         self.db.add(db_book)
         self.db.flush()
         return db_book
@@ -95,9 +124,24 @@ class BookRepository:
         self.db.flush()
         return db_copy
 
-    def update_book(self, book: Book, changes: BookUpdate) -> Book:
-        for field, value in changes.model_dump(exclude_unset=True).items():
+    def update_book(
+        self,
+        book: Book,
+        changes: BookUpdate,
+        *,
+        genres: list[Genre] | None = None,
+        genre_text: str | None = None,
+    ) -> Book:
+        # As categorias vão primeiro: o flush delas não deve emitir um UPDATE parcial de `books`,
+        # para a auditoria registrar uma única alteração da obra.
+        genres_changed = genres is not None and self.set_book_genres(book, genres)
+        for field, value in changes.model_dump(exclude_unset=True, exclude={"genre_ids"}).items():
             setattr(book, field, value)
+        if genres is not None:
+            book.genre = genre_text
+        if genres_changed:
+            # A mudança só de categorias também precisa de um UPDATE em `books` para a auditoria.
+            book.updated_at = func.now()
         self.db.flush()
         return book
 
@@ -107,6 +151,7 @@ class BookRepository:
         )
         return (
             self.db.query(Book)
+            .options(selectinload(Book.genres).selectinload(BookGenre.genre))
             .filter(
                 Book.title.ilike(f"%{escaped_title}%", escape="\\"),
                 Book.is_active.is_(True),

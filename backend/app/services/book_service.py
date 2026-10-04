@@ -18,6 +18,7 @@ from app.core.exceptions import (
     DuplicateBarcodeError,
     DuplicateIsbnError,
     EmployeeRecordRequiredError,
+    GenreNotFoundError,
     GoogleBooksInvalidResponseError,
     GoogleBooksNotFoundError,
     GoogleBooksRateLimitError,
@@ -25,7 +26,7 @@ from app.core.exceptions import (
     BookNotFoundError,
     BookWithoutActiveCopyError,
 )
-from app.models.domain import Book
+from app.models.domain import Book, Genre
 from app.repositories.book_repository import BookRepository
 from app.schemas.book_schema import (
     BookAvailabilityResponse,
@@ -43,6 +44,7 @@ GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
 GOOGLE_BOOKS_TIMEOUT_SECONDS = 5.0
 logger = logging.getLogger(__name__)
 LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
+GENRE_TEXT_MAX_LENGTH = 100
 
 UNIQUE_CONSTRAINT_ERRORS = {
     "books_isbn_key": DuplicateIsbnError,
@@ -224,6 +226,27 @@ class BookService:
                 raise GoogleBooksInvalidResponseError() from exc
             return book_data
 
+    def _resolve_genres(self, genre_ids: list[int]) -> list[Genre]:
+        """Categorias do catálogo para os ids informados; qualquer id inexistente é 404 estável (Issue #174)."""
+        genres = self.repository.find_genres_by_ids(genre_ids)
+        found = {genre.id for genre in genres}
+        missing = [genre_id for genre_id in genre_ids if genre_id not in found]
+        if missing:
+            raise GenreNotFoundError(missing)
+        by_id = {genre.id: genre for genre in genres}
+        return [by_id[genre_id] for genre_id in genre_ids]
+
+    @staticmethod
+    def genre_text(genres: list[Genre]) -> str | None:
+        """Texto legado `books.genre`: nomes das categorias separados por vírgula, até 100 caracteres."""
+        text_value = ""
+        for genre in genres:
+            candidate = f"{text_value}, {genre.name}" if text_value else genre.name
+            if len(candidate) > GENRE_TEXT_MAX_LENGTH:
+                break
+            text_value = candidate
+        return text_value or None
+
     async def create_book(self, book_data: BookCreate, *, employee_id: int) -> BookResponse:
         try:
             if not self.repository.employee_exists(employee_id):
@@ -233,7 +256,15 @@ class BookService:
             if self.repository.find_copy_by_barcode(book_data.initial_copy.barcode) is not None:
                 raise DuplicateBarcodeError()
 
+            genres = (
+                self._resolve_genres(book_data.genre_ids)
+                if book_data.genre_ids is not None
+                else None
+            )
             persisted_data = await self._complete_with_external_data(book_data)
+            if genres is not None:
+                # As categorias escolhidas valem; o texto legado só espelha os nomes.
+                persisted_data = persisted_data.model_copy(update={"genre": self.genre_text(genres)})
 
             if not persisted_data.title or not persisted_data.author:
                 raise GoogleBooksInvalidResponseError()
@@ -247,6 +278,8 @@ class BookService:
                 {"employee_id": str(employee_id)},
             )
             book = self.repository.create_book(persisted_data)
+            if genres:
+                self.repository.set_book_genres(book, genres)
             initial_copy = self.repository.create_copy(book.id, persisted_data.initial_copy)
             response = BookResponse(
                 id=book.id,
@@ -256,6 +289,7 @@ class BookService:
                 genre=book.genre,
                 cover_url=book.cover_url,
                 is_active=book.is_active,
+                genres=list(genres or []),
                 initial_copy=CopyResponse.model_validate(initial_copy),
             )
             self.db.commit()
@@ -320,6 +354,11 @@ class BookService:
                 changes.isbn, book_id
             ) is not None:
                 raise DuplicateIsbnError()
+            genres = (
+                self._resolve_genres(changes.genre_ids)
+                if "genre_ids" in changes.model_fields_set
+                else None
+            )
             self.db.execute(
                 text("SELECT set_config('libstock.employee_id', :employee_id, true)"),
                 {"employee_id": str(employee_id)},
@@ -332,7 +371,14 @@ class BookService:
                     self._ensure_no_active_operations(book_id, can_view_clients)
                 elif changes.is_active is True and not book.is_active:
                     self._ensure_has_active_copy(book_id)
-            updated = self.repository.update_book(book, changes)
+            if genres is not None:
+                self.repository.lock_book_row(book_id)
+            genre_args = (
+                {"genres": genres, "genre_text": self.genre_text(genres)}
+                if genres is not None
+                else {}
+            )
+            updated = self.repository.update_book(book, changes, **genre_args)
             response = BookDetailResponse.model_validate(updated)
             self.db.commit()
             return response

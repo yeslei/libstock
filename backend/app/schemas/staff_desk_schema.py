@@ -87,6 +87,12 @@ class StaffDashboard(BaseModel):
     pendencies: int
 
 
+class StaffGenre(BaseModel):
+    id: int
+    name: str
+    slug: str
+
+
 class StaffCatalogBook(BaseModel):
     """Obra do acervo para consulta do balcão; contagens consideram exemplares ativos e não vendidos."""
     id: int
@@ -94,6 +100,8 @@ class StaffCatalogBook(BaseModel):
     author: str
     isbn: str | None
     genre: str | None
+    # Categorias do catálogo público (book_genres), em ordem alfabética (Issue #174).
+    genres: list[StaffGenre] = []
     is_active: bool
     total_copies: int
     didactic_copies: int
