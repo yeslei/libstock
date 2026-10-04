@@ -82,6 +82,7 @@ describe('Balcão: novo empréstimo', () => {
     expect(button(root, 'Revisar empréstimo').disabled).toBeTrue();
     expect(root.textContent).toContain('Devolução prevista: calculada automaticamente ao registrar');
     expect(root.textContent).not.toContain('15 dias');
+    expect(root.textContent).toContain('O prazo é de um mês de calendário');
   });
 
   it('exige ao menos 2 caracteres para buscar o cliente e o termo para o exemplar', () => {

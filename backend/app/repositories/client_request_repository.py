@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.domain import Book, Client, Employee, Loan, LoanStatus, Profile
 from app.models.user import User
+from app.repositories.loan_rules import overdue_open_loan_clause
 
 
 class ClientRequestRepository:
@@ -21,7 +22,7 @@ class ClientRequestRepository:
 
     def has_overdue_loan(self, client_id: int, cutoff: datetime) -> bool:
         return self.db.scalar(select(Loan.id).where(
-            Loan.client_id == client_id, Loan.status == LoanStatus.OPEN, Loan.due_date < cutoff,
+            Loan.client_id == client_id, overdue_open_loan_clause(cutoff),
         ).limit(1)) is not None
 
     def is_active_employee(self, actor_id):
