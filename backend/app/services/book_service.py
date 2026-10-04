@@ -28,6 +28,7 @@ from app.core.exceptions import (
 )
 from app.models.domain import Book, Genre
 from app.repositories.book_repository import BookRepository
+from app.services.copy_rules import require_commercial_price
 from app.schemas.book_schema import (
     BookAvailabilityResponse,
     BookCreate,
@@ -251,6 +252,9 @@ class BookService:
         try:
             if not self.repository.employee_exists(employee_id):
                 raise EmployeeRecordRequiredError()
+            require_commercial_price(
+                book_data.initial_copy.destination, book_data.initial_copy.sale_price
+            )
             if self.repository.find_by_isbn(book_data.isbn) is not None:
                 raise DuplicateIsbnError()
             if self.repository.find_copy_by_barcode(book_data.initial_copy.barcode) is not None:

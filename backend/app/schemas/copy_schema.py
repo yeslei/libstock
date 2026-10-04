@@ -15,8 +15,8 @@ class CopyCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_sale_price(self) -> "CopyCreate":
-        if self.destination == DestinationType.COMMERCIAL and self.sale_price is None:
-            raise ValueError("sale_price é obrigatório para exemplares comerciais.")
+        # Comercial sem preço ou com preço zero é regra de domínio (422 `copy_sale_price_required`, Issue #175),
+        # aplicada no service, igual na inclusão e na edição.
         if self.destination == DestinationType.DIDACTIC and self.sale_price is not None:
             raise ValueError("sale_price não deve ser informado para exemplares didáticos.")
         return self

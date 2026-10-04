@@ -81,8 +81,7 @@ class InitialCopyCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_initial_state(self) -> "InitialCopyCreate":
-        if self.destination == DestinationType.COMMERCIAL and self.sale_price is None:
-            raise ValueError("Informe o preço do exemplar comercial.")
+        # Comercial sem preço ou com preço zero: 422 `copy_sale_price_required` no service (Issue #175).
         if self.destination == DestinationType.DIDACTIC and self.sale_price is not None:
             raise ValueError("Exemplar didático não pode possuir preço de venda.")
         return self
