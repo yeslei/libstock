@@ -763,6 +763,7 @@ Estado: `APPROVED` conforme o fluxo de acompanhamento solicitado em 03/10/2026.
 - As consultas do cliente usam o usuário autenticado; não recebem identidade, estado ou posição de fila do frontend.
 - Somente solicitações de empréstimo sem retirada confirmada e empréstimos OPEN aparecem em Meus empréstimos. Retirada e devolução são exclusivas de SELLER/ADMINISTRATOR com cadastro de funcionário ativo.
 - O empréstimo efetivo começa na retirada real. A devolução é um mês de calendário após essa retirada; a data da solicitação é uma prévia.
+- O `due_date` exibido na solicitação de empréstimo é apenas uma estimativa até a retirada; o prazo real é calculado na confirmação da retirada, um mês de calendário após a retirada efetiva (Issue #148).
 - Atraso significa que a data de negócio em America/Sao_Paulo ultrapassou a data de devolução nesse mesmo calendário. A data de vencimento ainda não conta como atraso.
 - Cliente com usuário/perfil inativo, penalidade cadastrada ou empréstimo OPEN em atraso não pode solicitar empréstimo, solicitar compra, entrar na fila ou concluir retirada/compra. A devolução continua permitida para regularizar o exemplar.
 - Compra usa o domínio existente PurchaseReservation: WAITING, NOTIFIED e FULFILLED. NOTIFIED é o estado interno de disponibilidade para retirada; não significa envio de notificação V3.
@@ -802,6 +803,8 @@ Um cliente possui pendência quando possui pelo menos um empréstimo que satisfa
 - `status = OPEN`;
 - `returned_at IS NULL`;
 - `due_date` anterior ao início do dia de negócio atual em America/Sao_Paulo (Regra aprovada — decisão delegada pelo responsável em 2026-10-03, Issue #147; vencer hoje não é atraso). A sincronização de penalidade do `GET /api/v1/clients/{id}/pendencies` usa o mesmo predicado de `has_overdue_loan`, deixando de usar o instante `now()`.
+
+Transição (Issue #148): ao passar a usar o corte por data de negócio, a sincronização V1 retira penalidades que a regra antiga por instante havia criado (por exemplo, empréstimo vencido no próprio dia), registrando a remoção em `audit_logs`. Os fluxos V2 leem o `is_penalized` gravado; por isso a divergência fica restrita ao dia da implantação, sem reconciliação automática.
 
 A pendência é derivada do estado do empréstimo e não é armazenada em uma tabela própria.
 
