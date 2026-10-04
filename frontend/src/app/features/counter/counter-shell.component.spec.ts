@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, RouterOutlet, provideRouter } from '@angular/router';
 
+import { AuthService } from '../../core/services/auth.service';
 import { CounterShellComponent } from './counter-shell.component';
 import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 import { By } from '@angular/platform-browser';
@@ -13,10 +14,11 @@ class StubComponent {}
 class RootComponent {}
 
 describe('Layout do balcão (menu lateral)', () => {
-  async function setup(url = '/balcao/painel') {
+  async function setup(url = '/balcao/painel', roles: string[] = ['SELLER']) {
     TestBed.configureTestingModule({
       imports: [RootComponent],
       providers: [
+        { provide: AuthService, useValue: { currentUser: { id: 1, role_codes: roles } } },
         provideRouter([
           {
             path: 'balcao',
@@ -95,5 +97,39 @@ describe('Layout do balcão (menu lateral)', () => {
     await router.navigateByUrl('/balcao/painel');
     fixture.detectChanges();
     expect(root.querySelector('.snackbar')).toBeNull();
+  });
+});
+
+describe('Layout do balcão (item Usuários por papel)', () => {
+  async function render(roles: string[]) {
+    TestBed.configureTestingModule({
+      imports: [RootComponent],
+      providers: [
+        { provide: AuthService, useValue: { currentUser: { id: 1, role_codes: roles } } },
+        provideRouter([
+          { path: 'balcao', component: CounterShellComponent, children: [{ path: 'painel', component: StubComponent }] },
+          { path: 'gestao/usuarios', component: StubComponent },
+        ]),
+      ],
+    });
+    const router = TestBed.inject(Router);
+    const fixture = TestBed.createComponent(RootComponent);
+    await router.navigateByUrl('/balcao/painel');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('mostra Usuários apenas para administrador, apontando para a gestão existente', async () => {
+    const root = await render(['ADMINISTRATOR']);
+    const link = Array.from(root.querySelectorAll('nav a')).find((a) => a.textContent?.trim() === 'Usuários');
+    expect(link?.getAttribute('href')).toBe('/gestao/usuarios');
+  });
+
+  it('oculta Usuários do vendedor', async () => {
+    const root = await render(['SELLER']);
+    const labels = Array.from(root.querySelectorAll('nav a')).map((a) => a.textContent?.trim());
+    expect(labels).not.toContain('Usuários');
   });
 });
