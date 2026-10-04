@@ -80,7 +80,7 @@ class ManagementServiceStub:
     }
 
     def get_book(self, _book_id): return self.detail
-    def update_book(self, _book_id, _changes, *, employee_id):
+    def update_book(self, _book_id, _changes, *, employee_id, can_view_clients=False):
         assert employee_id == 7
         return {**self.detail, "title": "Atualizada"}
     async def lookup_metadata(self, isbn):

@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ApplicationError, BookInactiveError
 from app.models.domain import CopyStatus, LoanStatus
 from app.repositories.loan_repository import LoanRepository
 from app.schemas.loan_schema import LoanCreate, LoanResponse
@@ -36,6 +37,7 @@ class LoanService:
                 commit=False,
             )
 
+            book = self.repository.lock_book_for_copy(loan_data.copy_id)
             copy = self.repository.find_copy_for_loan(loan_data.copy_id)
 
             if copy is None:
@@ -43,6 +45,9 @@ class LoanService:
                     status_code=404,
                     detail="Exemplar não encontrado ou inativo.",
                 )
+
+            if book is None or not book.is_active:
+                raise BookInactiveError()
 
             if copy.status != CopyStatus.AVAILABLE:
                 raise HTTPException(
@@ -65,6 +70,10 @@ class LoanService:
             self.db.refresh(loan)
 
             return LoanResponse.model_validate(loan)
+
+        except ApplicationError:
+            self.db.rollback()
+            raise
 
         except HTTPException:
             self.db.rollback()

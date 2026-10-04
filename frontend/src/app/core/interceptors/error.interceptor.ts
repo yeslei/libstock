@@ -52,6 +52,14 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   search_term_too_short: 'Informe ao menos 2 caracteres para buscar.',
   search_term_required: 'Informe o código do exemplar, o ISBN ou o título.',
   desk_query_error: 'Não foi possível consultar o balcão. Tente novamente.',
+  // Exclusão de exemplar e inativação de obra (Issue #135).
+  copy_not_found: 'O exemplar não foi encontrado. Atualize a obra.',
+  copy_not_available: 'Este exemplar não está disponível e não pode ser excluído.',
+  copy_has_history: 'Este exemplar possui histórico (empréstimo, venda, reserva ou solicitação) e não pode ser excluído.',
+  last_active_copy: 'Este é o último exemplar ativo de uma obra ativa e não pode ser excluído.',
+  copy_delete_persistence_error: 'Não foi possível excluir o exemplar. Nada foi alterado; tente novamente.',
+  book_inactive: 'A obra deste exemplar está inativa e não aceita novas operações.',
+  book_has_active_operations: 'Esta obra possui operações em andamento e não pode ser inativada.',
 };
 
 const MESSAGE_BY_STATUS: Readonly<Record<number, string>> = {
@@ -79,6 +87,13 @@ function readCode(body: unknown): string | undefined {
 
   const code = (body as { code: unknown }).code;
   return typeof code === 'string' ? code : undefined;
+}
+
+function readDetails(body: unknown): unknown {
+  if (typeof body !== 'object' || body === null || !('details' in body)) {
+    return undefined;
+  }
+  return (body as { details: unknown }).details ?? undefined;
 }
 
 function readValidationErrors(body: unknown): ApiValidationError[] | undefined {
@@ -124,6 +139,7 @@ function toApiError(error: HttpErrorResponse): ApiError {
     code,
     status: error.status,
     validationErrors: readValidationErrors(error.error),
+    details: readDetails(error.error),
   };
 }
 

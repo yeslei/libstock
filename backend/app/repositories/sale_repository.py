@@ -3,7 +3,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Client, Copy, Sale, SaleItem
+from app.models.domain import Book, Client, Copy, Sale, SaleItem
 
 
 class SaleRepository:
@@ -14,6 +14,18 @@ class SaleRepository:
         return self.db.scalar(
             select(Client).where(Client.id == client_id)
         )
+
+    def lock_books_for_copies(self, copy_ids: list[int]) -> dict[int, Book]:
+        """Trava os livros dos exemplares, em ordem de id, antes de travar os exemplares."""
+        book_ids = select(Copy.book_id).where(Copy.id.in_(copy_ids))
+        books = self.db.scalars(
+            select(Book)
+            .where(Book.id.in_(book_ids))
+            .order_by(Book.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+        return {book.id: book for book in books}
 
     def find_copies_for_sale(self, copy_ids: list[int]) -> list[Copy]:
         statement = (

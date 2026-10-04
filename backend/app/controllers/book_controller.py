@@ -14,6 +14,8 @@ from app.schemas.book_schema import (
 )
 from app.services.book_service import BookService
 
+CLIENT_DATA_ROLES = {"ADMINISTRATOR", "SELLER"}
+
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 
 
@@ -71,4 +73,10 @@ def update_book(
     ),
     service: BookService = Depends(get_book_service),
 ) -> BookDetailResponse:
-    return service.update_book(book_id, changes, employee_id=current_user.id)
+    return service.update_book(
+        book_id,
+        changes,
+        employee_id=current_user.id,
+        # Dados de cliente só para quem opera o balcão; estoquista/gerente veem tipo, exemplar e contagens.
+        can_view_clients=not set(current_user.role_codes).isdisjoint(CLIENT_DATA_ROLES),
+    )

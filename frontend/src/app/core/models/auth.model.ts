@@ -23,7 +23,7 @@ export interface MessageResponse {
   readonly message: string;
 }
 
-/** Formato de erro do backend: `{ detail, code }`. */
+/** Formato de erro do backend: `{ detail, code, details? }`. */
 export interface ApiError {
   /** Mensagem legível — pode ser exibida ao usuário. */
   readonly detail: string;
@@ -32,6 +32,8 @@ export interface ApiError {
   readonly status: number;
   /** Erros estruturados do FastAPI/Pydantic (normalmente em respostas 422). */
   readonly validationErrors?: readonly ApiValidationError[];
+  /** Dados estruturados do erro de domínio (ex.: motivos e vínculos de um bloqueio 409). */
+  readonly details?: unknown;
 }
 
 export interface ApiValidationError {

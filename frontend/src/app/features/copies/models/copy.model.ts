@@ -48,3 +48,14 @@ export function copyResponseFromApi(copy: CopyResponseApi): CopyResponse {
     isActive: copy.is_active,
   };
 }
+
+/** Resposta de `DELETE /api/v1/copies/{id}`: o exemplar removido. */
+export interface CopyDeleteResult {
+  readonly id: number;
+  readonly bookId: number;
+  readonly barcode: string;
+}
+
+export function copyDeleteResultFromApi(result: { id: number; book_id: number; barcode: string }): CopyDeleteResult {
+  return { id: result.id, bookId: result.book_id, barcode: result.barcode };
+}

@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ApplicationError
 from app.models.domain import Book, Copy, DestinationType, Loan, LoanStatus
 from app.repositories.book_repository import BookRepository
 from app.repositories.copy_repository import CopyRepository
@@ -54,8 +55,8 @@ def test_copy_creation_rejects_inactive_book_and_price_rules_are_validated(desk)
         assert inactive.value.status_code == 404
 
 
-def test_book_inactivation_is_not_blocked_by_open_loan_and_keeps_history(desk):  # noqa: F811
-    """Lacuna registrada: nenhuma trigger/constraint/serviço bloqueia a inativação de obra com empréstimo em aberto."""
+def test_book_inactivation_is_blocked_by_open_loan_and_keeps_everything(desk):  # noqa: F811
+    """Regra aprovada (Issue #135): empréstimo OPEN de qualquer exemplar da obra bloqueia a inativação."""
     _, engine, book_id, client_id, seller_id = desk
     with Session(engine) as db:
         copy_id = didactic_copy(db, book_id).id
@@ -64,10 +65,12 @@ def test_book_inactivation_is_not_blocked_by_open_loan_and_keeps_history(desk): 
                     due_date=now + timedelta(days=30), status=LoanStatus.OPEN))
         db.commit()
     with Session(engine) as db:
-        result = BookService(db=db, repository=BookRepository(db)).update_book(
-            book_id, BookUpdate(is_active=False), employee_id=seller_id)
-        assert result.is_active is False
+        with pytest.raises(ApplicationError) as blocked:
+            BookService(db=db, repository=BookRepository(db)).update_book(
+                book_id, BookUpdate(is_active=False), employee_id=seller_id)
+        assert (blocked.value.status_code, blocked.value.code) == (409, 'book_has_active_operations')
+        assert blocked.value.details['counts'] == {'open_loans': 1, 'pending_loan_requests': 0, 'purchase_reservations': 0}
     with Session(engine) as db:
-        assert db.get(Book, book_id).is_active is False
+        assert db.get(Book, book_id).is_active is True
         assert db.get(Copy, copy_id).is_active is True
         assert db.query(Loan).filter(Loan.copy_id == copy_id, Loan.status == LoanStatus.OPEN).count() == 1

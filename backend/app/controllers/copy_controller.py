@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from app.schemas.copy_schema import CopyBatchCreate, CopyCreate, CopyResponse
+from app.schemas.copy_schema import (
+    CopyBatchCreate,
+    CopyCreate,
+    CopyDeleteResponse,
+    CopyResponse,
+)
 from app.services.copy_service import CopyService
 from app.repositories.copy_repository import CopyRepository
 from app.core.database import get_db
@@ -39,3 +44,14 @@ def create_copy(
     ),
 ):
     return copy_service.create_new_copy(copy_data=copy, actor_id=current_user.id)
+
+
+@router.delete("/{copy_id}", response_model=CopyDeleteResponse)
+def delete_copy(
+    copy_id: int,
+    copy_service: CopyService = Depends(get_copy_service),
+    current_user: User = Depends(
+        require_roles("STOCK_KEEPER", "ADMINISTRATOR")
+    ),
+):
+    return copy_service.delete_copy(copy_id=copy_id, actor_id=current_user.id)

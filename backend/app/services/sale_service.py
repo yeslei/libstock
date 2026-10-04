@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ApplicationError, BookInactiveError
 from app.models.domain import CopyStatus, DestinationType, SaleStatus
 from app.repositories.sale_repository import SaleRepository
 from app.schemas.sale_schema import SaleCreate, SaleItemResponse, SaleResponse
@@ -36,6 +37,7 @@ class SaleService:
 
             copy_ids = [item.copy_id for item in sale_data.items]
 
+            books = self.repository.lock_books_for_copies(copy_ids)
             copies = self.repository.find_copies_for_sale(copy_ids)
 
             copies_by_id = {copy.id: copy for copy in copies}
@@ -52,6 +54,10 @@ class SaleService:
                         status_code=404,
                         detail="Um ou mais exemplares estão inativos.",
                     )
+
+                book = books.get(copy.book_id)
+                if book is None or not book.is_active:
+                    raise BookInactiveError()
 
                 if copy.status != CopyStatus.AVAILABLE:
                     raise HTTPException(
@@ -96,6 +102,10 @@ class SaleService:
                     for item in sale_items
                 ],
             )
+
+        except ApplicationError:
+            self.db.rollback()
+            raise
 
         except HTTPException:
             self.db.rollback()

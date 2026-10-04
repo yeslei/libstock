@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
+    BookHasActiveOperationsError,
     BookPersistenceError,
     BookUpdatePersistenceError,
     DuplicateBarcodeError,
@@ -250,7 +251,12 @@ class BookService:
         return BookDetailResponse.model_validate(book)
 
     def update_book(
-        self, book_id: int, changes: BookUpdate, *, employee_id: int
+        self,
+        book_id: int,
+        changes: BookUpdate,
+        *,
+        employee_id: int,
+        can_view_clients: bool = False,
     ) -> BookDetailResponse:
         try:
             if not self.repository.employee_exists(employee_id):
@@ -266,6 +272,8 @@ class BookService:
                 text("SELECT set_config('libstock.employee_id', :employee_id, true)"),
                 {"employee_id": str(employee_id)},
             )
+            if changes.is_active is False and book.is_active:
+                self._ensure_no_active_operations(book_id, can_view_clients)
             updated = self.repository.update_book(book, changes)
             response = BookDetailResponse.model_validate(updated)
             self.db.commit()
@@ -281,3 +289,14 @@ class BookService:
         except SQLAlchemyError as exc:
             self.db.rollback()
             raise BookUpdatePersistenceError() from exc
+
+    def _ensure_no_active_operations(self, book_id: int, can_view_clients: bool) -> None:
+        """Bloqueia a inativação enquanto houver operação em andamento (Issue #135)."""
+        # Com o livro e os exemplares travados, nenhuma retirada, empréstimo ou
+        # destinação concorrente confirma entre a contagem e o commit.
+        self.repository.lock_book_for_inactivation(book_id)
+        counts = self.repository.active_operation_counts(book_id)
+        if any(counts.values()):
+            raise BookHasActiveOperationsError(
+                counts, self.repository.active_operation_links(book_id, include_clients=can_view_clients)
+            )

@@ -54,9 +54,12 @@ async def application_error_handler(
     exception: ApplicationError,
 ) -> JSONResponse:
     headers = {"WWW-Authenticate": "Bearer"} if exception.status_code == 401 else None
+    content: dict[str, object] = {"detail": exception.message, "code": exception.code}
+    if exception.details is not None:
+        content["details"] = exception.details
     return JSONResponse(
         status_code=exception.status_code,
-        content={"detail": exception.message, "code": exception.code},
+        content=content,
         headers=headers,
     )
 
