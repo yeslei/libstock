@@ -123,6 +123,26 @@ class CatalogRepository:
             .where(BookGenre.book_id == Book.id, BookGenre.genre_id == genre_id)
             .exists()
         )
+        return self._paginate(filtered, page=page, page_size=page_size, q=q)
+
+    def find_all_books(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        q: str | None = None,
+    ) -> tuple[list[Book], int]:
+        """Acervo público completo: mesma visibilidade do catálogo, paginado."""
+        return self._paginate(self._catalog_books(), page=page, page_size=page_size, q=q)
+
+    def _paginate(
+        self,
+        filtered: Select[tuple[Book]],
+        *,
+        page: int,
+        page_size: int,
+        q: str | None,
+    ) -> tuple[list[Book], int]:
         if q:
             pattern = f"%{self._escape_like(q)}%"
             filtered = filtered.where(
@@ -137,7 +157,9 @@ class CatalogRepository:
         )
         items = list(
             self.db.scalars(
-                filtered.order_by(Book.title.asc())
+                # Book.id desempata títulos iguais: sem ele a paginação pode
+                # repetir ou perder obras entre páginas.
+                filtered.order_by(Book.title.asc(), Book.id.asc())
                 .offset((page - 1) * page_size)
                 .limit(page_size)
             )
@@ -181,6 +203,9 @@ class GenreRepository:
             .order_by(Genre.display_order.asc().nulls_last(), Genre.name.asc())
         )
         return list(self.db.scalars(statement))
+
+    def find_all(self) -> list[Genre]:
+        return list(self.db.scalars(select(Genre).order_by(Genre.name.asc(), Genre.id.asc())))
 
     def find_by_slug(self, slug: str) -> Genre | None:
         return self.db.scalar(select(Genre).where(Genre.slug == slug))
