@@ -16,8 +16,8 @@ import { destinationLabel, toLoadState } from './desk-flow';
 import { SaveFailureComponent } from './save-failure.component';
 import { failureVariant, isPersistenceFailure } from './save-failure';
 
-/** Papéis que o backend autoriza em `POST /api/v1/copies/`. No balcão, apenas ADMINISTRATOR chega à tela. */
-const CREATE_ROLES = ['STOCK_KEEPER', 'ADMINISTRATOR'];
+/** Papéis que o backend autoriza em `POST /api/v1/copies/` (Issue #151: o vendedor administra o acervo). */
+const CREATE_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
 const BARCODE_MAX = 100;
 const PRICE_PATTERN = /^\d+(?:\.\d{1,2})?$/;
 

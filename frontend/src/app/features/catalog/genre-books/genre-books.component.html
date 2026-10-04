@@ -2,7 +2,7 @@
   @if (state$ | async; as state) {
     @if (state.genre; as genre) {
       <nav class="genre__crumbs" aria-label="Trilha de navegação">
-        <a routerLink="/" fragment="categorias">Explorar acervo</a>
+        <a routerLink="/acervo">Explorar acervo</a>
         <span aria-hidden="true"> / </span>
         <span aria-current="page">{{ genre.name }}</span>
       </nav>
@@ -27,8 +27,8 @@
       @if (genres$ | async; as genres) {
         @if (genres.length > 0) {
           <ul class="genre__chips" aria-label="Categorias">
-            <li><a class="genre__chip" routerLink="/">Todos</a></li>
-            @for (item of genres; track item.id) {
+            <li><a class="genre__chip" routerLink="/acervo">Todos</a></li>
+            @for (item of allGenres.visible(genres); track item.id) {
               <li>
                 <a
                   class="genre__chip"
@@ -39,7 +39,15 @@
                 >
               </li>
             }
+            <li>
+              <button class="genre__chip genre__chip--more" type="button" [attr.aria-expanded]="allGenres.expanded()" (click)="allGenres.toggle()">
+                {{ allGenres.loading() ? 'Carregando…' : allGenres.expanded() ? 'Menos' : 'Mais' }}
+              </button>
+            </li>
           </ul>
+          @if (allGenres.failed()) {
+            <app-alert message="Não foi possível carregar todas as categorias." variant="error" />
+          }
         }
       }
 

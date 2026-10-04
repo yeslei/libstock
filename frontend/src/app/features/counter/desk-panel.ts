@@ -15,6 +15,7 @@ export interface Confirmation {
   readonly confirmLabel: string;
   readonly run: () => Observable<CirculationResult>;
   readonly success: (result: CirculationResult) => string;
+  readonly done?: (result: CirculationResult) => void;
 }
 
 export function errorMessage(error: unknown, fallback: string): string {
@@ -126,6 +127,7 @@ export abstract class DeskPanel<T> implements OnInit, OnChanges {
       .subscribe({
         next: (result) => {
           this.snackbar.show(confirmation.success(result), 'success');
+          confirmation.done?.(result);
           this.finish();
         },
         error: (error) => {

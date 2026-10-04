@@ -116,3 +116,12 @@ class PagedBooksResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class PagedCatalogResponse(BaseModel):
+    """Página do acervo público completo, sem recorte por gênero."""
+
+    items: list[CatalogBookResponse]
+    total: int
+    page: int
+    page_size: int

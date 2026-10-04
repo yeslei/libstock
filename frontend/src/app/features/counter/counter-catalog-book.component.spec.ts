@@ -31,7 +31,7 @@ function setup(book$: Observable<StaffCatalogBookDetail>, roles: RoleCode[] = ['
   const counter = jasmine.createSpyObj<CounterService>('CounterService', ['getCatalogBook']);
   counter.getCatalogBook.and.returnValue(book$);
   const books = jasmine.createSpyObj<BookService>('BookService', ['update']);
-  const copies = jasmine.createSpyObj<CopyService>('CopyService', ['delete']);
+  const copies = jasmine.createSpyObj<CopyService>('CopyService', ['delete', 'update']);
   TestBed.configureTestingModule({
     imports: [CounterCatalogBookComponent],
     providers: [
@@ -68,11 +68,11 @@ function confirmDialog(ctx: Ctx) {
 }
 
 const deleteButtonsOf = (root: HTMLElement) =>
-  Array.from(root.querySelectorAll('tbody tr')).map((row) => row.querySelector('button') as HTMLButtonElement | null);
+  Array.from(root.querySelectorAll('tbody tr')).map((row) => row.querySelector('button.btn--danger') as HTMLButtonElement | null);
 
 describe('Balcão: detalhes da obra', () => {
-  it('mostra dados da obra e exemplares reais, sem ações de escrita para o vendedor', () => {
-    const { root, counter, button } = setup(of(detail()));
+  it('mostra dados da obra e exemplares reais, sem ações de escrita para quem não administra o acervo', () => {
+    const { root, counter, button } = setup(of(detail()), ['USER']);
     expect(counter.getCatalogBook).toHaveBeenCalledWith(7);
     expect(root.querySelector('h1')?.textContent).toBe('Dom Casmurro');
     expect(root.textContent).toContain('Machado de Assis • ISBN 9780000000002');
@@ -93,12 +93,24 @@ describe('Balcão: detalhes da obra', () => {
     expect(root.querySelector('input')).toBeNull();
     expect(root.textContent).not.toContain('Excluir exemplar');
     expect(root.textContent).not.toContain('Novo exemplar');
+    expect(root.textContent).not.toContain('Editar exemplar');
+  });
+
+  it('oferece ao vendedor as ações de acervo: editar obra, novo exemplar, editar e excluir exemplar', () => {
+    const { root, button } = setup(of(detail()), ['SELLER']);
+    expect(button('Editar obra')).toBeDefined();
+    expect(Array.from(root.querySelectorAll('a')).some((a) => a.textContent?.trim() === 'Novo exemplar')).toBeTrue();
+    expect(root.querySelector('thead')?.textContent).toContain('Ações');
+    expect(root.querySelectorAll('tbody tr button').length).toBe(8);
   });
 
   it('oferece Novo exemplar apenas a papéis autorizados e a obras ativas', () => {
     const admin = setup(of(detail()), ['ADMINISTRATOR']);
     const link = Array.from(admin.root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Novo exemplar');
     expect(link?.getAttribute('href')).toBe('/balcao/acervo/7/exemplares/novo');
+    TestBed.resetTestingModule();
+    const user = setup(of(detail()), ['USER']);
+    expect(user.root.textContent).not.toContain('Novo exemplar');
     TestBed.resetTestingModule();
     const inactive = setup(of(detail({ is_active: false })), ['ADMINISTRATOR']);
     expect(inactive.root.textContent).not.toContain('Novo exemplar');
@@ -213,7 +225,7 @@ describe('Balcão: detalhes da obra', () => {
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
     });
 
-    it('inativa a obra somente após confirmação e não oferece reativação', () => {
+    it('inativa a obra somente após confirmação e passa a oferecer a reativação', () => {
       const ctx = setup(of(detail()), admin);
       ctx.books.update.and.returnValue(of({}) as never);
       ctx.button('Editar obra')!.click();
@@ -230,7 +242,8 @@ describe('Balcão: detalhes da obra', () => {
       expect(ctx.root.querySelector('a[href="/balcao/acervo"].btn')?.textContent).toContain('Voltar ao acervo');
       expect(ctx.root.textContent).toContain('Status da obra: Inativa');
       expect(ctx.button('Inativar obra')).toBeUndefined();
-      expect(ctx.root.textContent).toContain('A reativação ainda não está disponível.');
+      expect(ctx.button('Reativar obra')).toBeDefined();
+      expect(ctx.root.textContent).not.toContain('A reativação ainda não está disponível.');
     });
 
     it('o modal de inativação mostra a situação real dos exemplares e a regra de bloqueio', () => {
@@ -336,7 +349,7 @@ describe('Balcão: detalhes da obra', () => {
   describe('exclusão de exemplar', () => {
     const admin: RoleCode[] = ['ADMINISTRATOR'];
     const deleteButtons = (root: HTMLElement) =>
-      Array.from(root.querySelectorAll('tbody tr')).map((row) => row.querySelector('button') as HTMLButtonElement | null);
+      Array.from(root.querySelectorAll('tbody tr')).map((row) => row.querySelector('button.btn--danger') as HTMLButtonElement | null);
 
     function openDelete(ctx: Ctx, row = 0) {
       deleteButtons(ctx.root)[row]!.click();
@@ -344,7 +357,9 @@ describe('Balcão: detalhes da obra', () => {
     }
 
     it('só oferece a ação a papéis autorizados no backend', () => {
-      expect(deleteButtons(setup(of(detail()), ['SELLER']).root).every((b) => b === null)).toBeTrue();
+      expect(deleteButtons(setup(of(detail()), ['USER']).root).every((b) => b === null)).toBeTrue();
+      TestBed.resetTestingModule();
+      expect(deleteButtons(setup(of(detail()), ['SELLER']).root).length).toBe(4);
       TestBed.resetTestingModule();
       expect(deleteButtons(setup(of(detail()), ['STOCK_KEEPER']).root).length).toBe(4);
       TestBed.resetTestingModule();
@@ -495,6 +510,203 @@ describe('Balcão: detalhes da obra', () => {
       expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
       confirmDialog(ctx);
       expect(snackbarMessage()).toContain('Exemplar #00101 excluído.');
+    });
+  });
+
+  describe('reativação de obra', () => {
+    const inactive = (over: Partial<StaffCatalogBookDetail> = {}) => detail({ is_active: false, ...over });
+
+    it('oferece Reativar obra a SELLER e ADMINISTRATOR, e não a quem não administra o acervo', () => {
+      expect(setup(of(inactive()), ['SELLER']).button('Reativar obra')).toBeDefined();
+      TestBed.resetTestingModule();
+      expect(setup(of(inactive()), ['ADMINISTRATOR']).button('Reativar obra')).toBeDefined();
+      TestBed.resetTestingModule();
+      expect(setup(of(inactive()), ['USER']).button('Reativar obra')).toBeUndefined();
+      TestBed.resetTestingModule();
+      expect(setup(of(detail()), ['SELLER']).button('Reativar obra')).toBeUndefined();
+    });
+
+    it('pede confirmação, bloqueia duplo envio e só anuncia sucesso após 2xx, recarregando', () => {
+      const ctx = setup(of(inactive()), ['SELLER']);
+      const request = new Subject<unknown>();
+      ctx.books.update.and.returnValue(request as never);
+      ctx.button('Reativar obra')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.books.update).not.toHaveBeenCalled();
+      expect(ctx.root.textContent).toContain('Reativar Dom Casmurro?');
+      const submit = ctx.root.querySelector('.confirm__submit') as HTMLButtonElement;
+      submit.click();
+      submit.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.books.update).toHaveBeenCalledOnceWith(7, { is_active: true });
+      expect(snackbarMessage()).not.toContain('foi reativada');
+      ctx.counter.getCatalogBook.and.returnValue(of(detail()));
+      request.next({});
+      request.complete();
+      ctx.fixture.detectChanges();
+      expect(snackbarMessage()).toContain('Dom Casmurro foi reativada.');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+      expect(ctx.root.textContent).toContain('Status da obra: Ativa');
+    });
+
+    it('cancelar não altera nada', () => {
+      const ctx = setup(of(inactive()), ['SELLER']);
+      ctx.button('Reativar obra')!.click();
+      ctx.fixture.detectChanges();
+      ctx.button('Cancelar')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.books.update).not.toHaveBeenCalled();
+    });
+
+    it('antecipa o bloqueio sem exemplar ativo e não chama o backend', () => {
+      const ctx = setup(of(inactive({ copies: [copy({ is_active: false, status: 'INACTIVE', free: false })] })), ['SELLER']);
+      expect(ctx.button('Reativar obra')!.disabled).toBeTrue();
+      expect(ctx.root.textContent).toContain('A obra não tem exemplar ativo');
+      ctx.button('Reativar obra')!.click();
+      expect(ctx.books.update).not.toHaveBeenCalled();
+    });
+
+    it('mostra o erro de domínio do backend sem anunciar sucesso e recarrega', () => {
+      const ctx = setup(of(inactive()), ['SELLER']);
+      ctx.books.update.and.returnValue(throwError(() => ({
+        status: 409, code: 'book_without_active_copy', detail: 'A obra não pode ser reativada sem ao menos um exemplar ativo.',
+      })) as never);
+      ctx.button('Reativar obra')!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      expect(snackbarMessage()).toContain('não pode ser reativada sem ao menos um exemplar ativo');
+      expect(snackbarVariant()).toBe('warning');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('edição e conversão de exemplar', () => {
+    const seller: RoleCode[] = ['SELLER'];
+    const rowButton = (root: HTMLElement, row: number, label: string) =>
+      Array.from(root.querySelectorAll('tbody tr')[row].querySelectorAll('button')).find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
+
+    function open(ctx: Ctx, row: number) {
+      rowButton(ctx.root, row, 'Editar')!.click();
+      ctx.fixture.detectChanges();
+    }
+
+    function type(ctx: Ctx, selector: string, value: string, event = 'input') {
+      const field = ctx.root.querySelector(selector) as HTMLInputElement | HTMLSelectElement;
+      field.value = value;
+      field.dispatchEvent(new Event(event));
+      ctx.fixture.detectChanges();
+    }
+
+    it('só oferece Editar a papéis autorizados e o desabilita com o motivo quando o exemplar não é editável', () => {
+      const { root } = setup(of(detail()), seller);
+      expect([0, 1, 2, 3].map((row) => rowButton(root, row, 'Editar')!.disabled)).toEqual([false, true, false, true]);
+      expect(rowButton(root, 1, 'Editar')!.title).toBe('Exemplar emprestado: só exemplares disponíveis podem ser editados.');
+      expect(rowButton(root, 3, 'Editar')!.title).toBe('Exemplar reservado para venda: não pode ser editado.');
+      TestBed.resetTestingModule();
+      expect(setup(of(detail()), ['USER']).root.textContent).not.toContain('Editar exemplar');
+    });
+
+    it('abre o painel "Editando exemplar" com o código imutável e os dados atuais', () => {
+      const ctx = setup(of(detail()), seller);
+      open(ctx, 2);
+      expect(ctx.root.querySelector('#editar-exemplar-titulo')?.textContent).toBe('Editando exemplar #00103');
+      expect(ctx.root.textContent).toContain('Obra: Dom Casmurro');
+      const code = ctx.root.querySelector('#copy-barcode') as HTMLInputElement;
+      expect([code.value, code.readOnly]).toEqual(['00103', true]);
+      expect((ctx.root.querySelector('#copy-destination') as HTMLSelectElement).value).toBe('COMMERCIAL');
+      expect((ctx.root.querySelector('#copy-price') as HTMLInputElement).value).toBe('39,90');
+      expect(ctx.button('Salvar exemplar')!.disabled).toBeTrue();
+      ctx.button('Cancelar')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.querySelector('[data-copy-panel]')).toBeNull();
+    });
+
+    it('converte para Venda exigindo preço maior que zero e envia só o que mudou, após confirmar', () => {
+      const ctx = setup(of(detail()), seller);
+      const request = new Subject<unknown>();
+      ctx.copies.update.and.returnValue(request as never);
+      open(ctx, 0);
+      type(ctx, '#copy-destination', 'COMMERCIAL', 'change');
+      expect(ctx.root.textContent).toContain('Informe o preço de venda');
+      expect(ctx.button('Salvar exemplar')!.disabled).toBeTrue();
+      type(ctx, '#copy-price', '0');
+      expect(ctx.root.textContent).toContain('maior que zero');
+      type(ctx, '#copy-price', '29,5');
+      expect(ctx.button('Salvar exemplar')!.disabled).toBeFalse();
+      ctx.button('Salvar exemplar')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.copies.update).not.toHaveBeenCalled();
+      expect(ctx.root.textContent).toContain('Finalidade: Empréstimo → Venda');
+      expect(ctx.root.textContent).toContain('Preço de venda: — → R$');
+      const submit = ctx.root.querySelector('.confirm__submit') as HTMLButtonElement;
+      submit.click();
+      submit.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.copies.update).toHaveBeenCalledOnceWith(1, { destination: 'COMMERCIAL', salePrice: 29.5 });
+      expect(snackbarMessage()).not.toContain('atualizado');
+      ctx.counter.getCatalogBook.and.returnValue(of(detail({ copies: [copy({ destination: 'COMMERCIAL', sale_price: '29.50' }), ...detail().copies.slice(1)] })));
+      request.next({});
+      request.complete();
+      ctx.fixture.detectChanges();
+      expect(snackbarMessage()).toContain('Exemplar #00101 atualizado.');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+      expect(ctx.root.querySelector('[data-copy-panel]')).toBeNull();
+    });
+
+    it('converte para Empréstimo sem enviar preço', () => {
+      const ctx = setup(of(detail()), seller);
+      ctx.copies.update.and.returnValue(of({}) as never);
+      open(ctx, 2);
+      type(ctx, '#copy-destination', 'DIDACTIC', 'change');
+      expect(ctx.root.querySelector('#copy-price')).toBeNull();
+      expect(ctx.root.textContent).toContain('Converter para Empréstimo remove o preço de venda');
+      ctx.button('Salvar exemplar')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.textContent).toContain('Preço de venda: R$');
+      expect(ctx.root.textContent).toContain('removido');
+      confirmDialog(ctx);
+      expect(ctx.copies.update).toHaveBeenCalledOnceWith(3, { destination: 'DIDACTIC' });
+    });
+
+    it('edita a condição sem converter e limita a 30 caracteres', () => {
+      const ctx = setup(of(detail()), seller);
+      ctx.copies.update.and.returnValue(of({}) as never);
+      open(ctx, 0);
+      type(ctx, '#copy-condition', 'x'.repeat(31));
+      expect(ctx.root.textContent).toContain('A condição aceita até 30 caracteres.');
+      expect(ctx.button('Salvar exemplar')!.disabled).toBeTrue();
+      type(ctx, '#copy-condition', ' Bom estado ');
+      ctx.button('Salvar exemplar')!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      expect(ctx.copies.update).toHaveBeenCalledOnceWith(1, { condition: 'Bom estado' });
+    });
+
+    it('mostra o erro de domínio sem anunciar sucesso e recarrega a obra', () => {
+      const ctx = setup(of(detail()), seller);
+      ctx.copies.update.and.returnValue(throwError(() => ({
+        status: 409, code: 'copy_not_available', detail: 'Este exemplar não está disponível para esta operação. Atualize a obra.',
+      })) as never);
+      open(ctx, 0);
+      type(ctx, '#copy-condition', 'Usado');
+      ctx.button('Salvar exemplar')!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      expect(snackbarMessage()).toContain('não está disponível para esta operação');
+      expect(snackbarVariant()).toBe('warning');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+    });
+
+    it('fecha o painel quando a recarga mostra que o exemplar deixou de ser editável', () => {
+      const ctx = setup(of(detail()), seller);
+      ctx.copies.update.and.returnValue(throwError(() => ({ status: 409, code: 'copy_not_available', detail: 'x' })) as never);
+      open(ctx, 0);
+      type(ctx, '#copy-condition', 'Usado');
+      ctx.button('Salvar exemplar')!.click();
+      ctx.fixture.detectChanges();
+      ctx.counter.getCatalogBook.and.returnValue(of(detail({ copies: [copy({ status: 'BORROWED', free: false }), ...detail().copies.slice(1)] })));
+      confirmDialog(ctx);
+      expect(ctx.root.querySelector('[data-copy-panel]')).toBeNull();
     });
   });
 });

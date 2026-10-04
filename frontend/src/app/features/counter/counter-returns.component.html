@@ -20,6 +20,10 @@
     <p class="field__error" id="return-q-error" role="alert">Informe o código do exemplar ou o ISBN.</p>
   }
 
+  @if (returnedLoanId(); as loanId) {
+    <app-receipt kind="return" [id]="loanId" [closable]="true" [focusOnLoad]="true" (closed)="returnedLoanId.set(null)" />
+  }
+
   @if (flow.saveFailed()) {
     <app-save-failure>
       <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>

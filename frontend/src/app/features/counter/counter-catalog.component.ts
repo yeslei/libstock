@@ -10,6 +10,9 @@ import { SpinnerComponent } from '../../shared/components/spinner/spinner.compon
 import { CounterService, LIST_LIMIT, StaffCatalogBook } from './counter.service';
 import { toLoadState } from './desk-flow';
 
+/** Papéis que o backend autoriza em `POST /api/v1/books/` (Issue #151: o vendedor administra o acervo). */
+const CREATE_BOOK_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
+
 /** Frame "Funcionário / Acervo" (painel 03): obras cadastradas, busca e acesso à obra. Consulta somente leitura. */
 @Component({
   selector: 'app-counter-catalog',
@@ -26,8 +29,8 @@ export class CounterCatalogComponent implements OnInit {
   protected readonly term = signal('');
   protected readonly state = signal<LoadState<readonly StaffCatalogBook[]>>({ status: 'loading' });
   protected readonly limit = LIST_LIMIT;
-  /** Cadastro de obra só para quem o backend autoriza (STOCK_KEEPER/ADMINISTRATOR); no balcão, ADMINISTRATOR. */
-  protected readonly canCreate = inject(TokenStoreService).user?.role_codes.includes('ADMINISTRATOR') ?? false;
+  /** Cadastro de obra só para quem o backend autoriza (SELLER, STOCK_KEEPER, ADMINISTRATOR). */
+  protected readonly canCreate = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => CREATE_BOOK_ROLES.includes(role));
 
   constructor() {
     this.loads

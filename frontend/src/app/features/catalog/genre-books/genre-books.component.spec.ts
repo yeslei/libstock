@@ -24,17 +24,19 @@ describe('GenreBooksComponent', () => {
   let fixture: ComponentFixture<GenreBooksComponent>;
   let root: HTMLElement;
   let byGenre: jasmine.Spy;
+  let allGenres: jasmine.Spy;
   const params = new BehaviorSubject(convertToParamMap({ slug: 'romance' }));
 
   async function create(response: unknown = of(page([book(1, 'Orgulho e Preconceito', true), book(2, 'Jane Eyre', false)]))) {
     params.next(convertToParamMap({ slug: 'romance' }));
     byGenre = jasmine.createSpy('getBooksByGenre').and.returnValue(response);
+    allGenres = jasmine.createSpy('getAllGenres').and.returnValue(of([ficcao, romance, { id: 3, name: 'Poesia', slug: 'poesia' }]));
     await TestBed.configureTestingModule({
       imports: [GenreBooksComponent],
       providers: [
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { paramMap: params } },
-        { provide: CatalogService, useValue: { getBooksByGenre: byGenre, getFeaturedGenres: () => of([ficcao, romance]) } },
+        { provide: CatalogService, useValue: { getBooksByGenre: byGenre, getFeaturedGenres: () => of([ficcao, romance]), getAllGenres: allGenres } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(GenreBooksComponent);
@@ -57,13 +59,37 @@ describe('GenreBooksComponent', () => {
     expect(root.textContent).toContain('Livros filtrados pela categoria Romance.');
     expect(root.querySelector<HTMLInputElement>('#genre-search')!.placeholder).toBe('Buscar dentro de Romance');
     const chips = Array.from(root.querySelectorAll('.genre__chip')).map((c) => c.textContent!.trim());
-    expect(chips).toEqual(['Todos', 'Ficção', 'Romance']);
+    expect(chips).toEqual(['Todos', 'Ficção', 'Romance', 'Mais']);
+    expect(root.querySelector('a.genre__chip[href="/acervo"]')!.textContent).toContain('Todos');
+    expect(root.querySelector('.genre__crumbs a')!.getAttribute('href')).toBe('/acervo');
     expect(root.querySelector('.genre__chip--active')!.textContent).toContain('Romance');
     expect(root.querySelector('.genre__chip--active')!.getAttribute('aria-current')).toBe('page');
     expect(root.querySelectorAll('app-catalog-book-card').length).toBe(2);
     expect(root.textContent).toContain('Empréstimo disponível');
     expect(root.textContent).toContain('Esgotado');
     expect(byGenre).toHaveBeenCalledWith('romance', 1, '');
+  });
+
+  it('"Mais" troca os destaques pela lista completa de categorias, uma única consulta', async () => {
+    await create();
+    const more = () => Array.from(root.querySelectorAll<HTMLButtonElement>('button.genre__chip--more'))[0];
+    expect(allGenres).not.toHaveBeenCalled();
+    more().click(); fixture.detectChanges();
+    const names = () => Array.from(root.querySelectorAll('.genre__chip')).map((c) => c.textContent!.trim());
+    expect(names()).toEqual(['Todos', 'Ficção', 'Romance', 'Poesia', 'Menos']);
+    more().click(); fixture.detectChanges();
+    expect(names()).toEqual(['Todos', 'Ficção', 'Romance', 'Mais']);
+    more().click(); fixture.detectChanges();
+    expect(allGenres).toHaveBeenCalledTimes(1);
+  });
+
+  it('mantém os destaques e avisa quando a lista completa falha', async () => {
+    await create();
+    allGenres.and.returnValue(throwError(() => ({ status: 500 })));
+    root.querySelector<HTMLButtonElement>('button.genre__chip--more')!.click();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Não foi possível carregar todas as categorias.');
+    expect(Array.from(root.querySelectorAll('.genre__chip')).map((c) => c.textContent!.trim())).toEqual(['Todos', 'Ficção', 'Romance', 'Mais']);
   });
 
   it('exibe o estado de carregamento', async () => {

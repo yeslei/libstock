@@ -2,6 +2,7 @@ import { snackbarMessage, snackbarVariant } from '../../shared/components/snackb
 import { Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { receiptGet, receiptStub } from '../receipts/receipt-testing.spec';
 import { Subject, of, throwError } from 'rxjs';
 
 import { CounterReservationAttendComponent } from './counter-reservation-attend.component';
@@ -35,7 +36,7 @@ function create<T>(component: Type<T>, configure: (service: Spies) => void, inpu
     'listPurchaseReservations', 'allocatePurchase', 'confirmSale', 'cancelReservation', 'expireDueReservations',
   ]) as unknown as Spies;
   configure(service);
-  TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]), { provide: CounterService, useValue: service }] });
+  TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]), { provide: CounterService, useValue: service }, receiptStub()] });
   const fixture = TestBed.createComponent(component);
   for (const [name, value] of Object.entries(inputs)) fixture.componentRef.setInput(name, value);
   fixture.detectChanges();
@@ -251,6 +252,8 @@ describe('Balcão: atender reserva', () => {
     expect(root.textContent).toContain('A reserva de Maria Silva foi concluída.');
     expect(root.textContent).toContain('Dom Casmurro · Exemplar C-055 · Vendido');
     expect(root.textContent).toContain('Venda nº 9');
+    expect(receiptGet()).toHaveBeenCalledOnceWith('sale', 9);
+    expect(root.querySelector('app-receipt')).not.toBeNull();
     expect(root.textContent).toContain('Ana Santos passa à 1ª posição');
     expect(link(root, 'Voltar à fila')?.getAttribute('href')).toBe('/balcao/reservas');
     expect(link(root, 'Registrar outra venda')?.getAttribute('href')).toBe('/balcao/vendas');

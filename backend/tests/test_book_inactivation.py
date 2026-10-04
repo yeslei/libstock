@@ -128,9 +128,6 @@ def test_dados_de_cliente_so_para_administrador_e_vendedor(roles, expected):
         response = TestClient(app).patch("/api/v1/books/1", json={"is_active": False})
     finally:
         app.dependency_overrides.clear()
-    if roles == ["SELLER"]:
-        assert response.status_code == 403  # SELLER não edita obra; a regra só vale a quem passa pela autorização
-        return
     assert response.status_code == 200
     assert Recorder.seen == [expected]
 

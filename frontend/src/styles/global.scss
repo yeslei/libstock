@@ -69,3 +69,25 @@ textarea {
 .visually-hidden {
   @include visually-hidden;
 }
+
+// Impressão de comprovantes (Issue #152): só o comprovante sai no papel; o resto da página fica oculto.
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .receipt,
+  .receipt * {
+    visibility: visible;
+  }
+
+  .receipt {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    border: 0;
+    padding: 0;
+    color: #000;
+  }
+}

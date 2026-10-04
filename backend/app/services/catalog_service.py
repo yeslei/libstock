@@ -23,6 +23,7 @@ from app.schemas.catalog_schema import (
     GenreCreate,
     GenreResponse,
     PagedBooksResponse,
+    PagedCatalogResponse,
 )
 
 FEATURED_BOOKS_LIMIT = 12
@@ -111,6 +112,28 @@ class CatalogService:
 
     def list_featured_genres(self) -> list[Genre]:
         return self.genre_repository.find_featured()
+
+    def list_all_genres(self) -> list[Genre]:
+        return self.genre_repository.find_all()
+
+    def list_all_books(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        q: str | None = None,
+    ) -> PagedCatalogResponse:
+        books, total = self.catalog_repository.find_all_books(
+            page=page,
+            page_size=page_size,
+            q=(q or "").strip() or None,
+        )
+        return PagedCatalogResponse(
+            items=self._to_responses(books),
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
 
     def list_books_by_genre(
         self,

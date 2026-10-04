@@ -26,6 +26,8 @@ export interface PendingAction<R = unknown> {
   readonly confirmLabel: string;
   readonly run: () => Observable<R>;
   readonly success: (result: R) => string;
+  /** Chamado com o resultado após o 2xx (ex.: abrir o comprovante). */
+  readonly done?: (result: R) => void;
   /** Trata o erro por conta própria (ex.: tela de bloqueio); retornar true suprime o feedback genérico. */
   readonly onError?: (error: unknown) => boolean;
 }
@@ -72,6 +74,7 @@ export class ActionFlow {
         next: (result) => {
           this.confirming.set(null);
           this.snackbar.show(action.success(result), 'success');
+          action.done?.(result);
           this.after(true);
         },
         error: (error) => {

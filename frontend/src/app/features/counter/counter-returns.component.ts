@@ -10,6 +10,7 @@ import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { CounterService, StaffLoan } from './counter.service';
 import { ActionFlow, toLoadState } from './desk-flow';
+import { ReceiptComponent } from '../receipts/receipt.component';
 
 /**
  * Frame "Funcionário / Devolução": localiza o empréstimo aberto pelo código do exemplar ou pelo ISBN
@@ -18,7 +19,7 @@ import { ActionFlow, toLoadState } from './desk-flow';
 @Component({
   selector: 'app-counter-returns',
   standalone: true,
-  imports: [SaveFailureComponent, DatePipe, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, DatePipe, AlertComponent, SpinnerComponent, ConfirmDialogComponent, ReceiptComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-returns.component.html',
   styleUrl: './counter-returns.component.scss',
@@ -32,6 +33,8 @@ export class CounterReturnsComponent {
   /** Termo da última busca enviada; é ele que a recarga reutiliza. */
   protected readonly searched = signal('');
   protected readonly missingTerm = signal(false);
+  /** Empréstimo cuja devolução acabou de ser registrada; abre o comprovante de devolução. */
+  protected readonly returnedLoanId = signal<number | null>(null);
   /** `null` até a primeira busca. */
   protected readonly state = signal<LoadState<readonly StaffLoan[]> | null>(null);
 
@@ -87,6 +90,7 @@ export class CounterReturnsComponent {
       confirmLabel: 'Confirmar devolução',
       run: () => this.service.confirmReturn(loan.id),
       success: () => `Devolução confirmada: exemplar ${loan.copy_barcode} de “${loan.book.title}”.`,
+      done: (result) => this.returnedLoanId.set(result.id),
     });
   }
 }

@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
+import { receiptGet, receiptStub } from '../receipts/receipt-testing.spec';
 import { CounterLoanCreateComponent, isLoanable } from './counter-loan-create.component';
 import { CounterService, LoanRegistration, StaffClient, StaffCopyLookup } from './counter.service';
 
@@ -29,7 +30,7 @@ function setup(configure: (service: jasmine.SpyObj<CounterService>) => void = ()
   configure(service);
   TestBed.configureTestingModule({
     imports: [CounterLoanCreateComponent],
-    providers: [provideRouter([]), { provide: CounterService, useValue: service }],
+    providers: [provideRouter([]), { provide: CounterService, useValue: service }, receiptStub()],
   });
   const fixture = TestBed.createComponent(CounterLoanCreateComponent);
   fixture.detectChanges();
@@ -180,7 +181,9 @@ describe('Balcão: novo empréstimo', () => {
     expect(text).toContain('Retirada: 03/10/2026');
     expect(text).toContain('Devolução prevista: 18/10/2026');
     expect(text).toContain('Empréstimo nº 77 · Status do exemplar: Emprestado');
-    expect(text).not.toContain('comprovante');
+    // O comprovante vem do backend (dados persistidos), não da resposta do POST.
+    expect(receiptGet()).toHaveBeenCalledOnceWith('loan', 77);
+    expect(root.querySelector('app-receipt')).not.toBeNull();
   });
 
   it('volta ao formulário vazio em "Novo empréstimo"', async () => {

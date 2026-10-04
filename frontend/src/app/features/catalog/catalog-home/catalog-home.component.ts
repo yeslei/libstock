@@ -11,6 +11,7 @@ import { CatalogCapability, capabilitiesFor } from '../models/catalog-capabiliti
 import { CatalogBook, Genre, LoadState } from '../models/catalog.model';
 import { CatalogBookCardComponent } from '../components/catalog-book-card/catalog-book-card.component';
 import { CatalogAdminService } from '../services/catalog-admin.service';
+import { createAllGenresLoader } from '../services/all-genres-loader';
 import { CatalogSearchCriterion, CatalogService } from '../services/catalog.service';
 
 /**
@@ -36,6 +37,7 @@ export class CatalogHomeComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private searchSubscription?: Subscription;
+  protected readonly allGenres = createAllGenresLoader();
 
   private readonly user = toSignal(this.auth.user$, { initialValue: null });
 

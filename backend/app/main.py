@@ -12,6 +12,7 @@ from app.controllers.user_controller import router as user_router
 from app.controllers.loan_request_controller import router as loan_request_router
 from app.controllers.purchase_request_controller import router as purchase_request_router
 from app.controllers.client_tracking_controller import router as client_tracking_router
+from app.controllers.client_eligibility_controller import router as client_eligibility_router
 from app.controllers.circulation_controller import router as circulation_router
 from app.controllers.staff_desk_controller import router as staff_desk_router
 from app.core.config import get_settings
@@ -21,6 +22,7 @@ from app.controllers.client_pendency_controller import (
 )
 from app.controllers.loan_controller import router as loan_router
 from app.controllers.sale_controller import router as sale_router
+from app.controllers.receipt_controller import router as receipt_router
 
 
 settings = get_settings()
@@ -79,9 +81,11 @@ app.include_router(admin_catalog_router)
 app.include_router(loan_request_router)
 app.include_router(purchase_request_router)
 app.include_router(client_tracking_router)
+app.include_router(client_eligibility_router)
 
 app.include_router(circulation_router)
 app.include_router(staff_desk_router)
 app.include_router(client_pendency_router)
 app.include_router(loan_router)
 app.include_router(sale_router)
+app.include_router(receipt_router)

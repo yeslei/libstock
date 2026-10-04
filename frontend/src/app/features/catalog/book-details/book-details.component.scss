@@ -39,6 +39,10 @@ summary:focus-visible, input:focus-visible, button:focus-visible, a:focus-visibl
 .notice { padding: $space-4; margin: 0 0 $space-5; border-radius: 12px; font-size: $font-size-sm; }
 .notice p { margin: $space-1 0 0; }
 .notice--info { background: $client-hero; }
+.situation { margin: $space-3 0 0; }
+.situation--ok { color: $client-green; font-weight: 600; }
+.situation--blocked { padding: $space-3; border-radius: $radius-md; background: $client-hero; }
+.situation--blocked ul { margin: $space-2 0; padding-left: $space-5; }
 .notice--success { background: #e4f1e6; }
 .notice--error { background: #f9e6e3; }
 .modality-content .notice { margin-top: $space-4; }

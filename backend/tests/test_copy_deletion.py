@@ -246,7 +246,7 @@ def test_http_sem_token_retorna_401(http):
     assert response.json()["code"] == "invalid_token"
 
 
-@pytest.mark.parametrize("role", ["SELLER", "MANAGER", "USER"])
+@pytest.mark.parametrize("role", ["MANAGER", "USER"])
 def test_http_papeis_sem_permissao_retornam_403_sem_chamar_o_service(http, role):
     service = StubService()
     app.dependency_overrides[get_copy_service] = lambda: service
@@ -266,7 +266,7 @@ def test_http_usuario_inativo_retorna_403(http):
     assert (response.status_code, response.json()["code"]) == (403, "user_inactive")
 
 
-@pytest.mark.parametrize("role", ["STOCK_KEEPER", "ADMINISTRATOR"])
+@pytest.mark.parametrize("role", ["SELLER", "STOCK_KEEPER", "ADMINISTRATOR"])
 def test_http_papeis_autorizados_excluem_com_200(http, role):
     service = StubService()
     app.dependency_overrides[get_copy_service] = lambda: service

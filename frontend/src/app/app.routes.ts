@@ -15,6 +15,21 @@ export const routes: Routes = [
     loadComponent: () => import('./features/client-tracking/client-tracking.component').then(m => m.ClientTrackingComponent),
   },
   {
+    path: 'comprovantes/emprestimo/:id', canActivate: [authGuard, roleGuard], data: { roles: ['USER', 'SELLER', 'ADMINISTRATOR'], receipt: 'loan' },
+    title: 'Comprovante de empréstimo · LibStock',
+    loadComponent: () => import('./features/receipts/receipt-page.component').then(m => m.ReceiptPageComponent),
+  },
+  {
+    path: 'comprovantes/devolucao/:id', canActivate: [authGuard, roleGuard], data: { roles: ['USER', 'SELLER', 'ADMINISTRATOR'], receipt: 'return' },
+    title: 'Comprovante de devolução · LibStock',
+    loadComponent: () => import('./features/receipts/receipt-page.component').then(m => m.ReceiptPageComponent),
+  },
+  {
+    path: 'comprovantes/venda/:id', canActivate: [authGuard, roleGuard], data: { roles: ['USER', 'SELLER', 'ADMINISTRATOR'], receipt: 'sale' },
+    title: 'Comprovante de venda · LibStock',
+    loadComponent: () => import('./features/receipts/receipt-page.component').then(m => m.ReceiptPageComponent),
+  },
+  {
     path: 'balcao', canActivate: [authGuard, roleGuard], data: { roles: ['SELLER', 'ADMINISTRATOR'] },
     loadComponent: () => import('./features/counter/counter-shell.component').then(m => m.CounterShellComponent),
     children: [
@@ -89,6 +104,12 @@ export const routes: Routes = [
     pathMatch: 'full',
   },
   {
+    path: 'acervo',
+    title: 'Acervo completo · LibStock',
+    loadComponent: () =>
+      import('./features/catalog/all-books/all-books.component').then((m) => m.AllBooksComponent),
+  },
+  {
     path: 'livros/:id',
     title: 'Detalhes do livro · LibStock',
     loadComponent: () =>
@@ -115,7 +136,7 @@ export const routes: Routes = [
   {
     path: 'obras/nova',
     canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar obra · LibStock',
     loadComponent: () =>
       import('./features/books/book-create/book-create.component').then(
@@ -125,7 +146,7 @@ export const routes: Routes = [
   {
     path: 'obras/:id/exemplares/novo',
     canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar exemplar · LibStock',
     loadComponent: () =>
       import('./features/copies/copy-create/copy-create.component').then(

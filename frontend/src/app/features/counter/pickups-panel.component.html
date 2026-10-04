@@ -15,6 +15,10 @@
 
   <hr class="page__rule" />
 
+  @if (receipt(); as r) {
+    <app-receipt [kind]="r.kind" [id]="r.id" [closable]="true" [focusOnLoad]="true" (closed)="receipt.set(null)" />
+  }
+
   @if (saveFailed()) {
     <app-save-failure>
       <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>

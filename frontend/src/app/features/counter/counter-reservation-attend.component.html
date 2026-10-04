@@ -44,6 +44,7 @@
                 <p class="line">{{ next.client.name }} passa à {{ next.queue_position }}ª posição · aguardando disponibilidade</p>
               }
             </div>
+            <app-receipt kind="sale" [id]="done.saleId" />
             <div class="actions">
               <a class="btn btn--primary" routerLink="/balcao/reservas">Voltar à fila</a>
               <a class="btn" routerLink="/balcao/vendas">Registrar outra venda</a>
