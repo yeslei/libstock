@@ -235,14 +235,19 @@ export class CounterService {
     return this.http.get<StaffCatalogBookDetail>(`${STAFF}/books/${bookId}`);
   }
 
-  lookupCopies(q: string): Observable<StaffCopyLookup[]> {
-    return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, { params: params({ q: q.trim(), limit: COPY_LOOKUP_LIMIT }) });
-  }
 
-  /** Lista padrão sem termo (Issue #172): exemplares por finalidade e disponibilidade, ordenados por título e código. */
-  listCopies(filter: CopyListFilter): Observable<StaffCopyLookup[]> {
+  /**
+   * Exemplares por finalidade e disponibilidade, ordenados por título e código (Issue #172).
+   * O termo, quando informado, filtra dentro dessa lista (Issue #177).
+   */
+  listCopies(filter: CopyListFilter, q?: string): Observable<StaffCopyLookup[]> {
     return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, {
-      params: params({ destination: filter.destination, available: filter.available ? 'true' : null, limit: COPY_LOOKUP_LIMIT }),
+      params: params({
+        q: q?.trim() || null,
+        destination: filter.destination,
+        available: filter.available ? 'true' : null,
+        limit: COPY_LOOKUP_LIMIT,
+      }),
     });
   }
 
