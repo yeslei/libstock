@@ -28,6 +28,21 @@ label small, .hint { color: $text-muted; font-size: 12px; }
 .primary { margin-top: $space-4; min-height: $control-height; padding: $space-3 $space-4; border: 0; border-radius: $radius-sm; color: white; background: $client-green; font: inherit; cursor: pointer; }
 .primary:disabled { opacity: .65; cursor: default; }
 summary:focus-visible, input:focus-visible, button:focus-visible, a:focus-visible { @include focus-ring; }
-.snackbar { position: fixed; z-index: 100; bottom: $space-6; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: $space-4; max-width: calc(100vw - 32px); padding: $space-3 $space-4; background: $client-green; color: white; border-radius: $radius-sm; box-shadow: $shadow-md; font-size: $font-size-sm; }
-.snackbar button { background: none; border: 0; color: inherit; font-size: 24px; min-height: $target-min; min-width: $target-min; cursor: pointer; }
-@media (max-width: 767px) { .book-layout { grid-template-columns: 1fr; gap: $space-6; } .cover { width: min(290px, 100%); height: 380px; margin: auto; } .dates { grid-template-columns: 1fr; gap: $space-4; } h1 { font-size: 26px; } .snackbar { width: calc(100vw - 32px); box-sizing: border-box; } }
+@media (max-width: 767px) { .book-layout { grid-template-columns: 1fr; gap: $space-6; } .cover { width: min(290px, 100%); height: 380px; margin: auto; } .dates { grid-template-columns: 1fr; gap: $space-4; } h1 { font-size: 26px; } }
+.crumbs { margin-bottom: $space-6; color: $text-muted; font-size: $font-size-xs; }
+.crumbs a { color: inherit; }
+.flow { max-width: 1000px; margin: auto; }
+.flow h1 { margin-bottom: $space-4; }
+.card { padding: $space-5 $space-6; margin-bottom: $space-5; border: 1px solid $client-border; border-radius: 12px; font-size: $font-size-sm; }
+.card h2 { margin: 0 0 $space-3; color: $client-green; }
+.card p { margin: 0 0 $space-3; }
+.notice { padding: $space-4; margin: 0 0 $space-5; border-radius: 12px; font-size: $font-size-sm; }
+.notice p { margin: $space-1 0 0; }
+.notice--info { background: $client-hero; }
+.notice--success { background: #e4f1e6; }
+.notice--error { background: #f9e6e3; }
+.modality-content .notice { margin-top: $space-4; }
+.actions { display: flex; flex-wrap: wrap; gap: $space-4; margin-top: $space-6; }
+.actions .primary { margin-top: 0; display: inline-flex; align-items: center; text-decoration: none; }
+.secondary { min-height: $control-height; padding: $space-3 $space-4; border: 1px solid $client-border; border-radius: $radius-sm; background: white; color: $client-green; font: inherit; cursor: pointer; }
+.secondary:disabled { opacity: .65; cursor: default; }
