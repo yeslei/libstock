@@ -325,9 +325,24 @@ describe('Balcão: controle de pendências', () => {
 describe('Rotas do balcão', () => {
   const counter = routes.find((r) => r.path === 'balcao');
 
-  it('é protegida por autenticação e restrita a SELLER e ADMINISTRATOR', () => {
+  it('é protegida por autenticação e aberta a SELLER, STOCK_KEEPER e ADMINISTRATOR (telas de atendimento restritas por rota)', () => {
     expect(counter?.canActivate?.length).toBe(2);
-    expect(counter?.data?.['roles']).toEqual(['SELLER', 'ADMINISTRATOR']);
+    expect(counter?.data?.['roles']).toEqual(['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR']);
+  });
+
+  it('restringe a SELLER e ADMINISTRATOR toda rota filha que não é de acervo (Issue #169)', () => {
+    const children = (counter?.children ?? []).filter((r) => r.loadComponent);
+    for (const route of children) {
+      const stockKeeperAllowed = route.path === 'acervo' || route.path!.startsWith('acervo/');
+      if (stockKeeperAllowed) {
+        expect(route.data?.['roles']).withContext(route.path ?? '').toBeUndefined();
+      } else {
+        expect(route.canActivate?.length).withContext(route.path ?? '').toBe(1);
+        expect(route.data?.['roles']).withContext(route.path ?? '').toEqual(['SELLER', 'ADMINISTRATOR']);
+        expect(route.data?.['deniedRedirect']).withContext(route.path ?? '').toBe('/balcao/acervo');
+      }
+    }
+    expect(children.map((r) => r.path)).toEqual(jasmine.arrayContaining(['painel', 'clientes', 'vendas', 'reservas/:id']));
   });
 
   it('declara as telas do funcionário como rotas filhas do layout', () => {

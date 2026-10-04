@@ -35,14 +35,32 @@ def test_requires_authentication(api, path):
     assert client.get(path).status_code == 401
 
 
-@pytest.mark.parametrize('role', ['USER', 'STOCK_KEEPER'])
 @pytest.mark.parametrize('path', PATHS)
-def test_roles_without_counter_access_are_denied(api, path, role):
+def test_client_role_is_denied(api, path):
     client, fake = api
-    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=[role])
+    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=['USER'])
     assert client.get(path).status_code == 403
     for name in METHODS:
         getattr(fake, name).assert_not_called()
+
+
+def test_copy_lookup_stays_denied_to_stock_keeper(api):
+    client, fake = api
+    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=['STOCK_KEEPER'])
+    assert client.get('/api/v1/staff/copies?q=abc').status_code == 403
+    fake.copy_lookup.assert_not_called()
+
+
+def test_stock_keeper_reads_catalog_books_only(api):
+    """Issue #169: o estoquista consulta obras no balcão, sem acesso ao restante de /staff."""
+    client, fake = api
+    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=['STOCK_KEEPER'])
+    assert client.get('/api/v1/staff/books?q=dom').status_code == 200
+    fake.catalog_books.assert_called_once_with(7, 'dom', 50)
+    fake.catalog_book.return_value = {'id': 3, 'title': 'T', 'author': 'A', 'isbn': None, 'genre': None, 'is_active': True,
+                                      'total_copies': 0, 'didactic_copies': 0, 'commercial_copies': 0, 'copies': []}
+    assert client.get('/api/v1/staff/books/3').status_code == 200
+    fake.catalog_book.assert_called_once_with(7, 3)
 
 
 @pytest.mark.parametrize('role', ['SELLER', 'ADMINISTRATOR'])

@@ -8,13 +8,15 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { catchError, debounceTime, filter, map, of, switchMap, tap } from 'rxjs';
 
 import { ApiError, FormState } from '../../../core/models/auth.model';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
+import { SnackbarService } from '../../../shared/components/snackbar/snackbar.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { fieldError } from '../../../shared/validators/form-errors';
-import { BookCreateRequest, BookMetadata, BookResponse } from '../models/book.model';
+import { BookCreateRequest, BookMetadata } from '../models/book.model';
 import { BookService } from '../services/book.service';
 import { compactIsbn, isbnValidator } from '../validators/isbn.validator';
 
@@ -50,10 +52,14 @@ const PRICE_ERRORS = {
   server: 'Confira o preço informado.',
 };
 
+/**
+ * Cadastro de obra com o exemplar inicial, hospedado no layout do balcão (`/balcao/acervo/nova`).
+ * Depois do 201, avisa o sucesso e abre o detalhe da obra no balcão.
+ */
 @Component({
   selector: 'app-book-create',
   standalone: true,
-  imports: [ReactiveFormsModule, AlertComponent, SpinnerComponent],
+  imports: [ReactiveFormsModule, RouterLink, AlertComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './book-create.component.html',
   styleUrl: './book-create.component.scss',
@@ -63,6 +69,8 @@ export class BookCreateComponent {
   private readonly books = inject(BookService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly snackbar = inject(SnackbarService);
 
   protected readonly form = this.fb.nonNullable.group({
     isbn: ['', [Validators.required, isbnValidator]],
@@ -78,7 +86,6 @@ export class BookCreateComponent {
   });
   protected readonly state = signal<FormState>({ status: 'idle' });
   protected readonly submitted = signal(false);
-  protected readonly createdBook = signal<BookResponse | null>(null);
   protected readonly imageFailed = signal(false);
   protected readonly metadataState = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   protected readonly metadataMessage = signal<string | null>(null);
@@ -170,7 +177,6 @@ export class BookCreateComponent {
       return;
     }
     this.submitted.set(true);
-    this.createdBook.set(null);
 
     if (this.form.invalid) {
       this.state.set({ status: 'idle' });
@@ -184,11 +190,9 @@ export class BookCreateComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (book) => {
-          this.createdBook.set(book);
           this.state.set({ status: 'success', message: 'Obra cadastrada com sucesso.' });
-          this.unlockMetadata(false);
-          this.form.reset();
-          this.submitted.set(false);
+          this.snackbar.show(`Obra “${book.title}” cadastrada com sucesso.`, 'success');
+          void this.router.navigate(['/balcao/acervo', book.id]);
         },
         error: (error: ApiError) => this.handleError(error),
       });

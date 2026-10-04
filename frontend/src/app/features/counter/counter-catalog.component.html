@@ -8,7 +8,7 @@
     <input id="catalog-q" type="search" maxlength="100" placeholder="Buscar por título, autor ou ISBN" [value]="term()" (input)="setTerm($event)" />
     <button class="btn btn--primary" type="submit">Buscar</button>
     @if (canCreate) {
-      <a class="btn btn--primary" routerLink="/obras/nova">+ Nova obra</a>
+      <a class="btn btn--primary" routerLink="/balcao/acervo/nova">+ Nova obra</a>
     }
   </form>
 

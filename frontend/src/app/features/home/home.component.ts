@@ -27,7 +27,7 @@ export class HomeComponent {
   protected readonly leaving = signal(false);
 
   protected canUseCounter(roles: readonly string[]): boolean {
-    return roles.includes('SELLER') || roles.includes('ADMINISTRATOR');
+    return roles.includes('SELLER') || roles.includes('STOCK_KEEPER') || roles.includes('ADMINISTRATOR');
   }
 
   protected logout(): void {

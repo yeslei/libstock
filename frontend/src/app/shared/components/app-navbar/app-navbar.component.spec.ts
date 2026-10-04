@@ -25,31 +25,28 @@ describe('AppNavbarComponent', () => {
 
   function text(): string { fixture.detectChanges(); return fixture.nativeElement.textContent; }
 
-  it('mostra um único cadastro de exemplar para estoquista', () => {
+  it('não mostra mais o cadastro de exemplar do layout antigo: o estoquista acessa o balcão', () => {
     user$.next({ id: 1, name: 'Estoque', email: 'e@x.dev', role_codes: ['STOCK_KEEPER'], created_at: '' });
-    expect(text().match(/Cadastrar exemplar/g)?.length).toBe(1);
-    expect(fixture.nativeElement.querySelector('a[href="/gestao/acervo"]')).not.toBeNull();
-  });
-
-  it('não mostra gestão de acervo para vendedor ou usuário', () => {
-    user$.next({ id: 2, name: 'Venda', email: 'v@x.dev', role_codes: ['SELLER'], created_at: '' });
     expect(text()).not.toContain('Cadastrar exemplar');
+    expect(fixture.nativeElement.querySelector('a[href="/gestao/acervo"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/balcao"]')).not.toBeNull();
   });
 
-  it('mostra o balcão apenas para vendedor e administrador', () => {
-    for (const [role, visible] of [['SELLER', true], ['ADMINISTRATOR', true], ['STOCK_KEEPER', false], ['USER', false]] as const) {
+  it('mostra o balcão para vendedor, estoquista e administrador, e oculta do cliente', () => {
+    for (const [role, visible] of [['SELLER', true], ['ADMINISTRATOR', true], ['STOCK_KEEPER', true], ['USER', false]] as const) {
       user$.next({ id: 9, name: 'Conta', email: 'c@x.dev', role_codes: [role], created_at: '' });
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('a[href="/balcao"]') !== null).withContext(role).toBe(visible);
     }
   });
 
-  it('une capacidades sem duplicar links', () => {
+  it('une papéis sem duplicar o link do balcão', () => {
     user$.next({ id: 3, name: 'Admin', email: 'a@x.dev', role_codes: ['STOCK_KEEPER', 'ADMINISTRATOR'], created_at: '' });
-    const content = text();
-    expect(content.match(/Cadastrar exemplar/g)?.length).toBe(1);
-    expect(content).toContain('Gestão de usuários');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('a[href="/balcao"]').length).toBe(1);
+    expect(fixture.nativeElement.textContent).toContain('Gestão de usuários');
   });
+
   it('encaminha a busca global com o critério escolhido', () => {
     fixture.detectChanges();
     const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);

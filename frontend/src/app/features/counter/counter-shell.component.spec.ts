@@ -133,3 +133,36 @@ describe('Layout do balcão (item Usuários por papel)', () => {
     expect(labels).not.toContain('Usuários');
   });
 });
+
+describe('Layout do balcão (menu do estoquista, Issue #169)', () => {
+  async function labelsFor(roles: string[]) {
+    TestBed.configureTestingModule({
+      imports: [RootComponent],
+      providers: [
+        { provide: AuthService, useValue: { currentUser: { id: 1, role_codes: roles } } },
+        provideRouter([
+          { path: 'balcao', component: CounterShellComponent, children: [{ path: 'acervo', component: StubComponent }] },
+        ]),
+      ],
+    });
+    const router = TestBed.inject(Router);
+    const fixture = TestBed.createComponent(RootComponent);
+    await router.navigateByUrl('/balcao/acervo');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).map((a) => a.textContent?.trim());
+  }
+
+  it('mostra somente Acervo para STOCK_KEEPER', async () => {
+    expect(await labelsFor(['STOCK_KEEPER'])).toEqual(['Acervo']);
+  });
+
+  it('mantém o menu completo para ADMINISTRATOR', async () => {
+    expect(await labelsFor(['ADMINISTRATOR'])).toEqual(['Painel', 'Acervo', 'Clientes', 'Empréstimos', 'Devoluções', 'Vendas', 'Reservas', 'Usuários']);
+  });
+
+  it('mantém o menu de atendimento para quem acumula estoquista e vendedor', async () => {
+    expect(await labelsFor(['STOCK_KEEPER', 'SELLER'])).toEqual(['Painel', 'Acervo', 'Clientes', 'Empréstimos', 'Devoluções', 'Vendas', 'Reservas']);
+  });
+});

@@ -15,10 +15,14 @@ import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { CopyDestination, CounterService, StaffCatalogBookDetail, StaffCatalogCopy } from './counter.service';
 import { ActionFlow, copyStatusLabel, destinationLabel, formatPrice, toLoadState } from './desk-flow';
 
-/** Papéis que o backend autoriza em `PATCH /api/v1/books/{id}` (editar, inativar e reativar obra). Issue #151: o vendedor administra o acervo. */
-const EDIT_ROLES = ['SELLER', 'STOCK_KEEPER', 'MANAGER', 'ADMINISTRATOR'];
-/** Papéis que o backend autoriza em `POST`, `PATCH` e `DELETE` de `/api/v1/copies`. */
-const COPY_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
+/**
+ * Issue #169: o estoquista usa o balcão restrito ao cadastro (consulta, nova obra e novo exemplar). Edição e inativação/reativação de obra
+ * e edição, conversão e exclusão de exemplar ficam ocultas para ele, embora o backend mantenha as permissões de escrita da matriz da #151.
+ */
+const MANAGE_BOOK_ROLES = ['SELLER', 'MANAGER', 'ADMINISTRATOR'];
+const MANAGE_COPY_ROLES = ['SELLER', 'ADMINISTRATOR'];
+/** Papéis que o backend autoriza em `POST /api/v1/copies` e que a tela oferece (inclui o estoquista). */
+const ADD_COPY_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
 const GENRE_MAX = 100;
 const CONDITION_MAX = 30;
 const PRICE_PATTERN = /^\d+(?:\.\d{1,2})?$/;
@@ -99,10 +103,11 @@ export class CounterCatalogBookComponent {
   private currentId = 0;
 
   protected readonly state = signal<LoadState<StaffCatalogBookDetail>>({ status: 'loading' });
-  protected readonly canEdit = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => EDIT_ROLES.includes(role));
-  protected readonly canAddCopy = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => COPY_ROLES.includes(role));
-  protected readonly canDeleteCopy = this.canAddCopy;
-  protected readonly canEditCopy = this.canAddCopy;
+  private readonly roleCodes = inject(TokenStoreService).user?.role_codes ?? [];
+  protected readonly canEdit = this.roleCodes.some((role) => MANAGE_BOOK_ROLES.includes(role));
+  protected readonly canAddCopy = this.roleCodes.some((role) => ADD_COPY_ROLES.includes(role));
+  protected readonly canDeleteCopy = this.roleCodes.some((role) => MANAGE_COPY_ROLES.includes(role));
+  protected readonly canEditCopy = this.canDeleteCopy;
   protected readonly editingCopyId = signal<number | null>(null);
   protected readonly copyDestination = signal<CopyDestination>('DIDACTIC');
   protected readonly copyPrice = signal('');
