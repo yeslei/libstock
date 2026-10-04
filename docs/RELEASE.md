@@ -64,6 +64,14 @@ Releases; um merge concluído permanece em `main` mesmo se a API falhar.
 A concurrency `promotion-main` serializa as execuções, sem cancelar uma
 promoção em andamento. Outros escritores não são bloqueados.
 
+O passo "Cria token da GitHub App" solicita explicitamente `contents`,
+`pull-requests` e `workflows` com escrita. Se a instalação da App não conceder
+alguma delas, a execução falha nesse passo. O erro
+`Resource not accessible by integration (createPullRequest)` indica a mesma
+causa: em Settings → Developer settings → GitHub Apps → (App de release) →
+Permissions, conceder as permissões listadas em Configuração e aceitar a
+atualização em Settings → Integrations → GitHub Apps → Configure da instalação.
+
 ## Deploy
 
 O merge do PR atualiza `main` e segue as integrações Git existentes de Render e

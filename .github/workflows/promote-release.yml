@@ -39,6 +39,11 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
+          # A App precisa conceder estas permissões na instalação; sem elas o
+          # token falha aqui, em vez de quebrar ao abrir ou mesclar o PR.
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
 
       - uses: actions/checkout@v4
         with:
