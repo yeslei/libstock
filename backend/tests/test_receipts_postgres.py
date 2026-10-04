@@ -164,8 +164,7 @@ def test_confirmed_sale_receipt_with_items_prices_total_and_ownership(receipts):
     first = new_commercial(engine, book_id, '37.50')
     second = new_commercial(engine, book_id, '12.25')
     created = http.post('/api/v1/sales/', json={'client_id': client_id, 'items': [{'copy_id': first}, {'copy_id': second}]})
-    anonymous = http.post('/api/v1/sales/', json={'items': [{'copy_id': new_commercial(engine, book_id, '5.00')}]})
-    assert created.status_code == 201 and anonymous.status_code == 201
+    assert created.status_code == 201
     sale_id = created.json()['id']
 
     body = http.get(f'{RECEIPTS}/sales/{sale_id}').json()
@@ -176,12 +175,9 @@ def test_confirmed_sale_receipt_with_items_prices_total_and_ownership(receipts):
     assert body['employee']['id'] == seller_id
     with Session(engine) as db:
         assert datetime.fromisoformat(body['sale_date']) == db.get(Sale, sale_id).sale_date
-    anon_body = http.get(f'{RECEIPTS}/sales/{anonymous.json()["id"]}').json()
-    assert anon_body['client'] is None and anon_body['total_amount'] == '5.00'
 
     as_user(client_id, 'USER')
     assert http.get(f'{RECEIPTS}/sales/{sale_id}').status_code == 200
-    assert http.get(f'{RECEIPTS}/sales/{anonymous.json()["id"]}').status_code == 404  # venda sem cliente
     with Session(engine) as db:
         stranger = new_user(db, 'USER', 'Outro Cliente')
     as_user(stranger, 'USER')

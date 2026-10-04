@@ -6,7 +6,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.business_dates import BUSINESS_ZONE as ZONE
-from app.core.exceptions import ApplicationError, BookInactiveError, CopyReservedError, CopyWithoutPriceError
+from app.core.exceptions import (
+    ApplicationError, BookInactiveError, ClientInactiveError, ClientNotFoundError, CopyReservedError, CopyWithoutPriceError,
+)
 from app.models.domain import CopyStatus, DestinationType
 from app.repositories.sale_repository import SaleRepository
 from app.schemas.sale_schema import SaleCreate, SaleItemResponse, SaleResponse
@@ -28,14 +30,14 @@ class SaleService:
         employee_id: int,
     ) -> SaleResponse:
         try:
-            if sale_data.client_id is not None:
-                client = self.repository.find_client(sale_data.client_id)
+            # Penalidade não bloqueia a venda (pagamento no balcão); só cliente inexistente ou inativo.
+            active = self.repository.client_active_state(sale_data.client_id)
 
-                if client is None:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="Cliente não encontrado.",
-                    )
+            if active is None:
+                raise ClientNotFoundError()
+
+            if not active:
+                raise ClientInactiveError()
 
             copy_ids = [item.copy_id for item in sale_data.items]
 

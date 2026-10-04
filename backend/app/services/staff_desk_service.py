@@ -54,8 +54,10 @@ class StaffDeskService:
         return StaffBook(id=book.id, title=book.title, author=book.author, is_active=book.is_active)
 
     def search_clients(self, term, actor_id, limit):
+        # Sem `q` (Issue #172): lista padrão dos clientes ativos; com `q`, vale o mínimo de caracteres.
+        listing = term is None
         term = self._term(term)
-        if term is None or len(term) < MIN_SEARCH_LENGTH:
+        if not listing and (term is None or len(term) < MIN_SEARCH_LENGTH):
             raise ApplicationError(f'Informe ao menos {MIN_SEARCH_LENGTH} caracteres para buscar clientes.',
                                    'search_term_too_short', 422)
         _, cutoff = self._guard(actor_id)
@@ -170,13 +172,17 @@ class StaffDeskService:
                              free=bool(item['free']), allocated_for_purchase=bool(item['allocated_for_purchase']))
             for item in copies])
 
-    def copy_lookup(self, actor_id, term, limit):
-        """Exemplares por código, ISBN, título ou autor. A venda só é possível para comercial livre."""
+    def copy_lookup(self, actor_id, term, limit, destination=None, available=None):
+        """Exemplares por código, ISBN, título ou autor. A venda só é possível para comercial livre.
+
+        Sem `q` (Issue #172) lista os exemplares ativos; `destination` e `available` (livre) filtram a lista.
+        """
+        listing = term is None
         term = self._term(term)
-        if term is None:
+        if not listing and term is None:
             raise ApplicationError('Informe o código do exemplar, o ISBN ou o título.', 'search_term_required', 422)
         self._guard(actor_id)
-        rows = self._read(lambda: self.repository.copy_lookup(term, limit))
+        rows = self._read(lambda: self.repository.copy_lookup(term, limit, destination, available))
         book_ids = sorted({row['Book'].id for row in rows})
         free_counts = self._read(lambda: self.repository.free_commercial_counts(book_ids))
         result = []

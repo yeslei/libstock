@@ -34,6 +34,8 @@ export class ClientsPanelComponent {
 
   protected readonly term = signal('');
   protected readonly tooShort = signal(false);
+  /** Termo aplicado à lista; vazio é a lista padrão de clientes ativos (Issue #172). */
+  protected readonly applied = signal('');
   protected readonly results = signal<LoadState<readonly StaffClient[]> | null>(null);
   protected readonly selected = signal<StaffClient | null>(null);
   protected readonly pendencies = signal<LoadState<ClientPendencies> | null>(null);
@@ -41,13 +43,14 @@ export class ClientsPanelComponent {
   protected readonly limit = CLIENT_SEARCH_LIMIT;
 
   private readonly searches = new Subject<string>();
+  private byTerm = false;
   private readonly lookups = new Subject<StaffClient>();
 
   constructor() {
     this.searches
       .pipe(
         switchMap((term) =>
-          this.service.searchClients(term).pipe(
+          this.service.searchClients(term || undefined).pipe(
             map((data): LoadState<readonly StaffClient[]> => ({ status: 'loaded', data })),
             startWith<LoadState<readonly StaffClient[]>>({ status: 'loading' }),
             catchError((error) =>
@@ -62,7 +65,8 @@ export class ClientsPanelComponent {
       )
       .subscribe((state) => {
         this.results.set(state);
-        if (state.status === 'loaded' && state.data.length === 1) this.consult(state.data[0]);
+        // Só uma busca por termo com um único cliente abre a consulta direto; a lista padrão apenas lista.
+        if (this.byTerm && state.status === 'loaded' && state.data.length === 1) this.consult(state.data[0]);
       });
 
     this.lookups
@@ -82,6 +86,8 @@ export class ClientsPanelComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((state) => this.pendencies.set(state));
+
+    this.searches.next('');
   }
 
   protected setTerm(event: Event): void {
@@ -91,15 +97,17 @@ export class ClientsPanelComponent {
   protected search(event: Event): void {
     event.preventDefault();
     const term = this.term().trim();
-    this.tooShort.set(term.length < MIN_SEARCH_LENGTH);
+    this.tooShort.set(term.length > 0 && term.length < MIN_SEARCH_LENGTH);
     if (this.tooShort()) return;
     this.selected.set(null);
     this.pendencies.set(null);
+    this.applied.set(term);
+    this.byTerm = term.length > 0;
     this.searches.next(term);
   }
 
   protected retrySearch(): void {
-    this.searches.next(this.term().trim());
+    this.searches.next(this.applied());
   }
 
   protected consult(client: StaffClient): void {

@@ -70,12 +70,16 @@ def test_counter_roles_can_read_lists(api, role):
     assert client.get('/api/v1/staff/books?q=dom&limit=5').json() == []
     fake.catalog_books.assert_called_once_with(7, 'dom', 5)
     assert client.get('/api/v1/staff/copies?q=0010').json() == []
-    fake.copy_lookup.assert_called_once_with(7, '0010', 20)
+    fake.copy_lookup.assert_called_once_with(7, '0010', 20, destination=None, available=None)
+    fake.copy_lookup.reset_mock()
+    assert client.get('/api/v1/staff/copies?destination=DIDACTIC&available=true&limit=100').json() == []
+    fake.copy_lookup.assert_called_once_with(7, None, 100, destination=DestinationType.DIDACTIC, available=True)
 
 
 @pytest.mark.parametrize('path', [
     '/api/v1/staff/books?limit=0', '/api/v1/staff/books?limit=101', '/api/v1/staff/books?q=' + 'x' * 101,
-    '/api/v1/staff/books/0', '/api/v1/staff/books/abc', '/api/v1/staff/copies', '/api/v1/staff/copies?q=',
+    '/api/v1/staff/books/0', '/api/v1/staff/books/abc', '/api/v1/staff/copies?q=', '/api/v1/staff/copies?destination=OTHER',
+    '/api/v1/staff/copies?available=maybe', '/api/v1/staff/copies?limit=101',
     '/api/v1/staff/copies?q=' + 'x' * 101,
 ])
 def test_invalid_input_is_rejected(api, path):
@@ -162,6 +166,15 @@ def test_lookup_requires_term(term):
     repo.copy_lookup.assert_not_called()
 
 
+def test_lookup_without_term_lists_and_forwards_filters():
+    service, repo = make_service()
+    repo.copy_lookup.return_value = [lookup_row(copy(1, DestinationType.COMMERCIAL, price=Decimal('38.90')), True)]
+    repo.free_commercial_counts.return_value = {1: 1}
+    result = service.copy_lookup(7, None, 20, destination=DestinationType.COMMERCIAL, available=True)
+    repo.copy_lookup.assert_called_once_with(None, 20, DestinationType.COMMERCIAL, True)
+    assert [i.sellable for i in result] == [True]
+
+
 def test_lookup_decides_sale_block_in_backend():
     service, repo = make_service()
     repo.copy_lookup.return_value = [
@@ -171,7 +184,7 @@ def test_lookup_decides_sale_block_in_backend():
     ]
     repo.free_commercial_counts.return_value = {1: 1}
     result = service.copy_lookup(7, ' 00 ', 20)
-    repo.copy_lookup.assert_called_once_with('00', 20)
+    repo.copy_lookup.assert_called_once_with('00', 20, None, None)
     assert [(i.sellable, i.sale_block_reason) for i in result] == [
         (True, None), (False, 'DIDACTIC'), (False, 'NOT_AVAILABLE')]
     assert all(i.free_commercial_copies == 1 for i in result)

@@ -38,6 +38,7 @@ function setup<T>(component: Type<T>, configure: (service: Spies) => void = () =
     'searchClients', 'getClientPendencies', 'listLoanRequests', 'confirmPickup', 'listLoans', 'confirmReturn',
     'listPurchaseReservations', 'allocatePurchase', 'confirmSale',
   ]) as unknown as Spies;
+  service.searchClients.and.returnValue(of([]));
   configure(service);
   TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]), { provide: CounterService, useValue: service }, receiptStub(), ...extra] });
   const fixture = TestBed.createComponent(component);
@@ -221,26 +222,46 @@ describe('Balcão: controle de pendências', () => {
     fixture.detectChanges();
   }
 
-  it('começa orientando a busca, sem prometer CPF', () => {
-    const { root } = setup(ClientsPanelComponent);
+  it('abre listando os clientes ativos, sem consultar pendências nem prometer CPF', () => {
+    const { root, service } = setup(ClientsPanelComponent, (s) =>
+      s.searchClients.and.returnValue(of([client(), client({ id: 4, name: 'Bia' })])));
     expect(root.querySelector('h1')?.textContent).toContain('Controle de pendências');
-    expect(root.textContent).toContain('Busque um cliente');
-    expect((root.querySelector('#client-q') as HTMLInputElement).placeholder).toBe('Nome ou e-mail do cliente');
+    expect(service.searchClients).toHaveBeenCalledOnceWith(undefined);
+    expect(root.querySelectorAll('.pick').length).toBe(2);
+    expect(root.textContent).toContain('2 clientes ativos');
+    expect(root.textContent).toContain('Escolha um cliente da lista');
+    expect(service.getClientPendencies).not.toHaveBeenCalled();
+    expect((root.querySelector('#client-q') as HTMLInputElement).placeholder).toBe('Filtrar por nome ou e-mail');
     expect(root.textContent).not.toContain('CPF');
+  });
+
+  it('com um único cliente na lista padrão, lista sem abrir a consulta; o filtro por termo abre', () => {
+    const { fixture, root, service } = setup(ClientsPanelComponent, (s) => {
+      s.searchClients.and.returnValue(of([client()]));
+      s.getClientPendencies.and.returnValue(of({ client: client(), overdue_loans: [] }));
+    });
+    expect(root.querySelectorAll('.pick').length).toBe(1);
+    expect(service.getClientPendencies).not.toHaveBeenCalled();
+    search(fixture, root, '');
+    expect(service.searchClients.calls.mostRecent().args).toEqual([undefined]);
+    expect(service.getClientPendencies).not.toHaveBeenCalled();
+    search(fixture, root, 'ana');
+    expect(service.getClientPendencies).toHaveBeenCalledOnceWith(3);
   });
 
   it('não consulta com termo curto e orienta o funcionário', () => {
     const { fixture, root, service } = setup(ClientsPanelComponent);
     search(fixture, root, ' a ');
-    expect(service.searchClients).not.toHaveBeenCalled();
+    expect(service.searchClients).toHaveBeenCalledTimes(1); // só a lista inicial
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('ao menos 2 caracteres');
   });
 
   it('mostra carregamento enquanto busca', () => {
     const pending = new Subject<StaffClient[]>();
     const { fixture, root } = setup(ClientsPanelComponent, (s) => s.searchClients.and.returnValue(pending));
+    expect(root.textContent).toContain('Carregando clientes');
     search(fixture, root, 'ana');
-    expect(root.textContent).toContain('Buscando clientes');
+    expect(root.textContent).toContain('Carregando clientes');
   });
 
   it('cliente sem pendência: consulta o único resultado e mostra a situação', () => {
@@ -249,7 +270,7 @@ describe('Balcão: controle de pendências', () => {
       s.getClientPendencies.and.returnValue(of({ client: client(), overdue_loans: [] }));
     });
     search(fixture, root, 'ana');
-    expect(service.searchClients).toHaveBeenCalledOnceWith('ana');
+    expect(service.searchClients.calls.mostRecent().args).toEqual(['ana']);
     expect(service.getClientPendencies).toHaveBeenCalledOnceWith(3);
     expect(root.textContent).toContain('Ana Souza');
     expect(root.textContent).toContain('Sem pendência');
@@ -275,15 +296,17 @@ describe('Balcão: controle de pendências', () => {
     expect(root.textContent).toContain('penalizado');
   });
 
-  it('avisa quando a busca de clientes atinge o limite', () => {
+  it('avisa quando a lista de clientes atinge o limite', () => {
     const many = Array.from({ length: 20 }, (_, i) => client({ id: i + 1 }));
     const { fixture, root } = setup(ClientsPanelComponent, (s) => s.searchClients.and.returnValue(of(many)));
+    expect(root.textContent).toContain('Mostrando os primeiros 20 resultados');
     search(fixture, root, 'an');
     expect(root.textContent).toContain('Mostrando os primeiros 20 resultados');
   });
 
   it('mostra vazio e erro de busca de forma distinta', () => {
     const { fixture, root, service } = setup(ClientsPanelComponent, (s) => s.searchClients.and.returnValue(of([])));
+    expect(root.textContent).toContain('Nenhum cliente ativo cadastrado.');
     search(fixture, root, 'zz');
     expect(root.textContent).toContain('Nenhum cliente encontrado');
     service.searchClients.and.returnValue(throwError(() => ({ detail: 'Permissão insuficiente.' }) ));

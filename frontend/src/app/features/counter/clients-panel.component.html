@@ -4,28 +4,30 @@
 
   <form class="search" role="search" (submit)="search($event)">
     <label class="sr-only" for="client-q">Nome ou e-mail do cliente</label>
-    <input id="client-q" type="search" maxlength="100" autocomplete="off" placeholder="Nome ou e-mail do cliente"
+    <input id="client-q" type="search" maxlength="100" autocomplete="off" placeholder="Filtrar por nome ou e-mail"
       [value]="term()" (input)="setTerm($event)" [attr.aria-invalid]="tooShort()" aria-describedby="client-q-help" />
     <button class="btn btn--primary" type="submit">Buscar</button>
   </form>
   <p id="client-q-help" class="note" [class.note--danger]="tooShort()" [attr.role]="tooShort() ? 'alert' : null">
-    Informe ao menos {{ minLength }} caracteres.
+    Clientes ativos em ordem alfabética. Para filtrar, informe ao menos {{ minLength }} caracteres.
   </p>
 
   @if (results(); as r) {
     @switch (r.status) {
-      @case ('loading') { <p class="loading" role="status"><app-spinner /> Buscando clientes…</p> }
+      @case ('loading') { <p class="loading" role="status"><app-spinner /> Carregando clientes…</p> }
       @case ('error') {
         <app-alert [message]="r.message"><button class="btn" type="button" (click)="retrySearch()">Tentar novamente</button></app-alert>
       }
       @case ('loaded') {
         @if (!r.data.length) {
-          <p class="empty" role="status">Nenhum cliente encontrado para o termo informado.</p>
+          <p class="empty" role="status">
+            @if (applied()) { Nenhum cliente encontrado para o termo informado. } @else { Nenhum cliente ativo cadastrado. }
+          </p>
         } @else {
-          @if (r.data.length > 1) {
-            <p class="note" role="status">{{ r.data.length }} clientes encontrados. Escolha um para consultar a situação.</p>
+          @if (r.data.length > 1 || !applied()) {
+            <p class="note" role="status">{{ r.data.length }} {{ r.data.length === 1 ? 'cliente' : 'clientes' }} {{ applied() ? 'encontrados' : 'ativos' }}. Escolha um para consultar a situação.</p>
             @if (r.data.length >= limit) {
-              <p class="note" role="status">Mostrando os primeiros {{ limit }} resultados. Refine a busca para ver os demais.</p>
+              <p class="note" role="status">Mostrando os primeiros {{ limit }} resultados. Refine o filtro para ver os demais.</p>
             }
             <ul class="picks">
               @for (client of r.data; track client.id) {
@@ -81,7 +83,9 @@
         }
       }
     </div>
-  } @else if (!results()) {
-    <p class="empty">Busque um cliente para consultar a situação.</p>
+  } @else if (results(); as r) {
+    @if (r.status === 'loaded' && r.data.length) {
+      <p class="empty">Escolha um cliente da lista para consultar a situação.</p>
+    }
   }
 </section>
