@@ -40,6 +40,7 @@ describe('errorInterceptor', () => {
     expect(fail(409, { detail: 'x', code: 'copy_inactive' }).detail).toContain('inativo');
     expect(fail(409, { detail: 'x', code: 'copy_allocated' }).detail).toContain('reserva de compra');
     expect(fail(409, { detail: 'x', code: 'copy_in_operation' }).detail).toContain('venda em andamento');
+    expect(fail(409, { detail: 'x', code: 'copy_needed_for_requests' }).detail).toContain('solicitação de retirada pendente');
     expect(fail(422, { detail: 'x', code: 'copy_sale_price_required' }).detail).toContain('maior que zero');
     expect(fail(422, { detail: 'x', code: 'copy_sale_price_not_allowed' }).detail).toContain('didático');
     expect(fail(500, { detail: 'x', code: 'copy_update_persistence_error' }).detail).toContain('Nada foi alterado');

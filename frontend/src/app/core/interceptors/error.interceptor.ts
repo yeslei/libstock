@@ -65,6 +65,7 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   book_without_active_copy: 'A obra não pode ser reativada sem ao menos um exemplar ativo.',
   copy_inactive: 'Este exemplar está inativo e não pode ser editado.',
   copy_allocated: 'Este exemplar está destinado a uma reserva de compra e não pode ser editado.',
+  copy_needed_for_requests: 'Este é o último exemplar didático livre da obra e há solicitação de retirada pendente. Atenda ou cancele a solicitação antes de converter para venda.',
   copy_in_operation: 'Este exemplar está em uma venda em andamento e não pode ser editado.',
   copy_sale_price_required: 'Exemplar destinado à venda exige preço de venda maior que zero.',
   copy_sale_price_not_allowed: 'Exemplar didático não pode ter preço de venda.',
