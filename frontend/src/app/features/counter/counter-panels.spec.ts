@@ -190,13 +190,21 @@ describe('Balcão: retiradas', () => {
   });
 });
 
-describe('Balcão: clientes e navegação', () => {
+describe('Balcão: controle de pendências', () => {
   function search(fixture: ComponentFixture<unknown>, root: HTMLElement, term: string) {
     const input = root.querySelector('#client-q') as HTMLInputElement;
     input.value = term; input.dispatchEvent(new Event('input'));
     root.querySelector('form')!.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
   }
+
+  it('começa orientando a busca, sem prometer CPF', () => {
+    const { root } = setup(ClientsPanelComponent);
+    expect(root.querySelector('h1')?.textContent).toContain('Controle de pendências');
+    expect(root.textContent).toContain('Busque um cliente');
+    expect((root.querySelector('#client-q') as HTMLInputElement).placeholder).toBe('Nome ou e-mail do cliente');
+    expect(root.textContent).not.toContain('CPF');
+  });
 
   it('não consulta com termo curto e orienta o funcionário', () => {
     const { fixture, root, service } = setup(ClientsPanelComponent);
@@ -205,20 +213,43 @@ describe('Balcão: clientes e navegação', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('ao menos 2 caracteres');
   });
 
-  it('lista clientes, seleciona e consulta pendências', () => {
+  it('mostra carregamento enquanto busca', () => {
+    const pending = new Subject<StaffClient[]>();
+    const { fixture, root } = setup(ClientsPanelComponent, (s) => s.searchClients.and.returnValue(pending));
+    search(fixture, root, 'ana');
+    expect(root.textContent).toContain('Buscando clientes');
+  });
+
+  it('cliente sem pendência: consulta o único resultado e mostra a situação', () => {
     const { fixture, root, service } = setup(ClientsPanelComponent, (s) => {
+      s.searchClients.and.returnValue(of([client()]));
+      s.getClientPendencies.and.returnValue(of({ client: client(), overdue_loans: [] }));
+    });
+    search(fixture, root, 'ana');
+    expect(service.searchClients).toHaveBeenCalledOnceWith('ana');
+    expect(service.getClientPendencies).toHaveBeenCalledOnceWith(3);
+    expect(root.textContent).toContain('Ana Souza');
+    expect(root.textContent).toContain('Sem pendência');
+    expect(root.textContent).not.toContain('Pendência ativa');
+  });
+
+  it('pendência ativa: exemplar, obra, vencimento e dias de atraso', () => {
+    const { fixture, root } = setup(ClientsPanelComponent, (s) => {
       s.searchClients.and.returnValue(of([client(), client({ id: 4, name: 'Bia', eligible: false, has_overdue_loan: true })]));
-      s.getClientPendencies.and.returnValue(of({ client: client({ id: 4, is_penalized: true, eligible: false }),
-        overdue_loans: [loan({ id: 1, days_late: 3 })] }));
+      s.getClientPendencies.and.returnValue(of({ client: client({ id: 4, name: 'Bia', is_penalized: true, eligible: false }),
+        overdue_loans: [loan({ id: 1, days_late: 3, copy_barcode: '00127', due_date: '2026-09-15T12:00:00Z' })] }));
     });
     search(fixture, root, 'an');
-    expect(service.searchClients).toHaveBeenCalledOnceWith('an');
-    expect(root.textContent).toContain('Inelegível: empréstimo em atraso');
-    click(fixture, root.querySelectorAll<HTMLButtonElement>('button')[5]);
-    expect(service.getClientPendencies).toHaveBeenCalledOnceWith(4);
-    expect(root.textContent).toContain('Empréstimos em atraso: 1');
-    expect(root.textContent).toContain('Cliente penalizado');
+    expect(root.querySelectorAll('.pick').length).toBe(2);
+    click(fixture, root.querySelectorAll<HTMLButtonElement>('.pick')[1]);
+    expect(root.textContent).toContain('Pendência ativa');
+    expect(root.textContent).toContain('Empréstimo em atraso');
+    expect(root.textContent).toContain('Dom Casmurro');
+    expect(root.textContent).toContain('Exemplar #00127');
+    expect(root.textContent).toContain('vencimento 15/09/2026');
     expect(root.textContent).toContain('3 dia(s) de atraso');
+    expect(root.textContent).toContain('Pendência = empréstimo não devolvido após a data prevista');
+    expect(root.textContent).toContain('penalizado');
   });
 
   it('avisa quando a busca de clientes atinge o limite', () => {
@@ -235,14 +266,29 @@ describe('Balcão: clientes e navegação', () => {
     service.searchClients.and.returnValue(throwError(() => ({ detail: 'Permissão insuficiente.' }) ));
     search(fixture, root, 'zzz');
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('Permissão insuficiente.');
+    expect(button(root, 'Tentar novamente')).toBeTruthy();
+  });
+
+  it('mostra erro da consulta de pendências com nova tentativa', () => {
+    const { fixture, root, service } = setup(ClientsPanelComponent, (s) => {
+      s.searchClients.and.returnValue(of([client()]));
+      s.getClientPendencies.and.returnValue(throwError(() => ({})));
+    });
+    search(fixture, root, 'ana');
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('Não foi possível consultar as pendências');
+    service.getClientPendencies.and.returnValue(of({ client: client(), overdue_loans: [] }));
+    click(fixture, button(root, 'Tentar novamente'));
+    expect(root.textContent).toContain('Sem pendência');
   });
 
   it('abre a tela escolhida guardando o cliente como filtro', () => {
     const router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
-    const { fixture, root } = setup(CounterClientsPageComponent, (s) => s.searchClients.and.returnValue(of([client()])),
-      [{ provide: Router, useValue: router }]);
+    const { fixture, root } = setup(CounterClientsPageComponent, (s) => {
+      s.searchClients.and.returnValue(of([client()]));
+      s.getClientPendencies.and.returnValue(of({ client: client(), overdue_loans: [] }));
+    }, [{ provide: Router, useValue: router }]);
     search(fixture, root, 'ana');
-    click(fixture, button(root, 'Empréstimos'));
+    click(fixture, button(root, 'Empréstimos ativos'));
     expect(TestBed.inject(CounterContext).client()?.id).toBe(3);
     expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/balcao/emprestimos/ativos');
     click(fixture, button(root, 'Solicitações'));
@@ -251,6 +297,7 @@ describe('Balcão: clientes e navegação', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/reservas');
   });
 });
+
 
 describe('Rotas do balcão', () => {
   const counter = routes.find((r) => r.path === 'balcao');

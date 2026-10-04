@@ -7,7 +7,7 @@ import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { CLIENT_SEARCH_LIMIT, ClientPendencies, CounterService, StaffClient } from './counter.service';
-import { errorMessage, ineligibleReasons } from './desk-panel';
+import { errorMessage } from './desk-panel';
 
 export type DeskTab = 'retiradas' | 'devolucoes' | 'reservas';
 
@@ -24,7 +24,7 @@ export const MIN_SEARCH_LENGTH = 2;
   imports: [DatePipe, AlertComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './clients-panel.component.html',
-  styleUrl: './desk-panel.scss',
+  styleUrl: './clients-panel.component.scss',
 })
 export class ClientsPanelComponent {
   private readonly service = inject(CounterService);
@@ -37,7 +37,6 @@ export class ClientsPanelComponent {
   protected readonly results = signal<LoadState<readonly StaffClient[]> | null>(null);
   protected readonly selected = signal<StaffClient | null>(null);
   protected readonly pendencies = signal<LoadState<ClientPendencies> | null>(null);
-  protected readonly ineligibleReasons = ineligibleReasons;
   protected readonly minLength = MIN_SEARCH_LENGTH;
   protected readonly limit = CLIENT_SEARCH_LIMIT;
 
@@ -61,7 +60,10 @@ export class ClientsPanelComponent {
         ),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((state) => this.results.set(state));
+      .subscribe((state) => {
+        this.results.set(state);
+        if (state.status === 'loaded' && state.data.length === 1) this.consult(state.data[0]);
+      });
 
     this.lookups
       .pipe(
@@ -96,7 +98,11 @@ export class ClientsPanelComponent {
     this.searches.next(term);
   }
 
-  protected showPendencies(client: StaffClient): void {
+  protected retrySearch(): void {
+    this.searches.next(this.term().trim());
+  }
+
+  protected consult(client: StaffClient): void {
     this.selected.set(client);
     this.lookups.next(client);
   }
