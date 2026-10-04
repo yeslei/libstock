@@ -1,5 +1,5 @@
-from datetime import date, datetime, time
-from app.core.business_dates import BUSINESS_ZONE
+from datetime import date
+from app.core.business_dates import overdue_cutoff
 from app.core.exceptions import ApplicationError
 from app.repositories.client_request_repository import ClientRequestRepository
 
@@ -16,6 +16,6 @@ def require_eligible_client(repository: ClientRequestRepository, client_id: int,
     client, profile, user = records
     if not is_client_eligible(
         profile_active=profile.is_active, user_active=user.is_active, penalized=client.is_penalized,
-        has_overdue=repository.has_overdue_loan(client_id, datetime.combine(today, time.min, BUSINESS_ZONE)),
+        has_overdue=repository.has_overdue_loan(client_id, overdue_cutoff(today)),
     ):
         raise ApplicationError("Cliente inativo, penalizado ou com empréstimo em atraso.", "client_ineligible", 403)

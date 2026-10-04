@@ -8,7 +8,9 @@ from fastapi import HTTPException, status
 from app.controllers.loan_controller import create_loan
 from app.core.exceptions import ClientHasPendingError, ClientInactiveError
 from app.dependencies.authentication import require_roles
-from app.models.domain import CopyStatus, LoanStatus
+from app.core.business_dates import BUSINESS_ZONE, loan_due_at
+from app.core.exceptions import CopyNotForLoanError
+from app.models.domain import CopyStatus, DestinationType, LoanStatus
 from app.schemas.loan_schema import LoanCreate
 from app.services.loan_service import LoanService
 
@@ -28,7 +30,7 @@ class FakeLoanService:
         self.created.append((loan_data, employee_id))
 
         loan_date = datetime(2026, 9, 26, 14, 0, tzinfo=timezone.utc)
-        due_date = loan_date + timedelta(days=15)
+        due_date = loan_due_at(loan_date)
 
         return SimpleNamespace(
             id=100,
@@ -63,6 +65,7 @@ def _available_copy():
         id=15,
         is_active=True,
         status=CopyStatus.AVAILABLE,
+        destination=DestinationType.DIDACTIC,
     )
 
 def _open_loan():
@@ -152,7 +155,7 @@ def test_role_user_nao_pode_criar_emprestimo():
         dependency(SimpleNamespace(role_codes=["USER"]))
 
 
-def test_service_calcula_data_de_devolucao_em_15_dias():
+def test_service_calcula_prazo_de_um_mes_de_calendario():
     repository = MagicMock()
     db = FakeSession()
     client_service = MagicMock()
@@ -200,7 +203,8 @@ def test_service_calcula_data_de_devolucao_em_15_dias():
     due_date = kwargs["due_date"]
 
     assert loan_date.tzinfo == timezone.utc
-    assert due_date - loan_date == timedelta(days=15)
+    assert due_date == loan_due_at(loan_date)
+    assert due_date.astimezone(BUSINESS_ZONE).date() > loan_date.astimezone(BUSINESS_ZONE).date() + timedelta(days=27)
 
     assert result.loan_date == loan_date
     assert result.due_date == due_date
@@ -545,3 +549,32 @@ def test_controller_registra_devolucao():
     assert response.id == 100
     assert response.status == LoanStatus.RETURNED
     assert response.returned_at is not None
+
+@pytest.mark.parametrize(
+    "started, expected",
+    [
+        (datetime(2027, 1, 31, 15, 0, tzinfo=timezone.utc), (2027, 2, 28, 12)),
+        (datetime(2028, 1, 31, 15, 0, tzinfo=timezone.utc), (2028, 2, 29, 12)),
+        (datetime(2027, 1, 31, 2, 0, tzinfo=timezone.utc), (2027, 2, 28, 23)),  # 30/01 23h em São Paulo
+        (datetime(2026, 12, 15, 15, 0, tzinfo=timezone.utc), (2027, 1, 15, 12)),
+    ],
+)
+def test_prazo_unico_um_mes_em_sao_paulo_com_ajuste_de_fim_de_mes(started, expected):
+    due = loan_due_at(started).astimezone(BUSINESS_ZONE)
+    assert (due.year, due.month, due.day, due.hour) == expected
+
+
+def test_service_recusa_exemplar_comercial_com_409_copy_not_for_loan():
+    repository = MagicMock()
+    db = FakeSession()
+    copy = _available_copy()
+    copy.destination = DestinationType.COMMERCIAL
+    repository.find_copy_for_loan.return_value = copy
+    service = LoanService(repository=repository, db=db, client_pendency_service=MagicMock())
+
+    with pytest.raises(CopyNotForLoanError) as error:
+        service.create_loan(_loan_data(), employee_id=7)
+
+    assert (error.value.status_code, error.value.code) == (409, "copy_not_for_loan")
+    repository.create_loan.assert_not_called()
+    assert (db.commits, db.rollbacks) == (0, 1)

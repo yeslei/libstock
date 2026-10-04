@@ -1,17 +1,15 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ApplicationError, BookInactiveError
-from app.models.domain import CopyStatus, LoanStatus
+from app.core.business_dates import loan_due_at
+from app.core.exceptions import ApplicationError, BookInactiveError, CopyNotForLoanError
+from app.models.domain import CopyStatus, DestinationType, LoanStatus
 from app.repositories.loan_repository import LoanRepository
 from app.schemas.loan_schema import LoanCreate, LoanResponse
 from app.services.client_pendency_service import ClientPendencyService
-
-
-LOAN_DURATION_DAYS = 15
 
 
 class LoanService:
@@ -55,9 +53,12 @@ class LoanService:
                     detail="Exemplar não está disponível para empréstimo.",
                 )
 
-            # Regra de negócio: empréstimos possuem prazo de 15 dias corridos.
+            if copy.destination != DestinationType.DIDACTIC:
+                raise CopyNotForLoanError()
+
+            # Regra aprovada: vence um mês de calendário depois (America/Sao_Paulo).
             loan_date = datetime.now(timezone.utc)
-            due_date = loan_date + timedelta(days=LOAN_DURATION_DAYS)
+            due_date = loan_due_at(loan_date)
 
             loan = self.repository.create_loan(
                 loan_data,
