@@ -255,6 +255,15 @@ class ClientPenaltyPersistenceError(ApplicationError):
         )
 
 
+class BookInactiveError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "A obra do exemplar está inativa e não aceita novas operações.",
+            "book_inactive",
+            409,
+        )
+
+
 class CopyNotFoundError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Exemplar não encontrado.", "copy_not_found", 404)
