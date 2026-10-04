@@ -49,4 +49,34 @@ describe('CopyService', () => {
     expect(error?.status).toBe(409);
     expect(error?.error.code).toBe('duplicate_barcode');
   });
+
+  describe('delete', () => {
+    it('envia DELETE para o exemplar e converte a resposta', () => {
+      let result: unknown;
+      service.delete(21).subscribe((deleted) => (result = deleted));
+      const request = http.expectOne(`${COPIES_API}/21`);
+      expect(request.request.method).toBe('DELETE');
+      request.flush({ id: 21, book_id: 8, barcode: 'ABC-021', deleted: true });
+      expect(result).toEqual({ id: 21, bookId: 8, barcode: 'ABC-021' });
+    });
+
+    it('propaga o bloqueio 409 com código e motivos', () => {
+      let error: { status: number; error: { code: string; details: { reasons: unknown[] } } } | undefined;
+      service.delete(21).subscribe({ error: (received) => (error = received) });
+      http.expectOne(`${COPIES_API}/21`).flush(
+        { code: 'copy_has_history', details: { reasons: [{ code: 'copy_has_history' }] } },
+        { status: 409, statusText: 'Conflict' },
+      );
+      expect(error?.status).toBe(409);
+      expect(error?.error.code).toBe('copy_has_history');
+      expect(error?.error.details.reasons.length).toBe(1);
+    });
+
+    it('propaga 404 de exemplar inexistente', () => {
+      let status = 0;
+      service.delete(99).subscribe({ error: (received) => (status = received.status) });
+      http.expectOne(`${COPIES_API}/99`).flush({ code: 'copy_not_found' }, { status: 404, statusText: 'Not Found' });
+      expect(status).toBe(404);
+    });
+  });
 });

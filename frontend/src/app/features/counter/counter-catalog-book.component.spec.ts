@@ -5,6 +5,7 @@ import { Observable, Subject, of, throwError } from 'rxjs';
 import { RoleCode } from '../../core/models/user.model';
 import { TokenStoreService } from '../../core/services/token-store.service';
 import { BookService } from '../books/services/book.service';
+import { CopyService } from '../copies/services/copy.service';
 import { CounterCatalogBookComponent } from './counter-catalog-book.component';
 import { CounterService, StaffCatalogBookDetail, StaffCatalogCopy } from './counter.service';
 
@@ -29,12 +30,14 @@ function setup(book$: Observable<StaffCatalogBookDetail>, roles: RoleCode[] = ['
   const counter = jasmine.createSpyObj<CounterService>('CounterService', ['getCatalogBook']);
   counter.getCatalogBook.and.returnValue(book$);
   const books = jasmine.createSpyObj<BookService>('BookService', ['update']);
+  const copies = jasmine.createSpyObj<CopyService>('CopyService', ['delete']);
   TestBed.configureTestingModule({
     imports: [CounterCatalogBookComponent],
     providers: [
       provideRouter([]),
       { provide: CounterService, useValue: counter },
       { provide: BookService, useValue: books },
+      { provide: CopyService, useValue: copies },
       { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '7' })) } },
     ],
   });
@@ -44,7 +47,7 @@ function setup(book$: Observable<StaffCatalogBookDetail>, roles: RoleCode[] = ['
   const root = fixture.nativeElement as HTMLElement;
   const button = (label: string) =>
     Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
-  return { fixture, counter, books, root, button };
+  return { fixture, counter, books, copies, root, button };
 }
 
 type Ctx = ReturnType<typeof setup>;
@@ -225,7 +228,7 @@ describe('Balcão: detalhes da obra', () => {
       expect(ctx.root.textContent).toContain('A reativação ainda não está disponível.');
     });
 
-    it('o modal de inativação mostra a situação real dos exemplares e a ressalva do sistema', () => {
+    it('o modal de inativação mostra a situação real dos exemplares e a regra de bloqueio', () => {
       const ctx = setup(of(detail()), admin);
       ctx.button('Editar obra')!.click();
       ctx.fixture.detectChanges();
@@ -235,9 +238,11 @@ describe('Balcão: detalhes da obra', () => {
       expect(dialog.querySelector('h2')?.textContent).toBe('Inativar Dom Casmurro?');
       expect(dialog.textContent).toContain('Situação verificada');
       expect(Array.from(dialog.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
-        '4 exemplares vinculados', 'Exemplar 00102 emprestado', 'Exemplar 00104 reservado para venda',
-        'O sistema não impede a inativação nestes casos',
+        '4 exemplares vinculados', 'Exemplar 00102 emprestado (bloqueia a inativação)',
+        'Exemplar 00104 reservado para venda (bloqueia a inativação)',
       ]);
+      expect(dialog.textContent).toContain('bloqueada enquanto houver empréstimo em aberto, solicitação de retirada pendente ou reserva de compra');
+      expect(dialog.textContent).not.toContain('O sistema não impede');
       expect(dialog.textContent).toContain('Confirmar inativação');
     });
 
@@ -282,6 +287,176 @@ describe('Balcão: detalhes da obra', () => {
     it('oferece edição também a STOCK_KEEPER, papel autorizado pelo backend', () => {
       const keeper = setup(of(detail()), ['STOCK_KEEPER']);
       expect(keeper.button('Editar obra')).toBeDefined();
+    });
+
+    it('mostra a inativação bloqueada com os vínculos devolvidos pelo 409 e não anuncia sucesso', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.books.update.and.returnValue(throwError(() => ({
+        status: 409,
+        code: 'book_has_active_operations',
+        detail: 'Esta obra possui operações em andamento e não pode ser inativada.',
+        details: {
+          counts: { open_loans: 1, pending_loan_requests: 0, purchase_reservations: 1 },
+          links: [
+            { type: 'open_loan', copy_barcode: '00102', client_name: 'Maria Silva' },
+            { type: 'purchase_reservation', copy_barcode: null, client_name: 'Ana Santos' },
+          ],
+        },
+      })));
+      ctx.button('Editar obra')!.click();
+      ctx.fixture.detectChanges();
+      ctx.button('Inativar obra')!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      const blocked = ctx.root.querySelector('[data-blocked]')!;
+      expect(blocked.querySelector('h2')?.textContent).toBe('Inativação bloqueada');
+      expect(blocked.textContent).toContain('Esta obra possui operações ativas');
+      expect(blocked.textContent).toContain('Regularize os vínculos antes de tentar inativar.');
+      expect(blocked.textContent).toContain('Vínculos encontrados');
+      expect(Array.from(blocked.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+        'Empréstimos em aberto: 1',
+        'Reservas de compra aguardando ou com exemplar destinado: 1',
+        'Exemplar #00102 · empréstimo ativo · Maria Silva',
+        'reserva de compra · Ana Santos',
+      ]);
+      expect(blocked.querySelector('a[href="/balcao/emprestimos/ativos"]')?.textContent).toContain('Consultar empréstimos');
+      expect(blocked.querySelector('a[href="/balcao/reservas"]')?.textContent).toContain('Consultar reservas');
+      expect(ctx.root.querySelector('app-alert')).toBeNull();
+      expect(ctx.root.textContent).not.toContain('foi inativada');
+      expect(ctx.root.textContent).toContain('Status da obra: Ativa');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('exclusão de exemplar', () => {
+    const admin: RoleCode[] = ['ADMINISTRATOR'];
+    const deleteButtons = (root: HTMLElement) =>
+      Array.from(root.querySelectorAll('tbody tr')).map((row) => row.querySelector('button') as HTMLButtonElement | null);
+
+    function openDelete(ctx: Ctx, row = 0) {
+      deleteButtons(ctx.root)[row]!.click();
+      ctx.fixture.detectChanges();
+    }
+
+    it('só oferece a ação a papéis autorizados no backend', () => {
+      expect(deleteButtons(setup(of(detail()), ['SELLER']).root).every((b) => b === null)).toBeTrue();
+      TestBed.resetTestingModule();
+      expect(deleteButtons(setup(of(detail()), ['STOCK_KEEPER']).root).length).toBe(4);
+      TestBed.resetTestingModule();
+      const { root } = setup(of(detail()), admin);
+      expect(root.querySelector('thead')?.textContent).toContain('Ações');
+    });
+
+    it('antecipa o botão desabilitado com o motivo quando o status já indica bloqueio', () => {
+      const { root } = setup(of(detail()), admin);
+      const buttons = deleteButtons(root);
+      expect(buttons.map((b) => b!.disabled)).toEqual([false, true, false, true]);
+      expect(buttons[1]!.title).toBe('Exemplar emprestado: só exemplares disponíveis podem ser excluídos.');
+      expect(buttons[3]!.title).toBe('Exemplar reservado para venda: não pode ser excluído.');
+      expect(root.querySelector('#excluir-motivo-2')?.textContent).toContain('Exemplar emprestado');
+    });
+
+    it('antecipa o bloqueio do último exemplar ativo de obra ativa, mas não de obra inativa', () => {
+      const only = setup(of(detail({ copies: [copy()], total_copies: 1 })), admin);
+      expect(deleteButtons(only.root)[0]!.disabled).toBeTrue();
+      expect(only.root.textContent).toContain('Último exemplar ativo da obra');
+      TestBed.resetTestingModule();
+      const inactive = setup(of(detail({ copies: [copy()], total_copies: 1, is_active: false })), admin);
+      expect(deleteButtons(inactive.root)[0]!.disabled).toBeFalse();
+    });
+
+    it('abre o modal conforme o design com a contagem antes e depois, sem excluir antes de confirmar', () => {
+      const ctx = setup(of(detail()), admin);
+      openDelete(ctx);
+      const dialog = ctx.root.querySelector('dialog')!;
+      expect(dialog.querySelector('h2')?.textContent).toBe('Excluir exemplar #00101?');
+      expect(dialog.textContent).toContain('Você está excluindo somente esta cópia de Dom Casmurro. A obra e os outros exemplares serão mantidos.');
+      expect(dialog.textContent).toContain('Confira o exemplar');
+      expect(Array.from(dialog.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+        '#00101 · Empréstimo · Disponível',
+        'Quantidade da obra após exclusão: 4 → 3',
+        'Esta ação remove a cópia do acervo.',
+      ]);
+      expect(ctx.copies.delete).not.toHaveBeenCalled();
+      ctx.button('Cancelar')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.querySelector('dialog')).toBeNull();
+      expect(ctx.copies.delete).not.toHaveBeenCalled();
+    });
+
+    it('exclui só após confirmar, bloqueia duplo envio, avisa o sucesso e recarrega a obra', () => {
+      const ctx = setup(of(detail()), admin);
+      const request = new Subject<unknown>();
+      ctx.copies.delete.and.returnValue(request as never);
+      openDelete(ctx);
+      const submit = ctx.root.querySelector('.confirm__submit') as HTMLButtonElement;
+      submit.click();
+      submit.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.copies.delete).toHaveBeenCalledOnceWith(1);
+      expect(ctx.root.textContent).not.toContain('Exemplar #00101 excluído');
+      ctx.counter.getCatalogBook.and.returnValue(of(detail({ total_copies: 3, copies: detail().copies.slice(1) })));
+      request.next({ id: 1, bookId: 7, barcode: '00101' });
+      request.complete();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.textContent).toContain('Exemplar #00101 excluído. A quantidade de Dom Casmurro foi atualizada de 4 para 3 exemplares.');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+      expect(ctx.root.textContent).toContain('Quantidade total: 3 exemplares');
+      expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
+    });
+
+    it('mostra Exclusão bloqueada com os motivos do backend e recarrega sem anunciar sucesso', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.copies.delete.and.returnValue(throwError(() => ({
+        status: 409,
+        code: 'copy_has_history',
+        detail: 'Este exemplar possui histórico.',
+        details: {
+          reasons: [{ code: 'copy_has_history', message: 'O exemplar possui histórico de empréstimo, venda, reserva ou solicitação.' }],
+          history: { loans: 2, sales: 0, purchase_reservations: 1, requests: 0 },
+        },
+      })));
+      openDelete(ctx, 2);
+      confirmDialog(ctx);
+      const blocked = ctx.root.querySelector('[data-blocked]')!;
+      expect(blocked.querySelector('h2')?.textContent).toBe('Exclusão bloqueada');
+      expect(blocked.textContent).toContain('Este exemplar possui histórico.');
+      expect(blocked.textContent).toContain('A exclusão não pode ser concluída enquanto houver operação ativa ou histórico.');
+      expect(Array.from(blocked.querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+        'O exemplar possui histórico de empréstimo, venda, reserva ou solicitação.',
+        'Empréstimos: 2',
+        'Reservas de compra: 1',
+      ]);
+      expect(ctx.root.textContent).not.toContain('Exemplar #00101 excluído');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+      ctx.button('Voltar aos exemplares')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
+    });
+
+    it('trata falhas que não são bloqueio como erro genérico, sem tela de bloqueio', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.copies.delete.and.returnValue(throwError(() => ({ status: 500, code: 'copy_delete_persistence_error', detail: 'Não foi possível excluir o exemplar. Nada foi alterado; tente novamente.' })));
+      openDelete(ctx);
+      confirmDialog(ctx);
+      expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
+      expect(ctx.root.querySelector('[role="alert"]')?.textContent).toContain('Nada foi alterado');
+      expect(ctx.root.textContent).not.toContain('Exemplar #00101 excluído');
+    });
+
+    it('depois de excluir, a tela de bloqueio anterior some', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.copies.delete.and.returnValues(
+        throwError(() => ({ status: 409, code: 'copy_not_available', detail: 'Indisponível.', details: { reasons: [{ message: 'Não disponível.' }] } })),
+        of({ id: 1, bookId: 7, barcode: '00101' }),
+      );
+      openDelete(ctx);
+      confirmDialog(ctx);
+      expect(ctx.root.querySelector('[data-blocked]')).not.toBeNull();
+      openDelete(ctx);
+      expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
+      confirmDialog(ctx);
+      expect(ctx.root.textContent).toContain('Exemplar #00101 excluído.');
     });
   });
 });
