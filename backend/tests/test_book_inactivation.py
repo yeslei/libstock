@@ -34,7 +34,7 @@ class Repository:
     def find_by_isbn_except(self, *_args):
         return None
 
-    def lock_book_for_inactivation(self, book_id):
+    def lock_book_for_inactivation(self, book_id, now):
         self.calls.append(f"lock({book_id})")
 
     def active_operation_counts(self, book_id):

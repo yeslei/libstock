@@ -6,11 +6,19 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace as NS
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.business_dates import BUSINESS_ZONE, business_today, reservation_pickup_deadline
-from app.core.exceptions import ApplicationError
+from app.core.exceptions import ApplicationError, BookHasActiveOperationsError
+from app.dependencies.services import get_sale_service
+from app.repositories.book_repository import BookRepository
+from app.repositories.sale_repository import SaleRepository
+from app.schemas.book_schema import BookUpdate
+from app.schemas.sale_schema import SaleCreate
+from app.services.book_service import BookService
+from app.services.sale_service import SaleService
+from test_direct_sale_postgres import sale_service
 from app.controllers.client_tracking_controller import get_client_tracking_service
 from app.dependencies.authentication import get_current_user
 from app.models.domain import (
@@ -93,10 +101,13 @@ def test_allocation_persists_deadline(desk):  # noqa: F811
     assert state(engine, reservation_id)[2] is None  # sem destinação, sem prazo
     assert http.post(f'{BASE}/books/{book_id}/allocate-purchase').status_code == 200
     status, _, expires_at = state(engine, reservation_id)
+    with Session(engine) as db:
+        notified_at = db.get(PurchaseReservation, reservation_id).notified_at
+    # compara com a regra aplicada ao instante gravado da destinação (sem depender do relógio de execução)
+    assert status == 'NOTIFIED' and expires_at == reservation_pickup_deadline(notified_at)
     local = expires_at.astimezone(BUSINESS_ZONE)
-    assert status == 'NOTIFIED'
-    assert (local.date(), local.hour, local.minute, local.second, local.microsecond) == (
-        business_today() + timedelta(days=5), 23, 59, 59, 999000)
+    assert (local.hour, local.minute, local.second, local.microsecond) == (23, 59, 59, 999000)
+    assert (local.date() - notified_at.astimezone(BUSINESS_ZONE).date()).days == 5
     tracking = ClientTrackingService(Session(engine), ClientTrackingRepository(Session(engine))).reservations(client_id)[0]
     assert (tracking.expires_at, tracking.expired) == (expires_at, False)
 
@@ -322,13 +333,18 @@ def outcome(call):
 
 
 def run_in_order(engine, book_id, seller_id, first_op, second_op):
+    """Como run_in_order_db, com operações sobre o CirculationService."""
+    return run_in_order_db(engine, book_id, lambda db: first_op(circulation(db)), lambda db: second_op(circulation(db)))
+
+
+def run_in_order_db(engine, book_id, first_op, second_op):
     """Segura o lock do livro, enfileira first_op e depois second_op (fila FIFO do PostgreSQL) e libera."""
     holder = Session(engine)
     holder.execute(select(Book).where(Book.id == book_id).with_for_update())
 
     def run(operation):
         with Session(engine) as db:
-            return outcome(lambda: operation(circulation(db)))
+            return outcome(lambda: operation(db))
     with ThreadPoolExecutor(max_workers=2) as pool:
         first = pool.submit(run, first_op)
         wait_blocked(engine, 1)
@@ -405,8 +421,8 @@ def test_purchase_request_with_free_copy_is_an_allocation_with_the_same_deadline
         reservation_id, copy_id = reservation.id, reservation.allocated_copy_id
         assert reservation.expires_at == reservation_pickup_deadline(reservation.notified_at)
         local = reservation.expires_at.astimezone(BUSINESS_ZONE)
-        assert (local.date(), local.hour, local.minute, local.microsecond) == (
-            business_today() + timedelta(days=5), 23, 59, 999000)
+        assert (local.hour, local.minute, local.microsecond) == (23, 59, 999000)
+        assert (local.date() - reservation.notified_at.astimezone(BUSINESS_ZONE).date()).days == 5
     force_expired(engine, reservation_id)
     # expira pelas mesmas regras: a venda é recusada e o exemplar é liberado
     response = http.post(f'{BASE}/purchase-reservations/{reservation_id}/confirm-sale')
@@ -415,3 +431,118 @@ def test_purchase_request_with_free_copy_is_an_allocation_with_the_same_deadline
     with Session(engine) as db:
         assert db.get(Copy, copy_id).status == CopyStatus.AVAILABLE
         assert CirculationRepository(db).lock_free_copy(book_id, commercial_copy(db, book_id).destination) is not None
+
+
+# ---- venda direta e inativação de obra com reserva vencida (decisões 3 e 4) ----------------
+
+def test_direct_sale_of_copy_allocated_in_time_is_a_stable_conflict(desk):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (reservation_id,), copy_id = waiting_queue(engine, book_id, client_id, seller_id)
+    http.post(f'{BASE}/books/{book_id}/allocate-purchase')
+    sessions = []
+    app.dependency_overrides[get_sale_service] = sale_service(engine, sessions)
+    response = http.post('/api/v1/sales/', json={'items': [{'copy_id': copy_id}]})
+    assert (response.status_code, response.json()['code']) == (409, 'copy_reserved')  # nunca 500 do gatilho
+    assert state(engine, reservation_id)[:2] == ('NOTIFIED', copy_id)
+    with Session(engine) as db:
+        assert db.get(Copy, copy_id).status == CopyStatus.AVAILABLE
+        assert db.scalar(select(SaleItem.id).where(SaleItem.copy_id == copy_id)) is None
+    for db in sessions:
+        db.close()
+
+
+def test_direct_sale_of_copy_with_overdue_reservation_expires_it_and_sells(desk):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (reservation_id,), copy_id = waiting_queue(engine, book_id, client_id, seller_id)
+    http.post(f'{BASE}/books/{book_id}/allocate-purchase')
+    force_expired(engine, reservation_id)
+    sessions = []
+    app.dependency_overrides[get_sale_service] = sale_service(engine, sessions)
+    response = http.post('/api/v1/sales/', json={'items': [{'copy_id': copy_id}]})
+    assert (response.status_code, response.json()['status']) == (201, 'CONFIRMED')
+    assert state(engine, reservation_id)[0] == 'EXPIRED'
+    with Session(engine) as db:
+        assert db.get(Copy, copy_id).status == CopyStatus.SOLD
+    for db in sessions:
+        db.close()
+
+
+def test_inactivating_a_book_expires_overdue_reservations_before_counting(desk):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (reservation_id,), copy_id = waiting_queue(engine, book_id, client_id, seller_id)
+    http.post(f'{BASE}/books/{book_id}/allocate-purchase')
+
+    def inactivate():
+        with Session(engine) as db:
+            return BookService(db=db, repository=BookRepository(db)).update_book(
+                book_id, BookUpdate(is_active=False), employee_id=seller_id)
+    with pytest.raises(BookHasActiveOperationsError) as error:  # no prazo: continua bloqueando
+        inactivate()
+    assert error.value.details['counts']['purchase_reservations'] == 1
+    assert state(engine, reservation_id)[0] == 'NOTIFIED'
+    force_expired(engine, reservation_id)
+    assert inactivate().is_active is False  # vencida: expirada e não conta
+    assert state(engine, reservation_id)[0] == 'EXPIRED'
+    with Session(engine) as db:
+        assert db.get(Book, book_id).is_active is False
+
+
+# ---- corridas adicionais (ordem forçada pelo lock do livro) ------------------
+
+@pytest.mark.parametrize('expire_first', [True, False])
+def test_expire_endpoint_versus_allocation_is_serialized(desk, expire_first):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (first, second), copy_id = waiting_queue(engine, book_id, client_id, seller_id, extra_clients=1)
+    http.post(f'{BASE}/books/{book_id}/allocate-purchase')
+    force_expired(engine, first)
+    expire = lambda s: s.expire_due_reservations(seller_id)  # noqa: E731
+    allocate = lambda s: s.allocate_purchase(book_id, seller_id)  # noqa: E731
+    results = run_in_order(engine, book_id, seller_id, *((expire, allocate) if expire_first else (allocate, expire)))
+    assert results == ('ok', 'ok')
+    assert state(engine, first)[0] == 'EXPIRED'
+    assert state(engine, second)[:2] == ('NOTIFIED', copy_id)  # a destinação nunca fica sem exemplar nem duplicada
+
+
+@pytest.mark.parametrize('expire_first,expected', [(True, ('ok', 'reservation_not_ready')),
+                                                   (False, ('reservation_expired', 'ok'))])
+def test_expire_endpoint_versus_confirm_sale_is_serialized(desk, expire_first, expected):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (reservation_id,), copy_id = waiting_queue(engine, book_id, client_id, seller_id)
+    http.post(f'{BASE}/books/{book_id}/allocate-purchase')
+    force_expired(engine, reservation_id)
+    expire = lambda s: s.expire_due_reservations(seller_id)  # noqa: E731
+    sell = lambda s: s.confirm_sale(reservation_id, seller_id)  # noqa: E731
+    assert run_in_order(engine, book_id, seller_id, *((expire, sell) if expire_first else (sell, expire))) == expected
+    assert state(engine, reservation_id)[0] == 'EXPIRED'
+    with Session(engine) as db:
+        assert db.scalar(select(SaleItem.id).where(SaleItem.copy_id == copy_id)) is None
+        assert db.get(Copy, copy_id).status == CopyStatus.AVAILABLE
+
+
+def test_concurrent_allocations_with_ineligible_client_first_give_the_copy_once(desk):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (first, second, third), copy_id = waiting_queue(engine, book_id, client_id, seller_id, extra_clients=2)
+    with Session(engine) as db:
+        db.get(Client, clients[0]).is_penalized = True
+        db.commit()
+    allocate = lambda s: s.allocate_purchase(book_id, seller_id)  # noqa: E731
+    assert run_in_order(engine, book_id, seller_id, allocate, allocate) == ('ok', 'purchase_unavailable')
+    assert state(engine, first)[0] == 'WAITING'  # o inelegível mantém a posição
+    assert state(engine, second)[:2] == ('NOTIFIED', copy_id)
+    assert state(engine, third)[0] == 'WAITING'
+
+
+@pytest.mark.parametrize('sale_first', [True, False])
+def test_direct_sale_of_overdue_reserved_copy_versus_expire_endpoint(desk, sale_first):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (reservation_id,), copy_id = waiting_queue(engine, book_id, client_id, seller_id)
+    http.post(f'{BASE}/books/{book_id}/allocate-purchase')
+    force_expired(engine, reservation_id)
+    sell = lambda db: SaleService(SaleRepository(db), db).create_sale(  # noqa: E731
+        SaleCreate(items=[{'copy_id': copy_id}]), employee_id=seller_id)
+    expire = lambda db: circulation(db).expire_due_reservations(seller_id)  # noqa: E731
+    assert run_in_order_db(engine, book_id, *((sell, expire) if sale_first else (expire, sell))) == ('ok', 'ok')
+    assert state(engine, reservation_id)[0] == 'EXPIRED'
+    with Session(engine) as db:
+        assert db.get(Copy, copy_id).status == CopyStatus.SOLD
+        assert db.scalar(select(func.count()).select_from(SaleItem).where(SaleItem.copy_id == copy_id)) == 1
