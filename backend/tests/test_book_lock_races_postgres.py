@@ -74,7 +74,7 @@ def outcome(call):
         return 'ok'
     except ApplicationError as error:
         return error.code
-    except Exception as error:  # HTTPException dos fluxos legados de empréstimo e venda
+    except Exception as error:  # erros inesperados dos fluxos de empréstimo e venda
         return getattr(error, 'status_code', repr(error))
 
 
@@ -153,7 +153,7 @@ def test_loan_waits_for_an_uncommitted_delete_and_then_finds_no_copy(api):  # no
     holder = hold_book_lock(api)
     holder.execute(text('DELETE FROM copies WHERE id = :id'), {'id': copy_id})
     [result] = run_behind_lock(api, holder, loan_op(api, copy_id))
-    assert result == 404
+    assert result == 'copy_not_found'
     with Session(api.engine) as db:
         assert db.query(Loan).filter(Loan.copy_id == copy_id).count() == 0
 
