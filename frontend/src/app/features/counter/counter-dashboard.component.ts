@@ -24,7 +24,7 @@ const ACCESS: readonly AccessCard[] = [
   { title: 'Consultar acervo', description: 'Buscar obras e disponibilidade', route: '/balcao/acervo' },
   { title: 'Registrar devolução', description: 'Dar baixa em um exemplar', route: '/balcao/devolucoes' },
   { title: 'Vendas', description: 'Venda de acervo comercial', route: '/balcao/vendas' },
-  { title: 'Empréstimo', description: 'Registrar um novo empréstimo', route: '/balcao/emprestimos' },
+  { title: 'Empréstimo', description: 'Registrar um novo empréstimo', route: '/balcao/emprestimos/novo' },
 ];
 
 const INDICATORS: readonly Indicator[] = [

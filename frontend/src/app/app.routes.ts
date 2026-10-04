@@ -44,6 +44,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-loans-home.component').then(m => m.CounterLoansHomeComponent),
       },
       {
+        path: 'emprestimos/novo', title: 'Novo empréstimo · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-loan-create.component').then(m => m.CounterLoanCreateComponent),
+      },
+      {
         path: 'emprestimos/solicitacoes', title: 'Solicitações de empréstimo · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterPickupsPageComponent),
       },
