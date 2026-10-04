@@ -15,3 +15,4 @@ class PurchaseRequestResponse(BaseModel):
     pickup_date: date
     status: str
     created_at: datetime
+    reservation_status: str | None = None  # NOTIFIED: exemplar destinado; WAITING: entrou no fim da fila

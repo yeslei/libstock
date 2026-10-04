@@ -53,11 +53,15 @@ class ClientTrackingService:
                 raise BookNotFoundError()
             if self.repository.existing_reservation(client_id, book_id):
                 raise ApplicationError('Você já possui uma reserva de compra em andamento.', 'reservation_duplicate', 409)
-            if not self.repository.has_reservable_commercial_copy(book_id):
-                raise ApplicationError('Não há exemplar comercial para reserva de compra.', 'reservation_unavailable', 409)
-            free = self.repository.has_free_commercial_copy(book_id)
-            if free:
-                raise ApplicationError('Há exemplar disponível. Solicite a compra com data de retirada.', 'purchase_available', 409)
+            if self.repository.has_waiting_queue(book_id):
+                # Havendo fila WAITING a precedência é preservada: entra no fim da fila, mesmo com exemplar livre.
+                if not self.repository.has_queueable_commercial_copy(book_id):
+                    raise ApplicationError('Não há exemplar comercial para reserva de compra.', 'reservation_unavailable', 409)
+            else:
+                if not self.repository.has_reservable_commercial_copy(book_id):
+                    raise ApplicationError('Não há exemplar comercial para reserva de compra.', 'reservation_unavailable', 409)
+                if self.repository.has_free_commercial_copy(book_id):
+                    raise ApplicationError('Há exemplar disponível. Solicite a compra com data de retirada.', 'purchase_available', 409)
             reservation = self.repository.create_reservation(client_id, book_id)
             response = ReservePurchaseResponse.model_validate(reservation).model_copy(
                 update={'queue_position': self.repository.waiting_position(reservation)},

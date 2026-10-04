@@ -17,17 +17,16 @@ class PurchaseRequestRepository(ClientRequestRepository):
         return self.db.scalar(free_copies_statement(book_id).where(Copy.destination == DestinationType.COMMERCIAL)
                               .order_by(Copy.id).limit(1).with_for_update())
 
-    def has_waiting_queue(self, book_id):
-        return self.db.scalar(select(PurchaseReservation.id).where(
-            PurchaseReservation.book_id == book_id,
-            PurchaseReservation.status == ReservationStatus.WAITING,
-        ).limit(1)) is not None
-
-    def create(self, client_id, book_id, pickup_date, copy_id):
-        notified_at = datetime.now(timezone.utc)
-        reservation = PurchaseReservation(book_id=book_id, client_id=client_id, status=ReservationStatus.NOTIFIED,
-            allocated_copy_id=copy_id, notified_at=notified_at,
-            expires_at=reservation_pickup_deadline(notified_at))
+    def create(self, client_id, book_id, pickup_date, copy_id=None, notified_at=None):
+        """With a copy the reservation is born NOTIFIED (allocation, with the pickup deadline); without one it
+        joins the end of the WAITING queue."""
+        if copy_id is not None:
+            notified_at = notified_at or datetime.now(timezone.utc)
+            reservation = PurchaseReservation(book_id=book_id, client_id=client_id, status=ReservationStatus.NOTIFIED,
+                allocated_copy_id=copy_id, notified_at=notified_at,
+                expires_at=reservation_pickup_deadline(notified_at))
+        else:
+            reservation = PurchaseReservation(book_id=book_id, client_id=client_id, status=ReservationStatus.WAITING)
         self.db.add(reservation); self.db.flush(); self.db.refresh(reservation)
         request = PurchaseRequest(client_id=client_id, book_id=book_id, pickup_date=pickup_date,
                                   status='PENDING', reservation_id=reservation.id)

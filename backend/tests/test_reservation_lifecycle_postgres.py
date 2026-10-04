@@ -546,3 +546,62 @@ def test_direct_sale_of_overdue_reserved_copy_versus_expire_endpoint(desk, sale_
     with Session(engine) as db:
         assert db.get(Copy, copy_id).status == CopyStatus.SOLD
         assert db.scalar(select(func.count()).select_from(SaleItem).where(SaleItem.copy_id == copy_id)) == 1
+
+
+# ---- data de retirada limitada ao prazo e fila com exemplar livre (decisões 1 e 5) --------
+
+def purchase_request(db, book_id, client, pickup_date):
+    from app.repositories.purchase_request_repository import PurchaseRequestRepository
+    from app.schemas.purchase_request_schema import PurchaseRequestCreate
+    from app.services.purchase_request_service import PurchaseRequestService
+    return PurchaseRequestService(db, PurchaseRequestRepository(db)).create(
+        PurchaseRequestCreate(book_id=book_id, pickup_date=pickup_date), client_id=client)
+
+
+def test_pickup_date_of_a_request_born_notified_cannot_exceed_the_deadline(desk):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    limit = reservation_pickup_deadline(datetime.now(timezone.utc)).astimezone(BUSINESS_ZONE).date()
+    with Session(engine) as db:
+        with pytest.raises(ApplicationError) as error:
+            purchase_request(db, book_id, client_id, limit + timedelta(days=1))
+        assert (error.value.status_code, error.value.code) == (422, 'pickup_date_after_deadline')
+        db.rollback()
+        assert db.scalar(select(func.count()).select_from(PurchaseReservation).where(
+            PurchaseReservation.client_id == client_id, PurchaseReservation.book_id == book_id)) == 0
+        assert CirculationRepository(db).lock_free_copy(book_id, commercial_copy(db, book_id).destination) is not None
+        db.rollback()
+        response = purchase_request(db, book_id, client_id, limit)  # o próprio dia do prazo é aceito
+        assert response.reservation_status == 'NOTIFIED'
+
+
+def test_new_purchase_request_and_reservation_join_the_waiting_queue_even_with_a_free_copy(desk):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    clients, (first,), copy_id = waiting_queue(engine, book_id, client_id, seller_id)  # fila WAITING + exemplar livre
+    with Session(engine) as db:
+        newcomer, other = new_user(db, 'USER', 'Recém-chegado'), new_user(db, 'USER', 'Outro')
+        far = business_today() + timedelta(days=60)  # sem destinação, o limite do prazo ainda não se aplica
+        response = purchase_request(db, book_id, newcomer, far)
+        assert response.reservation_status == 'WAITING'
+        reservation = ClientTrackingService(db, ClientTrackingRepository(db)).reserve_purchase(other, book_id)
+        assert reservation.queue_position == 3
+        queued = db.scalar(select(PurchaseReservation).where(PurchaseReservation.client_id == newcomer))
+        assert (queued.status, queued.allocated_copy_id, queued.expires_at, queued.queue_position) == (
+            ReservationStatus.WAITING, None, None, 2)
+        assert CirculationRepository(db).lock_free_copy(book_id, commercial_copy(db, book_id).destination) is not None
+        db.rollback()
+    # a precedência é preservada: a destinação vai para o primeiro da fila, os novos seguem aguardando
+    assert http.post(f'{BASE}/books/{book_id}/allocate-purchase').json()['id'] == first
+    assert state(engine, first)[:2] == ('NOTIFIED', copy_id)
+    with Session(engine) as db:
+        assert [r.status.value for r in db.scalars(select(PurchaseReservation).where(
+            PurchaseReservation.book_id == book_id).order_by(PurchaseReservation.queue_position))] == [
+            'NOTIFIED', 'WAITING', 'WAITING']
+
+
+def test_without_a_waiting_queue_a_free_copy_still_means_immediate_allocation(desk):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    with Session(engine) as db:
+        with pytest.raises(ApplicationError) as error:
+            ClientTrackingService(db, ClientTrackingRepository(db)).reserve_purchase(client_id, book_id)
+        assert error.value.code == 'reservation_unavailable'  # sem fila nem exemplar a aguardar: comportamento anterior
+        assert purchase_request(db, book_id, client_id, business_today()).reservation_status == 'NOTIFIED'
