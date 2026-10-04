@@ -600,3 +600,15 @@ Referências: `png telas/referencias/01 - UX - Snackbars & Feedback.png` e Compl
 - Divergências: textos prontos da referência não usados quando divergem do comportamento real (ex.: venda direta fica pendente); a variante informação ainda não é usada por nenhuma tela do balcão.
 
 Regras e decisões pendentes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21.
+
+### Telas do cliente: login, início e categoria — Issue #129
+
+Referências: `png telas/paineis/02 — Cliente.png` (telas 1 a 3), `png telas/telas/cliente/Início & Acervo.png` e `png telas/telas/cliente/Ao selecionar uma categoria.png`.
+
+| Frame | Rota | Endpoints | Situação |
+| --- | --- | --- | --- |
+| Cliente / Login (tela 1) | `/login` | `POST /api/v1/auth/login` | Conforme a referência (dois campos, "Entrar", "Criar conta"). "Esqueceu a senha?" segue desabilitado com "em breve": não há fluxo aprovado e a nota "DEV" da referência manda manter o fluxo atual |
+| Cliente / Início & Acervo (tela 2) | `/` | `GET /api/v1/catalog/genres`, `GET /api/v1/catalog/featured-books`, `GET /api/v1/catalog/books` (busca) | Navbar com busca, Início, Explorar acervo, Meus empréstimos, Minhas reservas e menu do usuário; hero com o texto da referência e "Explorar livros" (vai às categorias); categorias em destaque; livros em destaque com Empréstimo disponível, Venda disponível ou Esgotado e "Ver detalhes" |
+| Cliente / Ao selecionar uma categoria (tela 3) | `/generos/:slug` | `GET /api/v1/catalog/genres/{slug}/books?q=&page=`, `GET /api/v1/catalog/genres` | Trilha "Explorar acervo / categoria", título, subtítulo, busca "Buscar dentro de <categoria>" (título ou autor, consulta do backend), chips de categorias com a atual marcada, cartões e paginação; estados de carregamento, categoria inexistente, erro, vazio e "nenhum resultado" com "Limpar busca" |
+
+Divergências e lacunas (detalhes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21): chip "Mais" e "Ver todos" ausentes (sem endpoint de todas as categorias nem de acervo completo); "Todos" volta ao início; "Indisponível" aparece como "Esgotado"; "gênero" não é critério da busca global; o bloco de busca recolhível do início foi mantido; sem filtro por várias categorias. Dados das imagens são ilustrativos e notas para desenvolvedores não são interface.
