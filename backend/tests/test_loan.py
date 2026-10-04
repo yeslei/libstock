@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from app.controllers.loan_controller import create_loan
 from app.core.exceptions import ClientHasPendingError, ClientInactiveError
 from app.dependencies.authentication import require_roles
-from app.core.business_dates import BUSINESS_ZONE, loan_due_at
+from app.core.business_dates import BUSINESS_ZONE, loan_due_at, overdue_cutoff
 from app.core.exceptions import CopyNotForLoanError
 from app.models.domain import CopyStatus, DestinationType, LoanStatus
 from app.schemas.loan_schema import LoanCreate
@@ -155,7 +155,15 @@ def test_role_user_nao_pode_criar_emprestimo():
         dependency(SimpleNamespace(role_codes=["USER"]))
 
 
-def test_service_calcula_prazo_de_um_mes_de_calendario():
+def test_service_calcula_prazo_de_um_mes_de_calendario(monkeypatch):
+    frozen = datetime(2027, 1, 31, 15, 0, tzinfo=timezone.utc)
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen
+
+    monkeypatch.setattr("app.services.loan_service.datetime", FrozenDatetime)
     repository = MagicMock()
     db = FakeSession()
     client_service = MagicMock()
@@ -203,8 +211,8 @@ def test_service_calcula_prazo_de_um_mes_de_calendario():
     due_date = kwargs["due_date"]
 
     assert loan_date.tzinfo == timezone.utc
-    assert due_date == loan_due_at(loan_date)
-    assert due_date.astimezone(BUSINESS_ZONE).date() > loan_date.astimezone(BUSINESS_ZONE).date() + timedelta(days=27)
+    assert loan_date == frozen
+    assert due_date == datetime(2027, 2, 28, 15, 0, tzinfo=timezone.utc)
 
     assert result.loan_date == loan_date
     assert result.due_date == due_date
@@ -578,3 +586,27 @@ def test_service_recusa_exemplar_comercial_com_409_copy_not_for_loan():
     assert (error.value.status_code, error.value.code) == (409, "copy_not_for_loan")
     repository.create_loan.assert_not_called()
     assert (db.commits, db.rollbacks) == (0, 1)
+
+
+def test_overdue_cutoff_e_inicio_do_dia_de_sao_paulo():
+    cutoff = overdue_cutoff(date(2026, 10, 3))
+    assert cutoff == datetime(2026, 10, 3, 3, 0, tzinfo=timezone.utc)
+    assert cutoff.astimezone(BUSINESS_ZONE).hour == 0
+
+
+@pytest.mark.parametrize("cutoff", [
+    datetime(2026, 10, 3, 2, 59, tzinfo=timezone.utc),
+    datetime(2026, 10, 3, 3, 0, tzinfo=timezone.utc),
+])
+def test_list_overdue_loans_usa_o_corte_injetado_com_comparacao_estrita(cutoff):
+    from sqlalchemy.dialects import postgresql
+    from app.repositories.client_pendency_repository import ClientPendencyRepository
+
+    db = MagicMock()
+    ClientPendencyRepository(db).list_overdue_loans(1, cutoff=cutoff)
+    compiled = db.execute.call_args.args[0].compile(dialect=postgresql.dialect())
+    sql = str(compiled)
+
+    assert "loans.due_date < %(due_date_1)s" in sql
+    assert compiled.params["due_date_1"] == cutoff
+    assert "loans.returned_at IS NULL" in sql

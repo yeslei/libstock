@@ -1,9 +1,10 @@
 """Prazo de um mês e atraso por data de São Paulo em todos os fluxos (Issue #148), contra PostgreSQL descartável."""
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core import business_dates
 from app.core.business_dates import BUSINESS_ZONE, loan_due_at
 from app.core.exceptions import ClientHasPendingError, CopyNotForLoanError
 from app.models.domain import Client, Loan, LoanStatus
@@ -14,6 +15,16 @@ from app.services.client_pendency_service import ClientPendencyService
 from app.services.loan_service import LoanService
 from test_client_requests_postgres import records  # noqa: F401  (fixture)
 from test_staff_desk_postgres import commercial_copy, desk, didactic_copy  # noqa: F401  (fixtures)
+
+
+FROZEN_TODAY = date(2026, 10, 3)
+
+
+@pytest.fixture
+def frozen_today(monkeypatch):
+    """Congela a data de negócio para que o corte de atraso não dependa do relógio real."""
+    monkeypatch.setattr(business_dates, 'business_today', lambda: FROZEN_TODAY)
+    return FROZEN_TODAY
 
 
 def loan_service(db):
@@ -47,9 +58,9 @@ def _open_loan(engine, book_id, client_id, seller_id, due):
         db.commit()
 
 
-def test_due_today_earlier_is_not_overdue_in_v1_pendencies_sync_or_direct_loan(desk):  # noqa: F811
+def test_due_today_earlier_is_not_overdue_in_v1_pendencies_sync_or_direct_loan(desk, frozen_today):  # noqa: F811
     _, engine, book_id, client_id, seller_id = desk
-    today = datetime.now(BUSINESS_ZONE).date()
+    today = frozen_today
     _open_loan(engine, book_id, client_id, seller_id, datetime.combine(today, time(0, 1), BUSINESS_ZONE))
     with Session(engine) as db:
         service = ClientPendencyService(db, ClientPendencyRepository(db))
@@ -59,9 +70,9 @@ def test_due_today_earlier_is_not_overdue_in_v1_pendencies_sync_or_direct_loan(d
         assert service.validate_client_for_operation(client_id).valid is True
 
 
-def test_due_yesterday_is_overdue_in_v1_pendencies_sync_and_blocks_direct_loan(desk):  # noqa: F811
+def test_due_yesterday_is_overdue_in_v1_pendencies_sync_and_blocks_direct_loan(desk, frozen_today):  # noqa: F811
     _, engine, book_id, client_id, seller_id = desk
-    today = datetime.now(BUSINESS_ZONE).date()
+    today = frozen_today
     _open_loan(engine, book_id, client_id, seller_id, datetime.combine(today - timedelta(days=1), time(23, 59), BUSINESS_ZONE))
     with Session(engine) as db:
         response = ClientPendencyService(db, ClientPendencyRepository(db)).get_pendencies(client_id)
