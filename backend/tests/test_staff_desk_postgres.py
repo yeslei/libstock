@@ -172,7 +172,7 @@ def test_purchase_queue_allocation_and_sale_cycle(desk):
     assert (ready['free_commercial_copies'], ready['can_allocate']) == (1, True)
     behind = http.get(f'{BASE}/purchase-reservations', params={'client_id': other}).json()[0]
     assert (behind['id'], behind['queue_position'], behind['can_allocate'], behind['allocation_blocked_reason']) == (
-        second.id, 2, False, 'NOT_FIRST_IN_QUEUE')
+        second.id, 2, False, 'NOT_FIRST_ELIGIBLE')
 
     allocated = http.post(f'{BASE}/books/{book_id}/allocate-purchase')
     assert allocated.status_code == 200 and allocated.json()['id'] == reservation.id
@@ -191,7 +191,7 @@ def test_purchase_queue_allocation_and_sale_cycle(desk):
         assert db.get(Copy, copy_id).status == CopyStatus.SOLD
 
 
-def test_ineligible_first_in_queue_blocks_allocation_without_skipping(desk):
+def test_ineligible_first_in_queue_is_skipped_keeping_position(desk):
     http, engine, book_id, client_id, seller_id = desk
     with Session(engine) as db:
         copy_id = commercial_copy(db, book_id).id
@@ -210,9 +210,11 @@ def test_ineligible_first_in_queue_blocks_allocation_without_skipping(desk):
     assert (head['id'], head['client']['eligible'], head['can_allocate'], head['allocation_blocked_reason']) == (
         first.id, False, False, 'CLIENT_INELIGIBLE')
     response = http.post(f'{BASE}/books/{book_id}/allocate-purchase')
-    assert (response.status_code, response.json()['code']) == (403, 'client_ineligible')
-    still_waiting = http.get(f'{BASE}/purchase-reservations', params={'client_id': other}).json()[0]
-    assert (still_waiting['queue_position'], still_waiting['can_allocate']) == (2, False)
+    assert response.status_code == 200
+    behind = http.get(f'{BASE}/purchase-reservations', params={'client_id': other, 'status': 'NOTIFIED'}).json()[0]
+    assert (behind['status'], behind['allocated_copy_id'], behind['expired']) == ('NOTIFIED', copy_id, False)
+    skipped = http.get(f'{BASE}/purchase-reservations', params={'client_id': client_id}).json()[0]
+    assert (skipped['id'], skipped['status'], skipped['queue_position']) == (first.id, 'WAITING', 1)
 
 
 def test_borrowed_didactic_copy_is_not_offered_for_pickup(desk):

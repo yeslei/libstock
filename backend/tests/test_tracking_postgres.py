@@ -1,3 +1,4 @@
+from app.core.business_dates import reservation_pickup_deadline
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -48,7 +49,7 @@ def test_purchase_waiting_allocated_sold(records):
         circulation.allocate_purchase(book_id,staff)
         item=tracking.reservations(client_id)[0]
         assert item.status=='NOTIFIED' and item.copy_barcode==copy.barcode
-        assert item.expires_at is None
+        assert item.expires_at == reservation_pickup_deadline(item.available_since)
         circulation.confirm_sale(reservation.id,staff)
         assert tracking.reservations(client_id)==[]
         db.expire_all()
