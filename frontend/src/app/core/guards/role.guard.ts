@@ -23,5 +23,11 @@ export const roleGuard: CanActivateFn = async (route) => {
   const allowedRoles = roles as readonly RoleCode[];
   const userRoles = store.user?.role_codes ?? [];
 
-  return userRoles.some((role) => allowedRoles.includes(role)) ? true : router.createUrlTree(['/']);
+  if (userRoles.some((role) => allowedRoles.includes(role))) {
+    return true;
+  }
+
+  /** Rotas podem indicar para onde mandar o papel sem acesso (ex.: estoquista no balcão volta ao acervo). */
+  const fallback = route.data['deniedRedirect'];
+  return router.createUrlTree([typeof fallback === 'string' ? fallback : '/']);
 };

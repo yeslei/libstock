@@ -1,7 +1,17 @@
-import { Routes } from '@angular/router';
+import { Route, Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { counterHomeGuard } from './features/counter/counter-home.guard';
+
+/**
+ * Issue #169: o estoquista usa o balcão restrito ao acervo. As demais telas do balcão exigem papel de atendimento;
+ * quem não o tem volta ao acervo.
+ */
+const SERVICE_DESK_ONLY: Pick<Route, 'canActivate' | 'data'> = {
+  canActivate: [roleGuard],
+  data: { roles: ['SELLER', 'ADMINISTRATOR'], deniedRedirect: '/balcao/acervo' },
+};
 
 export const routes: Routes = [
   {
@@ -30,14 +40,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/receipts/receipt-page.component').then(m => m.ReceiptPageComponent),
   },
   {
-    path: 'balcao', canActivate: [authGuard, roleGuard], data: { roles: ['SELLER', 'ADMINISTRATOR'] },
+    path: 'balcao', canActivate: [authGuard, roleGuard], data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     loadComponent: () => import('./features/counter/counter-shell.component').then(m => m.CounterShellComponent),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'painel' },
-      {
-        path: 'painel', title: 'Painel · Balcão · LibStock',
-        loadComponent: () => import('./features/counter/counter-dashboard.component').then(m => m.CounterDashboardComponent),
-      },
+      { path: '', pathMatch: 'full', canActivate: [counterHomeGuard], children: [] },
       {
         path: 'acervo', pathMatch: 'full', title: 'Acervo · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-catalog.component').then(m => m.CounterCatalogComponent),
@@ -51,42 +57,56 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-catalog-book.component').then(m => m.CounterCatalogBookComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
+        path: 'painel', title: 'Painel · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-dashboard.component').then(m => m.CounterDashboardComponent),
+      },
+      {
+        ...SERVICE_DESK_ONLY,
         path: 'clientes', title: 'Clientes · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterClientsPageComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'emprestimos', pathMatch: 'full', title: 'Empréstimos · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-loans-home.component').then(m => m.CounterLoansHomeComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'emprestimos/novo', title: 'Novo empréstimo · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-loan-create.component').then(m => m.CounterLoanCreateComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'emprestimos/solicitacoes', title: 'Solicitações de empréstimo · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterPickupsPageComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'emprestimos/ativos', title: 'Empréstimos ativos · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-active-loans.component').then(m => m.CounterActiveLoansComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'devolucoes', title: 'Registrar devolução · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-returns.component').then(m => m.CounterReturnsComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'vendas', title: 'Registrar venda · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-sales.component').then(m => m.CounterSalesComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'reservas', pathMatch: 'full', title: 'Reservas de compra · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-reservations.component').then(m => m.CounterReservationsComponent),
       },
       {
+        ...SERVICE_DESK_ONLY,
         path: 'reservas/:id', title: 'Atender reserva · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-reservation-attend.component').then(m => m.CounterReservationAttendComponent),
       },
-      { path: '**', redirectTo: 'painel' },
+      { path: '**', canActivate: [counterHomeGuard], children: [] },
     ],
   },
   {

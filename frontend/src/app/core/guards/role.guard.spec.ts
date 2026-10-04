@@ -116,3 +116,26 @@ describe('roleGuard', () => {
     expect(result).toBeTrue();
   });
 });
+
+describe('roleGuard com deniedRedirect', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), { provide: AuthService, useValue: { restoreSession: () => Promise.resolve() } }],
+    });
+    TestBed.inject(TokenStoreService).setSession('token', user(['STOCK_KEEPER']));
+  });
+
+  function run(data: Record<string, unknown>) {
+    return TestBed.runInInjectionContext(() =>
+      roleGuard({ data } as unknown as ActivatedRouteSnapshot, routerState()));
+  }
+
+  it('redireciona o papel sem acesso para o destino indicado na rota', async () => {
+    const result = await run({ roles: ['SELLER'], deniedRedirect: '/balcao/acervo' });
+    expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe('/balcao/acervo');
+  });
+
+  it('não redireciona quem tem acesso', async () => {
+    expect(await run({ roles: ['STOCK_KEEPER'], deniedRedirect: '/balcao/acervo' })).toBeTrue();
+  });
+});
