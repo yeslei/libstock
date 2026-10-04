@@ -62,4 +62,14 @@ describe('UserService', () => {
     expect(request.request.method).toBe('PATCH');
     request.flush({ ...USER, is_active: false });
   });
+
+  it('redefine a senha enviando somente o contrato explícito', () => {
+    const response = { user_id: 7, message: 'Senha redefinida com sucesso.' };
+    service.resetPassword(7, { new_password: 'nova-senha-teste' }).subscribe((result) => expect(result).toEqual(response));
+    const request = http.expectOne('/api/v1/users/7/reset-password');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ new_password: 'nova-senha-teste' });
+    expect(request.request.urlWithParams).not.toContain('nova-senha-teste');
+    request.flush(response);
+  });
 });

@@ -10,11 +10,12 @@ import { AlertComponent } from '../../../shared/components/alert/alert.component
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { UserPendenciesComponent } from '../user-pendencies/user-pendencies.component';
 import { isClient, rolesLabel } from '../user-labels';
+import { UserPasswordResetComponent } from '../user-password-reset/user-password-reset.component';
 
 @Component({
   selector: 'app-user-details',
   standalone: true,
-  imports: [AlertComponent, SpinnerComponent, DatePipe, RouterLink, UserPendenciesComponent],
+  imports: [AlertComponent, SpinnerComponent, DatePipe, RouterLink, UserPendenciesComponent, UserPasswordResetComponent],
   templateUrl: './user-details.component.html',
   styleUrl: './user-details.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

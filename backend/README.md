@@ -249,3 +249,9 @@ O endpoint legado `GET /api/v1/clients/{id}/pendencies` não é usado pelo balc�
 Erros de consulta inesperados retornam 500 `desk_query_error` sem detalhes de SQL.
 
 Relatório técnico, matriz completa da V2 e roteiro de testes: [V2_REVIEW.md](../docs/V2_REVIEW.md).
+
+### Redefinição assistida de senha (Issue #154)
+
+`POST /api/v1/users/{id}/reset-password`, exclusivo de `ADMINISTRATOR` com usuário/perfil ativos e cadastro de funcionário administrativo. Corpo: `{new_password: string}` (8–128 caracteres; campos extras proibidos); ID de 1 a 2147483647. Resposta 200: `{user_id, message}` após o commit, sem credencial ou hash. Sem token: 401; papel ou ator inelegível: 403 `permission_denied` (a autenticação pode recusar usuário/perfil inativo antes do service); usuário alvo inexistente: 404 `user_not_found`; entrada inválida: 422 sem eco do corpo; falha de persistência: 500 `password_reset_persistence_error`.
+
+Hash, revogação das sessões de refresh existentes e auditoria `PASSWORD_RESET` são atômicos; papel e estado do alvo não mudam. Auditoria contém ator, alvo, evento e data, sem senha, hash ou token. Access tokens já emitidos expiram normalmente; login/refresh concorrente não compartilha o lock e pode criar uma sessão após a revogação. Não há envio de e-mail nem endpoint público de recuperação.
