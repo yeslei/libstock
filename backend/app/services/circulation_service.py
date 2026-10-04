@@ -1,7 +1,7 @@
 from datetime import datetime
 from functools import wraps
 from sqlalchemy.exc import SQLAlchemyError
-from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today, next_month
+from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today, loan_due_at
 from app.core.exceptions import ApplicationError, BookNotFoundError
 from app.models.domain import CopyStatus, DestinationType, LoanStatus, ReservationStatus, SaleStatus
 from app.repositories.circulation_repository import CirculationRepository
@@ -52,7 +52,7 @@ class CirculationService:
         if not book or not book.is_active or copy is None:
             raise ApplicationError('Exemplar didático indisponível para retirada.', 'loan_unavailable', 409)
         now = datetime.now(ZONE)
-        due = datetime.combine(next_month(now.date()), now.timetz())
+        due = loan_due_at(now)
         loan = self.repository.create_loan(client_id=request.client_id, copy_id=copy.id, employee_id=actor_id,
                     loan_date=now, due_date=due, status=LoanStatus.OPEN)
         return {'id': loan.id}

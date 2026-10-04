@@ -41,6 +41,7 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   loan_request_not_found: 'A solicitação de empréstimo não foi encontrada. Atualize a lista.',
   pickup_already_confirmed: 'A retirada desta solicitação já foi confirmada.',
   loan_unavailable: 'O exemplar escolhido não está mais disponível para retirada.',
+  copy_not_for_loan: 'Somente exemplares didáticos podem ser emprestados. Escolha outro exemplar.',
   loan_not_found: 'O empréstimo não foi encontrado. Atualize a lista.',
   loan_already_closed: 'Este empréstimo já foi encerrado.',
   book_not_found: 'A obra não foi encontrada ou está inativa.',

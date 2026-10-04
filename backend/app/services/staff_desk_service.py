@@ -1,6 +1,6 @@
 from datetime import datetime, time, timedelta
 from sqlalchemy.exc import SQLAlchemyError
-from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today
+from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today, overdue_cutoff
 from app.core.exceptions import ApplicationError
 from app.models.domain import DestinationType, ReservationStatus
 from app.repositories.staff_desk_repository import StaffDeskRepository
@@ -25,7 +25,7 @@ class StaffDeskService:
         if not self.repository.is_active_employee(actor_id):
             raise ApplicationError('Cadastro de funcionário ativo necessário.', 'employee_record_required', 403)
         today = business_today()
-        return today, datetime.combine(today, time.min, ZONE)
+        return today, overdue_cutoff(today)
 
     def _read(self, query):
         try:

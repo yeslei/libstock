@@ -312,3 +312,8 @@ class BookHasActiveOperationsError(ApplicationError):
             409,
             {"counts": counts, "links": links},
         )
+
+
+class CopyNotForLoanError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Somente exemplares didáticos podem ser emprestados.", "copy_not_for_loan", 409)

@@ -29,6 +29,7 @@ describe('errorInterceptor', () => {
   it('mapeia o código estável da exclusão de exemplar para mensagem de UI', () => {
     expect(fail(404, { detail: 'x', code: 'copy_not_found' }).detail).toBe('O exemplar não foi encontrado. Atualize a obra.');
     expect(fail(409, { detail: 'x', code: 'copy_not_available' }).detail).toContain('não está disponível');
+    expect(fail(409, { detail: 'x', code: 'copy_not_for_loan' }).detail).toContain('didáticos');
     expect(fail(409, { detail: 'x', code: 'copy_has_history' }).detail).toContain('possui histórico');
     expect(fail(409, { detail: 'x', code: 'last_active_copy' }).detail).toContain('último exemplar ativo');
     expect(fail(500, { detail: 'x', code: 'copy_delete_persistence_error' }).detail).toContain('Nada foi alterado');
