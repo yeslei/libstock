@@ -2,9 +2,9 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from app.core.business_dates import overdue_cutoff
-from app.repositories.client_request_repository import overdue_open_loan_clause
 from sqlalchemy.orm import Session
+
+from app.core.business_dates import overdue_cutoff
 
 from app.models.domain import AuditLog, Book, Client, Copy, Employee, Loan, LoanStatus
 
@@ -18,6 +18,7 @@ from app.models.domain import (
     LoanStatus,
 )
 from app.models.user import User
+from app.repositories.loan_rules import overdue_open_loan_clause
 
 class ClientPendencyRepository:
     def __init__(self, db: Session) -> None:

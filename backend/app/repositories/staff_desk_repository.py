@@ -11,6 +11,7 @@ from app.models.purchase_request import PurchaseRequest
 from app.models.user import User
 from app.repositories.client_request_repository import ClientRequestRepository
 from app.repositories.inventory_availability import free_copies_statement
+from app.repositories.loan_rules import overdue_open_loan_clause
 
 
 def _contains(value: str) -> str:
@@ -32,15 +33,10 @@ def _matches_isbn(term: str, isbn_column):
 class StaffDeskRepository(ClientRequestRepository):
     """Consultas somente leitura do balcão. Devolve fatos; a elegibilidade é decidida no service."""
 
-    @staticmethod
-    def _overdue_conditions(loan, cutoff: datetime):
-        """Regra V2 de atraso: empréstimo OPEN vencido antes do início da data de negócio atual."""
-        return (loan.status == LoanStatus.OPEN, loan.due_date < cutoff)
-
     @classmethod
     def _client_columns(cls, cutoff: datetime):
         late = aliased(Loan)
-        overdue = exists().where(late.client_id == Client.id, *cls._overdue_conditions(late, cutoff)).label('has_overdue_loan')
+        overdue = exists().where(late.client_id == Client.id, overdue_open_loan_clause(cutoff, late)).label('has_overdue_loan')
         return (Client.id.label('client_id'), User.name.label('client_name'), User.email.label('client_email'),
                 Profile.is_active.label('profile_active'), User.is_active.label('user_active'),
                 Client.is_penalized.label('client_penalized'), overdue)
@@ -130,7 +126,7 @@ class StaffDeskRepository(ClientRequestRepository):
             'waiting_reservations': scalar(select(func.count()).select_from(PurchaseReservation).where(
                 PurchaseReservation.status == ReservationStatus.WAITING)),
             'pendencies': scalar(select(func.count(func.distinct(Loan.client_id))).where(
-                *self._overdue_conditions(Loan, cutoff))),
+                overdue_open_loan_clause(cutoff))),
         }
 
 

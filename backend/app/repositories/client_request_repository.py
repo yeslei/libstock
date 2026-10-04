@@ -1,13 +1,9 @@
 from datetime import datetime
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.domain import Book, Client, Employee, Loan, LoanStatus, Profile
 from app.models.user import User
-
-
-def overdue_open_loan_clause(cutoff: datetime):
-    """Single overdue predicate (business-day cutoff) shared by every flow."""
-    return and_(Loan.status == LoanStatus.OPEN, Loan.returned_at.is_(None), Loan.due_date < cutoff)
+from app.repositories.loan_rules import overdue_open_loan_clause
 
 
 class ClientRequestRepository:
