@@ -3,7 +3,9 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from fastapi import HTTPException, status
+from fastapi import status
+
+from app.core.exceptions import ApplicationError
 from sqlalchemy.exc import IntegrityError
 
 from app.controllers.copy_controller import create_copy, create_copies_batch
@@ -230,7 +232,7 @@ def test_obra_inexistente_continua_retornando_404():
     repository = FakeCopyRepository()
     session = FakeSession(book=None)
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         CopyService(repository, session).create_new_copy(
             copy_data=_copy_data(),
             actor_id=7,
@@ -243,7 +245,7 @@ def test_codigo_de_barras_duplicado_continua_retornando_409():
     repository = FakeCopyRepository(copy_error=IntegrityError("insert", {}, Exception()))
     session = FakeSession(book=SimpleNamespace(id=1, is_active=True))
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         CopyService(repository, session).create_new_copy(
             copy_data=_copy_data("EX-DUP"),
             actor_id=7,
@@ -257,7 +259,7 @@ def test_falha_inesperada_executa_rollback_e_retorna_erro_controlado():
     repository = FakeCopyRepository(copy_error=RuntimeError("database exploded"))
     session = FakeSession(book=SimpleNamespace(id=1, is_active=True))
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         CopyService(repository, session).create_new_copy(
             copy_data=_copy_data(),
             actor_id=7,
@@ -364,7 +366,7 @@ def test_service_faz_rollback_se_o_lote_falhar():
         ]
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         CopyService(repository, session).create_copies(
             copies_data=batch,
             actor_id=7,

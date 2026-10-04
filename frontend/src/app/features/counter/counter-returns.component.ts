@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, switchMap } from 'rxjs';
 
@@ -8,13 +8,14 @@ import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
-import { CounterService, StaffLoan } from './counter.service';
+import { CounterService, LIST_LIMIT, StaffLoan } from './counter.service';
 import { ActionFlow, toLoadState } from './desk-flow';
 import { ReceiptComponent } from '../receipts/receipt.component';
 
 /**
- * Frame "Funcionário / Devolução": localiza o empréstimo aberto pelo código do exemplar ou pelo ISBN
- * (`GET /staff/loans?q=`) e registra a devolução com confirmação (`POST /staff/loans/{id}/confirm-return`).
+ * Frame "Funcionário / Devolução": abre listando os empréstimos em aberto (`GET /staff/loans`, já ordenado por
+ * vencimento, logo com os atrasados primeiro) e a busca por exemplar, ISBN, cliente ou obra filtra a lista
+ * (Issue #180). Registra a devolução com confirmação (`POST /staff/loans/{id}/confirm-return`).
  */
 @Component({
   selector: 'app-counter-returns',
@@ -24,19 +25,18 @@ import { ReceiptComponent } from '../receipts/receipt.component';
   templateUrl: './counter-returns.component.html',
   styleUrl: './counter-returns.component.scss',
 })
-export class CounterReturnsComponent {
+export class CounterReturnsComponent implements OnInit {
   private readonly service = inject(CounterService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly searches = new Subject<void>();
 
   protected readonly term = signal('');
-  /** Termo da última busca enviada; é ele que a recarga reutiliza. */
+  /** Termo da última busca enviada (vazio = lista padrão); é ele que a recarga reutiliza. */
   protected readonly searched = signal('');
-  protected readonly missingTerm = signal(false);
+  protected readonly limit = LIST_LIMIT;
   /** Empréstimo cuja devolução acabou de ser registrada; abre o comprovante de devolução. */
   protected readonly returnedLoanId = signal<number | null>(null);
-  /** `null` até a primeira busca. */
-  protected readonly state = signal<LoadState<readonly StaffLoan[]> | null>(null);
+  protected readonly state = signal<LoadState<readonly StaffLoan[]>>({ status: 'loading' });
 
   protected readonly flow = new ActionFlow(inject(DestroyRef), () => {
     this.reload();
@@ -49,7 +49,7 @@ export class CounterReturnsComponent {
         switchMap(() =>
           toLoadState(
             this.service.listLoans({ q: this.searched() }),
-            'Não foi possível buscar os empréstimos. Tente novamente.',
+            'Não foi possível carregar os empréstimos. Tente novamente.',
           ),
         ),
         takeUntilDestroyed(),
@@ -57,25 +57,23 @@ export class CounterReturnsComponent {
       .subscribe((state) => this.state.set(state));
   }
 
+  ngOnInit(): void {
+    this.reload();
+  }
+
   protected setTerm(event: Event): void {
     this.term.set((event.target as HTMLInputElement).value);
-    this.missingTerm.set(false);
   }
 
   protected search(event: Event): void {
     event.preventDefault();
-    const term = this.term().trim();
-    if (!term) {
-      this.missingTerm.set(true);
-      return;
-    }
     this.flow.saveFailed.set(false);
-    this.searched.set(term);
+    this.searched.set(this.term().trim());
     this.reload();
   }
 
   protected reload(): void {
-    if (this.searched()) this.searches.next();
+    this.searches.next();
   }
 
   protected confirmReturn(loan: StaffLoan): void {

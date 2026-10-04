@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.encoders import jsonable_encoder
 
 from app.controllers.admin_catalog_controller import router as admin_catalog_router
 from app.controllers.auth_controller import router as auth_router
@@ -52,17 +52,29 @@ app.add_middleware(
 )
 
 
+VALIDATION_ERROR_CODE = "validation_error"
+
+
 @app.exception_handler(RequestValidationError)
-async def password_reset_validation_handler(request: Request, exception: RequestValidationError):
-    if getattr(request.scope.get("route"), "name", None) == "reset_user_password":
-        # FastAPI's default includes raw input. Never reflect credentials in 422 responses.
-        errors = [{key: error[key] for key in ("loc", "msg", "type") if key in error}
-                  for error in exception.errors()]
-        for error in errors:
-            if error.get("type") == "extra_forbidden":
-                error["loc"] = ["body", "campo_desconhecido"]
-        return JSONResponse(status_code=422, content={"detail": errors})
-    return await request_validation_exception_handler(request, exception)
+async def validation_error_handler(_request: Request, exception: RequestValidationError) -> JSONResponse:
+    """422 de validação em TODAS as rotas, sem eco da entrada (Issue #175).
+
+    O padrão do FastAPI devolve `input` e `ctx` de cada erro, o que reflete senhas digitadas
+    (`password`, `new_password`, `current_password`...) e qualquer outro valor. Aqui só seguem
+    `loc`, `msg` e `type`; o nome de um campo desconhecido também é ocultado, pois pode ser o próprio
+    segredo. O formato é {detail, code}: `detail` continua a lista de erros por campo e `code` é
+    estável (`validation_error`).
+    """
+    errors = []
+    for error in exception.errors():
+        safe = {key: error[key] for key in ("loc", "msg", "type") if key in error}
+        if safe.get("type") == "extra_forbidden":
+            safe["loc"] = [*list(safe.get("loc", ()))[:-1], "campo_desconhecido"]
+        errors.append(safe)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(errors), "code": VALIDATION_ERROR_CODE},
+    )
 
 
 @app.exception_handler(ApplicationError)

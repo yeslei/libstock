@@ -4,7 +4,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Book, Client, Copy, PurchaseReservation, ReservationStatus, Sale, SaleItem, SaleStatus
+from app.models.domain import Book, Client, Copy, Profile, PurchaseReservation, ReservationStatus, Sale, SaleItem, SaleStatus
+from app.models.user import User
 from app.repositories.reservation_expiry import expire_due_reservations
 
 
@@ -16,6 +17,17 @@ class SaleRepository:
         return self.db.scalar(
             select(Client).where(Client.id == client_id)
         )
+
+    def client_active_state(self, client_id: int) -> bool | None:
+        """None se o cliente não existe; True só com perfil e usuário ativos."""
+        row = self.db.execute(
+            select(Profile.is_active, User.is_active)
+            .select_from(Client)
+            .join(Profile, Profile.id == Client.id)
+            .join(User, User.id == Client.id)
+            .where(Client.id == client_id)
+        ).first()
+        return None if row is None else bool(row[0] and row[1])
 
     def lock_books_for_copies(self, copy_ids: list[int]) -> dict[int, Book]:
         """Trava os livros dos exemplares, em ordem de id, antes de travar os exemplares."""
@@ -55,7 +67,7 @@ class SaleRepository:
     def create_sale(
         self,
         *,
-        client_id: int | None,
+        client_id: int,
         employee_id: int,
         total_amount: Decimal,
     ) -> Sale:

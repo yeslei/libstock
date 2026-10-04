@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.authentication import require_roles
+from app.models.domain import DestinationType
 from app.models.user import User
 from app.repositories.staff_desk_repository import StaffDeskRepository
 from app.schemas.staff_desk_schema import (
@@ -30,7 +31,7 @@ def dashboard(user: User = Depends(staff_only), service=Depends(get_staff_desk_s
 
 
 @router.get('/clients', response_model=list[StaffClient])
-def search_clients(q: Annotated[str, Query(min_length=2, max_length=100)], limit: Limit = 20,
+def search_clients(q: Term = None, limit: Limit = 20,
                    user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
     return service.search_clients(q, user.id, limit)
 
@@ -73,6 +74,7 @@ def get_catalog_book(book_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
 
 
 @router.get('/copies', response_model=list[StaffCopyLookup])
-def lookup_copies(q: Annotated[str, Query(min_length=1, max_length=100)], limit: Limit = 20,
+def lookup_copies(q: Term = None,
+                  destination: DestinationType | None = None, available: bool | None = None, limit: Limit = 20,
                   user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
-    return service.copy_lookup(user.id, q, limit)
+    return service.copy_lookup(user.id, q, limit, destination=destination, available=available)

@@ -8,12 +8,13 @@ import { LoadState } from '../../core/models/load-state.model';
 import { TokenStoreService } from '../../core/services/token-store.service';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
+import { GenrePickerComponent } from '../books/components/genre-picker/genre-picker.component';
 import { BookService } from '../books/services/book.service';
 import { CopyService } from '../copies/services/copy.service';
 import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
-import { CopyDestination, CounterService, StaffCatalogBookDetail, StaffCatalogCopy } from './counter.service';
-import { ActionFlow, copyStatusLabel, destinationLabel, formatPrice, toLoadState } from './desk-flow';
+import { CopyDestination, CounterService, StaffCatalogBookDetail, StaffCatalogCopy, StaffGenre } from './counter.service';
+import { ActionFlow, copyStatusLabel, destinationLabel, formatPrice, genreLabel, toLoadState } from './desk-flow';
 
 /**
  * Issue #169: o estoquista usa o balcão restrito ao cadastro (consulta, nova obra e novo exemplar). Edição e inativação/reativação de obra
@@ -23,7 +24,6 @@ const MANAGE_BOOK_ROLES = ['SELLER', 'MANAGER', 'ADMINISTRATOR'];
 const MANAGE_COPY_ROLES = ['SELLER', 'ADMINISTRATOR'];
 /** Papéis que o backend autoriza em `POST /api/v1/copies` e que a tela oferece (inclui o estoquista). */
 const ADD_COPY_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
-const GENRE_MAX = 100;
 const CONDITION_MAX = 30;
 const PRICE_PATTERN = /^\d+(?:\.\d{1,2})?$/;
 
@@ -89,7 +89,7 @@ function positiveEntries(values: Readonly<Record<string, number>> | undefined, l
 @Component({
   selector: 'app-counter-catalog-book',
   standalone: true,
-  imports: [SaveFailureComponent, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent, GenrePickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-catalog-book.component.html',
   styleUrl: './counter-catalog.component.scss',
@@ -115,15 +115,16 @@ export class CounterCatalogBookComponent {
   protected readonly conditionMax = CONDITION_MAX;
   protected readonly blocked = signal<BlockedState | null>(null);
   protected readonly editing = signal(false);
-  protected readonly genre = signal('');
-  protected readonly genreMax = GENRE_MAX;
+  /** Categorias do catálogo escolhidas na edição (Issue #174); começam nas atuais da obra. */
+  protected readonly selectedGenres = signal<readonly StaffGenre[]>([]);
+  protected readonly genreIds = computed(() => this.selectedGenres().map((genre) => genre.id));
+  protected readonly genreLabel = genreLabel;
   protected readonly flow = new ActionFlow(inject(DestroyRef), (succeeded) => {
     if (succeeded) this.editingCopyId.set(null);
     this.reload();
   });
   protected readonly destinationLabel = destinationLabel;
   protected readonly copyStatusLabel = copyStatusLabel;
-  protected readonly genreTooLong = computed(() => this.genre().trim().length > GENRE_MAX);
   protected readonly conditionTooLong = computed(() => this.copyCondition().trim().length > CONDITION_MAX);
   protected readonly priceError = computed(() => {
     if (this.copyDestination() !== 'COMMERCIAL') return null;
@@ -146,7 +147,7 @@ export class CounterCatalogBookComponent {
       )
       .subscribe((state) => {
         this.state.set(state);
-        if (state.status === 'loaded') this.genre.set(state.data.genre ?? '');
+        if (state.status === 'loaded') this.selectedGenres.set(state.data.genres);
       });
   }
 
@@ -154,28 +155,27 @@ export class CounterCatalogBookComponent {
     this.reloads.next();
   }
 
-  protected setGenre(event: Event): void {
-    this.genre.set((event.target as HTMLInputElement).value);
-  }
-
   protected startEditing(): void {
     this.editing.set(true);
   }
 
   protected changed(book: StaffCatalogBookDetail): boolean {
-    return this.genre().trim() !== (book.genre ?? '');
+    const current = new Set(book.genres.map((genre) => genre.id));
+    const next = new Set(this.genreIds());
+    return current.size !== next.size || [...next].some((id) => !current.has(id));
   }
 
   protected askSaveGenre(book: StaffCatalogBookDetail): void {
-    if (!this.canEdit || this.genreTooLong() || !this.changed(book)) return;
+    if (!this.canEdit || !this.changed(book)) return;
     this.blocked.set(null);
-    const next = this.genre().trim() || null;
+    const ids = this.genreIds();
+    const next = this.selectedGenres().map((genre) => genre.name).join(', ') || null;
     this.flow.ask({
       title: 'Salvar alteração da obra?',
-      details: [`Obra: ${book.title}`, `Categoria: ${book.genre ?? 'sem categoria'} → ${next ?? 'sem categoria'}`],
+      details: [`Obra: ${book.title}`, `Categorias: ${genreLabel(book) ?? 'sem categoria'} → ${next ?? 'sem categoria'}`],
       confirmLabel: 'Salvar alteração',
-      run: () => this.books.update(book.id, { genre: next }),
-      success: () => `Categoria de “${book.title}” atualizada.`,
+      run: () => this.books.update(book.id, { genre_ids: ids }),
+      success: () => `Categorias de “${book.title}” atualizadas.`,
     });
   }
 

@@ -3,7 +3,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException, status
+from fastapi import status
+
+from app.core.exceptions import ApplicationError
 
 from app.controllers.loan_controller import create_loan
 from app.core.exceptions import ClientHasPendingError, ClientInactiveError
@@ -234,7 +236,7 @@ def test_service_faz_rollback_se_exemplar_nao_for_encontrado():
         client_pendency_service=client_service,
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         service.create_loan(
             _loan_data(),
             employee_id=7,
@@ -264,7 +266,7 @@ def test_service_rejeita_exemplar_indisponivel():
         client_pendency_service=client_service,
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         service.create_loan(
             _loan_data(),
             employee_id=7,
@@ -342,7 +344,7 @@ def test_service_trata_erro_de_integridade_com_rollback():
         client_pendency_service=client_service,
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         service.create_loan(
             _loan_data(),
             employee_id=7,
@@ -372,7 +374,7 @@ def test_service_trata_falha_de_banco_com_rollback():
         client_pendency_service=client_service,
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         service.create_loan(
             _loan_data(),
             employee_id=7,
@@ -438,7 +440,7 @@ def test_service_rejeita_devolucao_de_emprestimo_inexistente():
         client_pendency_service=client_service,
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         service.register_return(loan_id=999)
 
     assert exc.value.status_code == status.HTTP_404_NOT_FOUND
@@ -471,7 +473,7 @@ def test_service_rejeita_devolucao_de_emprestimo_ja_encerrado():
         client_pendency_service=client_service,
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         service.register_return(loan_id=100)
 
     assert exc.value.status_code == status.HTTP_409_CONFLICT
@@ -502,7 +504,7 @@ def test_service_trata_falha_de_banco_na_devolucao():
         client_pendency_service=client_service,
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         service.register_return(loan_id=100)
 
     assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

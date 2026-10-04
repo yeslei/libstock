@@ -11,7 +11,7 @@ import { CounterCopyCreateComponent } from './counter-copy-create.component';
 import { CounterService, StaffCatalogBookDetail } from './counter.service';
 
 const detail = (over: Partial<StaffCatalogBookDetail> = {}): StaffCatalogBookDetail => ({
-  id: 7, title: 'Dom Casmurro', author: 'Machado de Assis', isbn: null, genre: 'Romance', is_active: true,
+  id: 7, title: 'Dom Casmurro', author: 'Machado de Assis', isbn: null, genre: 'Romance', genres: [], is_active: true,
   total_copies: 4, didactic_copies: 2, commercial_copies: 2, copies: [], ...over,
 });
 
@@ -87,6 +87,18 @@ describe('Balcão: novo exemplar', () => {
     type('#copy-price', '12.345');
     expect(root.textContent).toContain('com até 10 dígitos e duas casas decimais');
     save();
+    expect(copies.create).not.toHaveBeenCalled();
+  });
+
+  it('rejeita preço zero para venda, como a edição (Issue #175)', () => {
+    const { root, copies, type, choose, save } = setup(of(detail()));
+    type('#copy-barcode', '00105');
+    choose('COMMERCIAL');
+    type('#copy-price', '0');
+    save();
+    expect(root.textContent).toContain('O preço de venda deve ser maior que zero.');
+    type('#copy-price', '0,00');
+    expect(root.textContent).toContain('O preço de venda deve ser maior que zero.');
     expect(copies.create).not.toHaveBeenCalled();
   });
 

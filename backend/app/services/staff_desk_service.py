@@ -54,8 +54,10 @@ class StaffDeskService:
         return StaffBook(id=book.id, title=book.title, author=book.author, is_active=book.is_active)
 
     def search_clients(self, term, actor_id, limit):
+        # Sem `q` (Issue #172): lista padrão dos clientes ativos; com `q`, vale o mínimo de caracteres.
+        listing = term is None
         term = self._term(term)
-        if term is None or len(term) < MIN_SEARCH_LENGTH:
+        if not listing and (term is None or len(term) < MIN_SEARCH_LENGTH):
             raise ApplicationError(f'Informe ao menos {MIN_SEARCH_LENGTH} caracteres para buscar clientes.',
                                    'search_term_too_short', 422)
         _, cutoff = self._guard(actor_id)
@@ -145,17 +147,18 @@ class StaffDeskService:
         return result
 
     @staticmethod
-    def _catalog_book(row):
+    def _catalog_book(row, genres=None):
         book = row['Book']
         return dict(id=book.id, title=book.title, author=book.author, isbn=book.isbn, genre=book.genre,
-                    is_active=book.is_active, total_copies=row['total_copies'],
+                    genres=(genres or {}).get(book.id, []), is_active=book.is_active, total_copies=row['total_copies'],
                     didactic_copies=row['didactic_copies'], commercial_copies=row['commercial_copies'])
 
     def catalog_books(self, actor_id, term, limit):
         """Acervo somente leitura para o balcão (obras e contagem de exemplares)."""
         self._guard(actor_id)
         rows = self._read(lambda: self.repository.catalog_books(self._term(term), limit))
-        return [StaffCatalogBook(**self._catalog_book(row)) for row in rows]
+        genres = self._read(lambda: self.repository.book_genres([row['Book'].id for row in rows]))
+        return [StaffCatalogBook(**self._catalog_book(row, genres)) for row in rows]
 
     def catalog_book(self, actor_id, book_id):
         self._guard(actor_id)
@@ -163,20 +166,25 @@ class StaffDeskService:
         if row is None:
             raise ApplicationError('Obra não encontrada.', 'book_not_found', 404)
         copies = self._read(lambda: self.repository.book_copies(book_id))
-        return StaffCatalogBookDetail(**self._catalog_book(row), copies=[
+        genres = self._read(lambda: self.repository.book_genres([book_id]))
+        return StaffCatalogBookDetail(**self._catalog_book(row, genres), copies=[
             StaffCatalogCopy(id=item['Copy'].id, barcode=item['Copy'].barcode, destination=item['Copy'].destination,
                              status=item['Copy'].status, condition=item['Copy'].condition,
                              sale_price=item['Copy'].sale_price, is_active=item['Copy'].is_active,
                              free=bool(item['free']), allocated_for_purchase=bool(item['allocated_for_purchase']))
             for item in copies])
 
-    def copy_lookup(self, actor_id, term, limit):
-        """Exemplares por código, ISBN, título ou autor. A venda só é possível para comercial livre."""
+    def copy_lookup(self, actor_id, term, limit, destination=None, available=None):
+        """Exemplares por código, ISBN, título ou autor. A venda só é possível para comercial livre.
+
+        Sem `q` (Issue #172) lista os exemplares ativos; `destination` e `available` (livre) filtram a lista.
+        """
+        listing = term is None
         term = self._term(term)
-        if term is None:
+        if not listing and term is None:
             raise ApplicationError('Informe o código do exemplar, o ISBN ou o título.', 'search_term_required', 422)
         self._guard(actor_id)
-        rows = self._read(lambda: self.repository.copy_lookup(term, limit))
+        rows = self._read(lambda: self.repository.copy_lookup(term, limit, destination, available))
         book_ids = sorted({row['Book'].id for row in rows})
         free_counts = self._read(lambda: self.repository.free_commercial_counts(book_ids))
         result = []

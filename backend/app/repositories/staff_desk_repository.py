@@ -4,7 +4,7 @@ import re
 from sqlalchemy import and_, case, exists, false, func, or_, select
 from sqlalchemy.orm import aliased
 from app.models.domain import (
-    Book, Client, Copy, CopyStatus, DestinationType, Loan, LoanStatus, Profile, PurchaseReservation, ReservationStatus,
+    Book, BookGenre, Client, Copy, CopyStatus, DestinationType, Genre, Loan, LoanStatus, Profile, PurchaseReservation, ReservationStatus,
 )
 from app.models.loan_request import LoanRequest
 from app.models.purchase_request import PurchaseRequest
@@ -55,7 +55,11 @@ class StaffDeskRepository(ClientRequestRepository):
     def search_clients(self, term, cutoff, limit):
         statement = (select(*self._client_columns(cutoff)).select_from(Client)
             .join(Profile, Profile.id == Client.id).join(User, User.id == Client.id)
-            .where(_matches(term, User.name, User.email)).order_by(User.name, Client.id).limit(limit))
+            .order_by(User.name, Client.id).limit(limit))
+        if term:
+            statement = statement.where(_matches(term, User.name, User.email))
+        else:  # lista padrão (sem termo): somente clientes ativos
+            statement = statement.where(Profile.is_active.is_(True), User.is_active.is_(True))
         return self.db.execute(statement).mappings().all()
 
     def client_summary(self, client_id, cutoff):
@@ -168,6 +172,19 @@ class StaffDeskRepository(ClientRequestRepository):
             statement = statement.where(self._catalog_term(term))
         return self.db.execute(statement.order_by(Book.title, Book.id).limit(limit)).mappings().all()
 
+    def book_genres(self, book_ids):
+        """Categorias do catálogo (book_genres) por obra, em ordem alfabética (Issue #174)."""
+        if not book_ids:
+            return {}
+        rows = self.db.execute(
+            select(BookGenre.book_id, Genre.id, Genre.name, Genre.slug)
+            .join(Genre, Genre.id == BookGenre.genre_id)
+            .where(BookGenre.book_id.in_(book_ids)).order_by(func.lower(Genre.name), Genre.id)).all()
+        result = {}
+        for book_id, genre_id, name, slug in rows:
+            result.setdefault(book_id, []).append(dict(id=genre_id, name=name, slug=slug))
+        return result
+
     def catalog_book(self, book_id):
         counted = and_(Copy.is_active.is_(True), Copy.status != CopyStatus.SOLD)
         statement = (select(
@@ -187,11 +204,17 @@ class StaffDeskRepository(ClientRequestRepository):
             .where(Copy.book_id == book_id).order_by(Copy.id))
         return self.db.execute(statement).mappings().all()
 
-    def copy_lookup(self, term, limit):
+    def copy_lookup(self, term, limit, destination=None, available=None):
         """Exemplares ativos por código, ISBN, título ou autor; `free` e estoque comercial livre pela definição comum."""
         free_ids = free_copies_statement().with_only_columns(Copy.id)
         statement = (select(Copy, Book, Copy.id.in_(free_ids).label('free'))
             .join(Book, Book.id == Copy.book_id).where(Copy.is_active.is_(True))
-            .where(or_(_matches(term, Copy.barcode, Book.title, Book.author, Book.isbn), _matches_isbn(term, Book.isbn)))
             .order_by(Book.title, Copy.id).limit(limit))
+        if term:
+            statement = statement.where(
+                or_(_matches(term, Copy.barcode, Book.title, Book.author, Book.isbn), _matches_isbn(term, Book.isbn)))
+        if destination is not None:
+            statement = statement.where(Copy.destination == destination)
+        if available is not None:
+            statement = statement.where(Copy.id.in_(free_ids) if available else Copy.id.not_in(free_ids))
         return self.db.execute(statement).mappings().all()

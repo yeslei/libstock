@@ -20,7 +20,8 @@ class SaleItemCreate(BaseModel):
 
 
 class SaleCreate(BaseModel):
-    client_id: int | None = Field(default=None, gt=0)
+    # Issue #172: a venda direta identifica o cliente (existente e ativo).
+    client_id: int = Field(gt=0)
     items: list[SaleItemCreate] = Field(min_length=1)
 
     model_config = ConfigDict(extra="forbid")

@@ -53,7 +53,7 @@ def test_counter_roles_can_read(api, path, role):
 
 
 @pytest.mark.parametrize('path', [
-    '/api/v1/staff/clients', '/api/v1/staff/clients?q=a', '/api/v1/staff/clients?q=' + 'x' * 101,
+    '/api/v1/staff/clients?q=' + 'x' * 101,
     '/api/v1/staff/clients?q=ana&limit=0', '/api/v1/staff/loans?limit=101', '/api/v1/staff/loans?client_id=0',
     '/api/v1/staff/loans?client_id=abc', '/api/v1/staff/loan-requests?client_id=2147483648',
     '/api/v1/staff/purchase-reservations?status=FULFILLED', '/api/v1/staff/loans?q=' + 'x' * 101,
@@ -106,13 +106,21 @@ def test_inactive_employee_is_denied_without_querying(method, args):
     repo.active_reservations.assert_not_called()
 
 
-@pytest.mark.parametrize('term', [None, '', ' a ', '   '])
+@pytest.mark.parametrize('term', ['', ' a ', '   '])
 def test_client_search_requires_minimum_term(term):
     service, repo = make_service()
     with pytest.raises(ApplicationError) as error:
         service.search_clients(term, 7, 20)
     assert (error.value.status_code, error.value.code) == (422, 'search_term_too_short')
     repo.search_clients.assert_not_called()
+
+
+def test_client_listing_without_term_is_allowed_and_forwards_no_term():
+    service, repo = make_service()
+    repo.search_clients.return_value = [client_row(), client_row(client_id=4, client_name='Bia')]
+    result = service.search_clients(None, 7, 20)
+    assert [c.id for c in result] == [3, 4]
+    assert repo.search_clients.call_args.args[0] is None and repo.search_clients.call_args.args[2] == 20
 
 
 def test_client_search_flags_ineligible_clients_and_trims_term():

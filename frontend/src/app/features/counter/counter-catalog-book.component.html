@@ -50,7 +50,7 @@
         <div class="stack">
           <article class="card" aria-labelledby="dados-titulo">
             <h2 id="dados-titulo">Dados da obra</h2>
-            <p>Categoria literária: {{ s.data.genre || '—' }}</p>
+            <p>Categoria literária: {{ genreLabel(s.data) || '—' }}</p>
             <p>Destinação dos exemplares: {{ s.data.didactic_copies }} para empréstimo · {{ s.data.commercial_copies }} para venda</p>
             <p>Status da obra: {{ s.data.is_active ? 'Ativa' : 'Inativa' }}</p>
             <p>Quantidade total: {{ s.data.total_copies === 1 ? '1 exemplar' : s.data.total_copies + ' exemplares' }}</p>
@@ -62,14 +62,13 @@
           @if (canEdit && editing()) {
             <article class="card" aria-labelledby="editar-titulo">
               <h2 id="editar-titulo">Editar obra</h2>
-              <div class="field" [class.field--error]="genreTooLong()">
-                <label for="book-genre">Categoria literária</label>
-                <input id="book-genre" type="text" [value]="genre()" (input)="setGenre($event)" [attr.aria-invalid]="genreTooLong()" />
-                @if (genreTooLong()) { <span class="field__error" role="alert">A categoria aceita até {{ genreMax }} caracteres.</span> }
-              </div>
+              <app-genre-picker idPrefix="book-genre" [selected]="genreIds()" [disabled]="flow.submitting()" (selectedChange)="selectedGenres.set($event)" />
+              @if (!s.data.genres.length && s.data.genre) {
+                <p class="note">Texto de categoria anterior: “{{ s.data.genre }}”. Escolha as categorias do catálogo para a obra aparecer nas páginas públicas.</p>
+              }
               <p class="note">A destinação é definida em cada exemplar; a conversão de destinação ainda não está disponível.</p>
               <div class="actions">
-                <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || genreTooLong() || !changed(s.data)" (click)="askSaveGenre(s.data)">Salvar alteração</button>
+                <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !changed(s.data)" (click)="askSaveGenre(s.data)">Salvar alteração</button>
                 @if (s.data.is_active) {
                   <button class="btn btn--danger" type="button" [disabled]="flow.submitting()" (click)="askDeactivate(s.data)">Inativar obra</button>
                 }

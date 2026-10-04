@@ -76,9 +76,10 @@ export class CounterCopyCreateComponent {
     const value = this.normalizedPrice();
     if (!value) return this.submitted() ? 'Informe o preço de venda.' : null;
     if (!PRICE_PATTERN.test(value) || value.replace('.', '').length > 10) {
-      return 'Informe um preço não negativo, com até 10 dígitos e duas casas decimais.';
+      return 'Informe um preço com até 10 dígitos e duas casas decimais.';
     }
-    return null;
+    // Issue #175: preço de exemplar comercial deve ser maior que zero, também na inclusão.
+    return Number(value) > 0 ? null : 'O preço de venda deve ser maior que zero.';
   });
 
   constructor() {

@@ -10,9 +10,10 @@ import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { businessToday } from './business-date';
+import { ClientPickerComponent } from './client-picker.component';
 import {
-  CLIENT_SEARCH_LIMIT,
   COPY_LOOKUP_LIMIT,
+  CopyListFilter,
   CounterService,
   LoanRegistration,
   StaffClient,
@@ -42,22 +43,18 @@ interface Completed {
   readonly copy: StaffCopyLookup;
 }
 
-const NOT_LOANABLE: Readonly<Record<string, string>> = {
-  BORROWED: 'emprestado',
-  RESERVED: 'reservado',
-  SOLD: 'vendido',
-  INACTIVE: 'inativo',
-};
+/** Lista padrão de exemplares do empréstimo direto (Issue #172): didáticos disponíveis. */
+const LOANABLE_LIST: CopyListFilter = { destination: 'DIDACTIC', available: true };
+
 
 /** Exemplar didático livre (mesma definição de disponibilidade da retirada V2) de obra ativa. */
 export function isLoanable(copy: StaffCopyLookup): boolean {
   return copy.destination === 'DIDACTIC' && copy.free && copy.book.is_active;
 }
 
-function notLoanableReason(copy: StaffCopyLookup): string {
-  if (copy.destination === 'COMMERCIAL') return 'exemplar destinado à venda';
-  if (!copy.book.is_active) return 'obra inativa';
-  return NOT_LOANABLE[copy.status] ?? 'indisponível no momento';
+/** A lista já traz só didáticos livres; resta a obra inativa, que o backend não exclui. */
+function notLoanableReason(): string {
+  return 'obra inativa';
 }
 
 /**
@@ -69,7 +66,7 @@ function notLoanableReason(copy: StaffCopyLookup): string {
 @Component({
   selector: 'app-counter-loan-create',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent, ReceiptComponent],
+  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent, ReceiptComponent, ClientPickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-loan-create.component.html',
   styleUrl: './counter-loan-create.component.scss',
@@ -79,13 +76,11 @@ export class CounterLoanCreateComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly snackbar = inject(SnackbarService);
-  private readonly clientSearches = new Subject<string>();
   private readonly copySearches = new Subject<string>();
 
   protected readonly ineligibleReasons = ineligibleReasons;
   protected readonly isLoanable = isLoanable;
   protected readonly notLoanableReason = notLoanableReason;
-  protected readonly clientLimit = CLIENT_SEARCH_LIMIT;
   protected readonly copyLimit = COPY_LOOKUP_LIMIT;
   protected readonly today = (() => {
     const [year, month, day] = businessToday().split('-');
@@ -93,20 +88,16 @@ export class CounterLoanCreateComponent {
   })();
 
   protected readonly step = signal<Step>('form');
-  protected readonly clientTerm = signal('');
-  protected readonly clientError = signal<string | null>(null);
-  protected readonly clientState = signal<LoadState<readonly StaffClient[]> | null>(null);
   protected readonly client = signal<StaffClient | null>(null);
   protected readonly copyTerm = signal('');
-  protected readonly copyError = signal<string | null>(null);
   protected readonly copyState = signal<LoadState<readonly StaffCopyLookup[]> | null>(null);
   protected readonly copy = signal<StaffCopyLookup | null>(null);
   protected readonly submitting = signal(false);
   protected readonly saveFailed = signal(false);
   protected readonly blocked = signal<Blocked | null>(null);
   protected readonly completed = signal<Completed | null>(null);
-  /** Termo da última busca de exemplar, reutilizado ao atualizar a seleção. */
-  private lastCopyTerm = '';
+  /** Termo do filtro de exemplares aplicado (vazio: lista padrão de didáticos disponíveis), reutilizado ao atualizar. */
+  protected lastCopyTerm = '';
 
   /** Só é possível revisar com cliente apto (`eligible` do backend) e exemplar didático livre. */
   protected readonly canReview = computed(() => {
@@ -116,38 +107,22 @@ export class CounterLoanCreateComponent {
   });
 
   constructor() {
-    this.clientSearches
-      .pipe(
-        switchMap((term) => toLoadState(this.service.searchClients(term), 'Não foi possível buscar os clientes. Tente novamente.')),
-        takeUntilDestroyed(),
-      )
-      .subscribe((state) => this.clientState.set(state));
     this.copySearches
       .pipe(
-        switchMap((term) => toLoadState(this.service.lookupCopies(term), 'Não foi possível buscar os exemplares. Tente novamente.')),
+        switchMap((term) =>
+          toLoadState(
+            this.service.listCopies(LOANABLE_LIST, term),
+            'Não foi possível buscar os exemplares. Tente novamente.',
+          ),
+        ),
         takeUntilDestroyed(),
       )
       .subscribe((state) => this.copyState.set(state));
-  }
-
-  protected setClientTerm(event: Event): void {
-    this.clientTerm.set((event.target as HTMLInputElement).value);
-    this.clientError.set(null);
-  }
-
-  protected searchClients(event: Event): void {
-    event.preventDefault();
-    const term = this.clientTerm().trim();
-    if (term.length < 2) {
-      this.clientError.set('Informe ao menos 2 caracteres do nome ou do e-mail.');
-      return;
-    }
-    this.clientSearches.next(term);
+    this.reloadCopies();
   }
 
   protected selectClient(client: StaffClient): void {
     this.client.set(client);
-    this.clientState.set(null);
   }
 
   protected changeClient(): void {
@@ -156,18 +131,16 @@ export class CounterLoanCreateComponent {
 
   protected setCopyTerm(event: Event): void {
     this.copyTerm.set((event.target as HTMLInputElement).value);
-    this.copyError.set(null);
   }
 
   protected searchCopies(event: Event): void {
     event.preventDefault();
-    const term = this.copyTerm().trim();
-    if (!term) {
-      this.copyError.set('Informe o código do exemplar, o ISBN ou o título.');
-      return;
-    }
-    this.lastCopyTerm = term;
-    this.copySearches.next(term);
+    this.lastCopyTerm = this.copyTerm().trim();
+    this.reloadCopies();
+  }
+
+  protected reloadCopies(): void {
+    this.copySearches.next(this.lastCopyTerm);
   }
 
   protected selectCopy(copy: StaffCopyLookup): void {
@@ -178,6 +151,7 @@ export class CounterLoanCreateComponent {
 
   protected changeCopy(): void {
     this.copy.set(null);
+    this.reloadCopies();
   }
 
   protected review(): void {
@@ -243,7 +217,6 @@ export class CounterLoanCreateComponent {
   /** "Selecionar outro cliente": volta ao formulário sem cliente, mantendo o exemplar. */
   protected chooseAnotherClient(): void {
     this.client.set(null);
-    this.clientState.set(null);
     this.blocked.set(null);
     this.go('form');
   }
@@ -253,18 +226,16 @@ export class CounterLoanCreateComponent {
     this.copy.set(null);
     this.blocked.set(null);
     this.copyState.set(null);
-    if (this.lastCopyTerm) this.copySearches.next(this.lastCopyTerm);
+    this.reloadCopies();
     this.go('form');
   }
 
   protected reset(): void {
     this.client.set(null);
     this.copy.set(null);
-    this.clientState.set(null);
-    this.copyState.set(null);
-    this.clientTerm.set('');
     this.copyTerm.set('');
     this.lastCopyTerm = '';
+    this.reloadCopies();
     this.completed.set(null);
     this.blocked.set(null);
     this.saveFailed.set(false);

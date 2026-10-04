@@ -1,11 +1,13 @@
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
     ApplicationError,
     AuditActorRequiredError,
+    BookNotFoundError,
     CopyDeletionBlockedError,
+    CopyPersistenceError,
+    DuplicateBarcodeError,
     CopyDeletionPersistenceError,
     CopyNotFoundError,
     CopySalePriceNotAllowedError,
@@ -21,6 +23,7 @@ from decimal import Decimal
 
 from app.models.domain import Book, CopyStatus, DestinationType
 from app.repositories.copy_repository import CopyRepository
+from app.services.copy_rules import require_commercial_price
 from app.schemas.copy_schema import CopyBatchCreate, CopyCreate, CopyDeleteResponse, CopyUpdate
 
 LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
@@ -65,13 +68,14 @@ class CopyService:
     def create_new_copy(self, copy_data: CopyCreate, actor_id: int):
         if not self.repository.is_employee(actor_id):
             raise AuditActorRequiredError()
+        require_commercial_price(copy_data.destination, copy_data.sale_price)
 
         try:
             self.repository.set_audit_actor(actor_id)
 
             book = self.db.get(Book, copy_data.book_id)
             if book is None or not book.is_active:
-                raise HTTPException(status_code=404, detail="Obra não encontrada ou inativa.")
+                raise BookNotFoundError("Obra não encontrada ou inativa.")
 
             copy = self.repository.create_copy(copy_data=copy_data)
             self.db.commit()
@@ -79,19 +83,13 @@ class CopyService:
             return copy
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail="Já existe um exemplar com este código de barras.",
-            ) from exc
-        except HTTPException:
+            raise DuplicateBarcodeError("Já existe um exemplar com este código de barras.") from exc
+        except ApplicationError:
             self.db.rollback()
             raise
-        except Exception:
+        except Exception as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Não foi possível cadastrar o exemplar.",
-            )
+            raise CopyPersistenceError("Não foi possível cadastrar o exemplar.") from exc
 
     def create_copies(
         self,
@@ -100,6 +98,8 @@ class CopyService:
     ):
         if not self.repository.is_employee(actor_id):
             raise AuditActorRequiredError()
+        for item in copies_data.copies:
+            require_commercial_price(item.destination, item.sale_price)
 
         try:
             self.repository.set_audit_actor(actor_id)
@@ -108,10 +108,7 @@ class CopyService:
             book = self.db.get(Book, book_id)
 
             if book is None or not book.is_active:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Obra não encontrada ou inativa.",
-                )
+                raise BookNotFoundError("Obra não encontrada ou inativa.")
 
             copies = self.repository.create_copies(copies_data.copies)
 
@@ -124,21 +121,15 @@ class CopyService:
 
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail="Já existe um exemplar com este código de barras.",
-            ) from exc
+            raise DuplicateBarcodeError("Já existe um exemplar com este código de barras.") from exc
 
-        except HTTPException:
+        except ApplicationError:
             self.db.rollback()
             raise
 
-        except Exception:
+        except Exception as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Não foi possível cadastrar os exemplares.",
-            )
+            raise CopyPersistenceError("Não foi possível cadastrar os exemplares.") from exc
 
     def update_copy(self, copy_id: int, changes: CopyUpdate, actor_id: int):
         """Edita ou converte exemplar disponível, ativo e sem operação em andamento (Issue #151)."""
@@ -201,8 +192,7 @@ class CopyService:
         values: dict = {}
         if destination == DestinationType.COMMERCIAL:
             price = changes.sale_price if "sale_price" in fields else copy.sale_price
-            if price is None or Decimal(price) <= 0:
-                raise CopySalePriceRequiredError()
+            require_commercial_price(destination, price)
             values["sale_price"] = price
         else:
             if copy.destination == DestinationType.DIDACTIC and changes.sale_price is not None:

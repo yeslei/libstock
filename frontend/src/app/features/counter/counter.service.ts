@@ -91,13 +91,21 @@ export interface StaffDashboard {
 export type CopyDestination = 'DIDACTIC' | 'COMMERCIAL';
 export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'RESERVED' | 'SOLD' | 'INACTIVE';
 
+export interface StaffGenre {
+  readonly id: number;
+  readonly name: string;
+  readonly slug: string;
+}
+
 /** `GET /api/v1/staff/books`: obra com a contagem de exemplares ativos e não vendidos. */
 export interface StaffCatalogBook {
   readonly id: number;
   readonly title: string;
   readonly author: string;
   readonly isbn: string | null;
+  /** Texto legado; as categorias do catálogo público estão em `genres` (Issue #174). */
   readonly genre: string | null;
+  readonly genres: readonly StaffGenre[];
   readonly is_active: boolean;
   readonly total_copies: number;
   readonly didactic_copies: number;
@@ -143,6 +151,12 @@ export const LIST_LIMIT = 50;
 export const CLIENT_SEARCH_LIMIT = 20;
 export const COPY_LOOKUP_LIMIT = 20;
 
+/** Filtros da lista padrão de exemplares (`GET /staff/copies` sem termo). */
+export interface CopyListFilter {
+  readonly destination?: 'COMMERCIAL' | 'DIDACTIC';
+  readonly available?: boolean;
+}
+
 /** Item pedido a `POST /api/v1/sales/`: só o exemplar; o preço é sempre o cadastrado, definido pelo backend. */
 export interface SaleItemRequest {
   readonly copy_id: number;
@@ -151,7 +165,7 @@ export interface SaleItemRequest {
 /** Resposta de `POST /api/v1/sales/`: a venda direta nasce CONFIRMED e o exemplar passa a SOLD. */
 export interface SaleRegistration {
   readonly id: number;
-  readonly client_id: number | null;
+  readonly client_id: number;
   readonly employee_id?: number;
   readonly sale_date?: string;
   readonly status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
@@ -200,8 +214,9 @@ export class CounterService {
     return this.http.get<StaffDashboard>(`${STAFF}/dashboard`);
   }
 
-  searchClients(q: string): Observable<StaffClient[]> {
-    return this.http.get<StaffClient[]>(`${STAFF}/clients`, { params: params({ q: q.trim(), limit: CLIENT_SEARCH_LIMIT }) });
+  /** Sem termo, lista os clientes ativos por nome (Issue #172); com termo, busca por nome ou e-mail (mínimo de 2 caracteres). */
+  searchClients(q?: string): Observable<StaffClient[]> {
+    return this.http.get<StaffClient[]>(`${STAFF}/clients`, { params: params({ q: q?.trim(), limit: CLIENT_SEARCH_LIMIT }) });
   }
 
   getClientPendencies(clientId: number): Observable<ClientPendencies> {
@@ -228,14 +243,26 @@ export class CounterService {
     return this.http.get<StaffCatalogBookDetail>(`${STAFF}/books/${bookId}`);
   }
 
-  lookupCopies(q: string): Observable<StaffCopyLookup[]> {
-    return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, { params: params({ q: q.trim(), limit: COPY_LOOKUP_LIMIT }) });
+
+  /**
+   * Exemplares por finalidade e disponibilidade, ordenados por título e código (Issue #172).
+   * O termo, quando informado, filtra dentro dessa lista (Issue #177).
+   */
+  listCopies(filter: CopyListFilter, q?: string): Observable<StaffCopyLookup[]> {
+    return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, {
+      params: params({
+        q: q?.trim() || null,
+        destination: filter.destination,
+        available: filter.available ? 'true' : null,
+        limit: COPY_LOOKUP_LIMIT,
+      }),
+    });
   }
 
-  /** Registra a venda direta, confirmada no ato (SELLER e ADMINISTRATOR). Não envia preço: vale o do exemplar. */
-  registerSale(copyId: number): Observable<SaleRegistration> {
+  /** Registra a venda direta, confirmada no ato (SELLER e ADMINISTRATOR). Exige o cliente; não envia preço: vale o do exemplar. */
+  registerSale(clientId: number, copyId: number): Observable<SaleRegistration> {
     const items: SaleItemRequest[] = [{ copy_id: copyId }];
-    return this.http.post<SaleRegistration>('/api/v1/sales/', { items });
+    return this.http.post<SaleRegistration>('/api/v1/sales/', { client_id: clientId, items });
   }
 
   /** Registra o empréstimo direto. Endpoint existente de `/api/v1/loans`, permitido a SELLER e ADMINISTRATOR; o prazo é calculado por ele. */

@@ -1,0 +1,50 @@
+<form class="search" role="search" (submit)="search($event)">
+  <label class="sr-only" [attr.for]="inputId">Nome ou e-mail do cliente</label>
+  <input
+    [id]="inputId"
+    type="search"
+    maxlength="100"
+    autocomplete="off"
+    placeholder="Filtrar por nome ou e-mail"
+    [value]="term()"
+    [attr.aria-invalid]="error() ? 'true' : null"
+    [attr.aria-describedby]="error() ? inputId + '-error' : null"
+    (input)="setTerm($event)"
+  />
+  <button class="btn btn--primary" type="submit">Buscar cliente</button>
+</form>
+@if (error(); as message) {
+  <p class="field__error" [id]="inputId + '-error'" role="alert">{{ message }}</p>
+} @else {
+  <p class="hint">Clientes ativos em ordem alfabética. Filtre por nome ou e-mail (mínimo de 2 caracteres).</p>
+}
+@if (state(); as s) {
+  @switch (s.status) {
+    @case ('loading') { <p class="loading" role="status"><app-spinner /> Carregando clientes…</p> }
+    @case ('error') {
+      <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+    }
+    @case ('loaded') {
+      @if (!s.data.length) {
+        <p class="empty" role="status">
+          @if (applied()) { Nenhum cliente encontrado. Confira o nome ou o e-mail. } @else { Nenhum cliente ativo cadastrado. }
+        </p>
+      } @else {
+        <ul class="results" aria-label="Clientes">
+          @for (item of s.data; track item.id) {
+            <li class="result" [class.result--blocked]="mode === 'loan' ? !item.eligible : !item.is_active">
+              <div>
+                <p class="result__title">{{ item.name }}</p>
+                <p class="result__meta">{{ meta(item) }}</p>
+              </div>
+              <button class="btn" type="button" [disabled]="!selectable(item)" (click)="picked.emit(item)">Selecionar</button>
+            </li>
+          }
+        </ul>
+        @if (s.data.length >= limit) {
+          <p class="note">Mostrando os primeiros {{ limit }} clientes. Refine o filtro para localizar outro cliente.</p>
+        }
+      }
+    }
+  }
+}

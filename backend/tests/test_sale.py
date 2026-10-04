@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException, status
+from fastapi import status
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -117,7 +117,7 @@ def test_service_registra_venda_com_sucesso_e_calcula_total():
     db = FakeSession()
     sale_data = _sale_data()
 
-    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [
         _copy(15),
         _copy(16),
@@ -167,11 +167,12 @@ def test_service_usa_preco_do_exemplar_e_ignora_o_valor_enviado():
     repository = MagicMock()
     db = FakeSession()
     sale_data = SaleCreate(
+        client_id=42,
         items=[{"copy_id": 15, "unit_price": Decimal("0.01")}],
     )
     repository.find_copies_for_sale.return_value = [_copy(15, sale_price=Decimal("39.90"))]
     repository.create_sale.return_value = _sale_entity(
-        SaleCreate(items=[{"copy_id": 15, "unit_price": Decimal("39.90")}])
+        SaleCreate(client_id=42, items=[{"copy_id": 15, "unit_price": Decimal("39.90")}])
     )
 
     _service(repository, db).create_sale(sale_data, employee_id=7)
@@ -188,7 +189,7 @@ def test_service_recusa_exemplar_comercial_sem_preco_com_rollback():
     repository.find_copies_for_sale.return_value[0].sale_price = None
 
     with pytest.raises(ApplicationError) as error:
-        _service(repository, db).create_sale(SaleCreate(items=[{"copy_id": 15}]), employee_id=7)
+        _service(repository, db).create_sale(SaleCreate(client_id=42, items=[{"copy_id": 15}]), employee_id=7)
 
     assert (error.value.status_code, error.value.code) == (409, "copy_without_price")
     repository.create_sale.assert_not_called()
@@ -196,56 +197,58 @@ def test_service_recusa_exemplar_comercial_sem_preco_com_rollback():
     assert (db.commits, db.rollbacks) == (0, 1)
 
 
-def test_service_permita_venda_sem_cliente():
+def test_schema_exige_client_id_na_venda():
+    with pytest.raises(ValidationError):
+        SaleCreate(items=[{"copy_id": 15}])
+    with pytest.raises(ValidationError):
+        SaleCreate(client_id=None, items=[{"copy_id": 15}])
+
+
+def test_service_aceita_cliente_penalizado_pois_so_verifica_existencia_e_atividade():
     repository = MagicMock()
     db = FakeSession()
-
-    sale_data = SaleCreate(
-        client_id=None,
-        items=[
-            {"copy_id": 15, "unit_price": Decimal("39.90")},
-        ],
-    )
-
+    sale_data = SaleCreate(client_id=42, items=[{"copy_id": 15}])
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [_copy(15)]
+    repository.create_sale.return_value = SimpleNamespace(
+        id=100, client_id=42, employee_id=7, sale_date=datetime(2026, 10, 2, tzinfo=timezone.utc),
+        total_amount=Decimal("39.90"), status=SaleStatus.CONFIRMED)
+    repository.create_sale_items.return_value = [
+        SimpleNamespace(id=1, sale_id=100, copy_id=15, unit_price=Decimal("39.90"))]
 
-    sale = _sale_entity(sale_data)
-    repository.create_sale.return_value = sale
-    def create_items(*, sale_id, items):
-        return [
-            SimpleNamespace(
-                id=1,
-                sale_id=sale_id,
-                copy_id=copy_id,
-                unit_price=unit_price,
-            )
-            for copy_id, unit_price in items
-        ]
+    response = _service(repository, db).create_sale(sale_data, employee_id=7)
 
-    repository.create_sale_items.side_effect = create_items
-
-    response = _service(repository, db).create_sale(
-        sale_data,
-        employee_id=7,
-    )
-
-    assert response.client_id is None
-    repository.find_client.assert_not_called()
+    assert response.client_id == 42
+    repository.client_active_state.assert_called_once_with(42)
     assert db.commits == 1
+
+
+def test_service_rejeita_cliente_inativo_com_codigo_estavel():
+    repository = MagicMock()
+    db = FakeSession()
+    repository.client_active_state.return_value = False
+
+    with pytest.raises(ApplicationError) as exc:
+        _service(repository, db).create_sale(_sale_data(), employee_id=7)
+
+    assert (exc.value.status_code, exc.value.code) == (403, "client_inactive")
+    repository.lock_books_for_copies.assert_not_called()
+    repository.create_sale.assert_not_called()
+    assert (db.commits, db.rollbacks) == (0, 1)
 
 
 def test_service_rejeita_cliente_inexistente():
     repository = MagicMock()
     db = FakeSession()
-    repository.find_client.return_value = None
+    repository.client_active_state.return_value = None
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
         )
 
-    assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+    assert (exc.value.status_code, exc.value.code) == (404, "client_not_found")
     repository.find_copies_for_sale.assert_not_called()
     repository.create_sale.assert_not_called()
     assert db.commits == 0
@@ -256,10 +259,10 @@ def test_service_rejeita_exemplar_inexistente():
     repository = MagicMock()
     db = FakeSession()
 
-    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [_copy(15)]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -289,7 +292,7 @@ def test_service_rejeita_exemplar_indisponivel_ou_inativo(
     repository = MagicMock()
     db = FakeSession()
 
-    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [
         _copy(
             15,
@@ -299,7 +302,7 @@ def test_service_rejeita_exemplar_indisponivel_ou_inativo(
         _copy(16),
     ]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -316,7 +319,7 @@ def test_service_trata_erro_de_integridade_com_rollback():
     repository = MagicMock()
     db = FakeSession()
 
-    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [
         _copy(15),
         _copy(16),
@@ -327,7 +330,7 @@ def test_service_trata_erro_de_integridade_com_rollback():
         Exception("integrity error"),
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -345,7 +348,7 @@ def test_service_trata_falha_de_banco_com_rollback():
     repository = MagicMock()
     db = FakeSession()
 
-    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [
         _copy(15),
         _copy(16),
@@ -354,7 +357,7 @@ def test_service_trata_falha_de_banco_com_rollback():
         "database error"
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -421,7 +424,7 @@ def test_service_bloqueia_venda_de_exemplar_didatico():
     repository = MagicMock()
     db = FakeSession()
 
-    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [
         _copy(
             15,
@@ -429,7 +432,7 @@ def test_service_bloqueia_venda_de_exemplar_didatico():
         ),
     ]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             SaleCreate(
                 client_id=42,
@@ -455,7 +458,7 @@ def test_service_bloqueia_venda_comercial_quando_um_exemplar_e_didatico():
     repository = MagicMock()
     db = FakeSession()
 
-    repository.find_client.return_value = SimpleNamespace(id=42)
+    repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [
         _copy(
             15,
@@ -467,7 +470,7 @@ def test_service_bloqueia_venda_comercial_quando_um_exemplar_e_didatico():
         ),
     ]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
