@@ -33,7 +33,7 @@
                         <p class="guidance">Devolva o exemplar no balcão até a data prevista.</p>
                       }
                       @case ('OVERDUE') {
-                        <p class="dates">Exemplar #{{ item.copy_barcode }} · Retirado em {{ item.pickup_date | date:'dd/MM/yyyy' }} · Devolução prevista: {{ item.due_date | date:'dd/MM/yyyy' }} · vencido há {{ item.days_late }} dia(s).</p>
+                        <p class="dates">Exemplar #{{ item.copy_barcode }} · Retirado em {{ item.pickup_date | date:'dd/MM/yyyy' }} · Devolução prevista: {{ item.due_date | date:'dd/MM/yyyy' }} · vencido há {{ item.days_late }} {{ item.days_late === 1 ? 'dia' : 'dias' }}.</p>
                         <p class="guidance guidance--overdue">Este atraso gera pendência. Dirija-se ao balcão para devolver o exemplar.</p>
                       }
                       @case ('WAITING') {
@@ -41,8 +41,8 @@
                         <p class="guidance">Quando um exemplar comercial ficar disponível, sua posição poderá avançar.</p>
                       }
                       @case ('NOTIFIED') {
-                        <p class="dates">{{ item.copy_barcode ? 'Exemplar #' + item.copy_barcode : 'Exemplar aguardando identificação no balcão' }} · Disponível desde {{ item.available_since | date:'dd/MM/yyyy':'-0300' }}@if (item.expires_at) { · Retire até {{ item.expires_at | date:'dd/MM/yyyy':'-0300' }} }.</p>
-                        <p class="guidance">Dirija-se ao balcão @if (item.expires_at) { até {{ item.expires_at | date:'dd/MM/yyyy':'-0300' }} } para finalizar a compra. Informe seu e-mail cadastrado.</p>
+                        <p class="dates">{{ item.copy_barcode ? 'Exemplar #' + item.copy_barcode : 'Exemplar aguardando identificação no balcão' }} · Disponível desde {{ item.available_since | date:'dd/MM/yyyy':'-0300' }}{{ item.expires_at ? ' · Retire até ' + (item.expires_at | date:'dd/MM/yyyy':'-0300') : '' }}.</p>
+                        <p class="guidance">Dirija-se ao balcão{{ item.expires_at ? ' até ' + (item.expires_at | date:'dd/MM/yyyy':'-0300') : '' }} para finalizar a compra. Informe seu e-mail cadastrado.</p>
                       }
                     }
                   </div>
