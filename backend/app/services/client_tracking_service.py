@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today
 from app.core.exceptions import ApplicationError, BookNotFoundError
@@ -36,7 +37,8 @@ class ClientTrackingService:
             cover_url=book.cover_url, status=reservation.status.value,
             copy_barcode=copy.barcode if copy else None,
             queue_position=self.repository.waiting_position(reservation) if reservation.status == ReservationStatus.WAITING else None,
-            available_since=reservation.notified_at, expires_at=reservation.expires_at)
+            available_since=reservation.notified_at, expires_at=reservation.expires_at,
+            expired=reservation.status == ReservationStatus.NOTIFIED and reservation.expires_at is not None and reservation.expires_at < datetime.now(ZONE))
             for reservation, book, copy in self.repository.active_reservations(client_id)]
 
     def validate_client(self, client_id):
@@ -45,6 +47,7 @@ class ClientTrackingService:
     def reserve_purchase(self, client_id, book_id):
         try:
             book = self.repository.lock_book(book_id)
+            self.repository.expire_due_reservations(book_id, datetime.now(ZONE))
             self.validate_client(client_id)
             if book is None or not book.is_active:
                 raise BookNotFoundError()

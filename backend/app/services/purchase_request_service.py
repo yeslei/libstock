@@ -1,8 +1,9 @@
+from datetime import datetime
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app.core.exceptions import ApplicationError, BookNotFoundError
 from app.repositories.purchase_request_repository import PurchaseRequestRepository
 from app.schemas.purchase_request_schema import PurchaseRequestCreate, PurchaseRequestResponse
-from app.core.business_dates import business_today
+from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today
 from app.services.client_eligibility import require_eligible_client
 
 
@@ -16,6 +17,7 @@ class PurchaseRequestService:
             raise ApplicationError('Informe uma data de retirada válida, a partir de hoje.', 'invalid_pickup_date', 422)
         try:
             book = self.repository.lock_book(data.book_id)
+            self.repository.expire_due_reservations(data.book_id, datetime.now(ZONE))
             require_eligible_client(self.repository, client_id, business_today())
             if book is None or not book.is_active:
                 raise BookNotFoundError()

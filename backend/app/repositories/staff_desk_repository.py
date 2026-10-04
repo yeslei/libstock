@@ -115,6 +115,27 @@ class StaffDeskRepository(ClientRequestRepository):
             Copy.book_id.in_(book_ids), Copy.destination == DestinationType.COMMERCIAL).subquery()
         return dict(self.db.execute(select(free.c.book_id, func.count()).group_by(free.c.book_id)).all())
 
+    def waiting_queues(self, book_ids, cutoff):
+        """WAITING reservations of the books (full queues, not the filtered page) with client eligibility facts."""
+        if not book_ids:
+            return []
+        statement = (select(PurchaseReservation.id.label('reservation_id'), PurchaseReservation.book_id.label('book_id'),
+                            *self._client_columns(cutoff))
+            .select_from(PurchaseReservation).join(Client, Client.id == PurchaseReservation.client_id)
+            .join(Profile, Profile.id == Client.id).join(User, User.id == Client.id)
+            .where(PurchaseReservation.book_id.in_(book_ids), PurchaseReservation.status == ReservationStatus.WAITING)
+            .order_by(PurchaseReservation.book_id, PurchaseReservation.queue_position, PurchaseReservation.id))
+        return self.db.execute(statement).mappings().all()
+
+    def expired_notified_counts(self, book_ids, now):
+        """Destinadas com prazo vencido ainda não efetivadas: o exemplar será liberado na próxima escrita da obra."""
+        if not book_ids:
+            return {}
+        return dict(self.db.execute(select(PurchaseReservation.book_id, func.count()).where(
+            PurchaseReservation.book_id.in_(book_ids), PurchaseReservation.status == ReservationStatus.NOTIFIED,
+            PurchaseReservation.expires_at.is_not(None), PurchaseReservation.expires_at < now,
+        ).group_by(PurchaseReservation.book_id)).all())
+
     def dashboard_counts(self, cutoff: datetime, next_cutoff: datetime):
         """Indicadores do painel; cutoff/next_cutoff delimitam o dia de negócio atual (America/Sao_Paulo)."""
         def scalar(statement):

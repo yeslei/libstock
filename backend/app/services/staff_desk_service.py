@@ -110,20 +110,28 @@ class StaffDeskService:
             self._term(term), client_id, ReservationStatus(status) if status else None, cutoff, limit))
         free = self._read(lambda: self.repository.free_commercial_counts(sorted({row['Book'].id for row in rows})))
         now = datetime.now(ZONE)
+        book_ids = sorted({row['Book'].id for row in rows})
+        # Reservas destinadas vencidas ainda não gravadas liberam o exemplar na próxima escrita da obra (a consulta não grava).
+        releasable = self._read(lambda: self.repository.expired_notified_counts(book_ids, now))
+        # Primeira reserva ELEGÍVEL da fila completa de cada obra (inelegíveis mantêm a posição, mas são puladas).
+        first_eligible = {}
+        for queued in self._read(lambda: self.repository.waiting_queues(book_ids, cutoff)):
+            if queued['book_id'] not in first_eligible and self._client(queued).eligible:
+                first_eligible[queued['book_id']] = queued['reservation_id']
         result = []
         for row in rows:
             reservation, book, client = row['PurchaseReservation'], row['Book'], self._client(row)
             waiting = reservation.status == ReservationStatus.WAITING
             position = row['waiting_position'] if waiting else None
-            available = free.get(book.id, 0)
+            available = free.get(book.id, 0) + releasable.get(book.id, 0)
             blocked = None
             if waiting:
                 if not book.is_active:
                     blocked = 'BOOK_INACTIVE'
-                elif position != 1:
-                    blocked = 'NOT_FIRST_IN_QUEUE'
                 elif not client.eligible:
                     blocked = 'CLIENT_INELIGIBLE'
+                elif first_eligible.get(book.id) != reservation.id:
+                    blocked = 'NOT_FIRST_ELIGIBLE'
                 elif available == 0:
                     blocked = 'NO_FREE_COPY'
             result.append(StaffPurchaseReservation(

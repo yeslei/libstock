@@ -19,3 +19,12 @@ def require_eligible_client(repository: ClientRequestRepository, client_id: int,
         has_overdue=repository.has_overdue_loan(client_id, overdue_cutoff(today)),
     ):
         raise ApplicationError("Cliente inativo, penalizado ou com empréstimo em atraso.", "client_ineligible", 403)
+
+
+def is_client_locked_eligible(repository: ClientRequestRepository, client_id: int, today: date) -> bool:
+    """Non-raising variant of require_eligible_client: locks the client and tells whether it is eligible."""
+    try:
+        require_eligible_client(repository, client_id, today)
+    except ApplicationError:
+        return False
+    return True
