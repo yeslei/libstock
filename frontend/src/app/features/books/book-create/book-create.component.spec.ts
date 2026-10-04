@@ -99,7 +99,7 @@ describe('BookCreateComponent', () => {
     expect(control.valid).toBeTrue();
   });
 
-  it('consulta, preenche e bloqueia metadados enquanto o ISBN é digitado', fakeAsync(() => {
+  it('consulta e preenche apenas campos vazios, sem bloquear a edição', fakeAsync(() => {
     input('book-isbn', '978-85-7522-553-0');
     tick(451);
     fixture.detectChanges();
@@ -107,8 +107,32 @@ describe('BookCreateComponent', () => {
     expect(service.lookupMetadata).toHaveBeenCalledOnceWith('9788575225530');
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector<HTMLInputElement>('#book-title')?.value).toBe('Python Fluente');
-    expect(root.querySelector<HTMLInputElement>('#book-title')?.disabled).toBeTrue();
-    expect(root.textContent).toContain('bloqueados para evitar inconsistências');
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.disabled).toBeFalse();
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.readOnly).toBeFalse();
+    expect(root.textContent).toContain('Sugestão do Google Books aplicada em campos vazios');
+  }));
+
+  it('não sobrescreve título e autor já digitados com a sugestão externa (Issue #176)', fakeAsync(() => {
+    input('book-title', 'Título do funcionário');
+    input('book-author', 'Autor do funcionário');
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.value).toBe('Título do funcionário');
+    expect(root.querySelector<HTMLInputElement>('#book-author')?.value).toBe('Autor do funcionário');
+    expect(root.textContent).toContain('dados informados foram mantidos');
+  }));
+
+  it('não usa a categoria do Google Books como categoria da obra (Issue #176)', fakeAsync(() => {
+    spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    service.create.and.returnValue(of(response));
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    submit();
+    expect(service.create.calls.mostRecent().args[0].genre).toBeNull();
   }));
 
   it('libera o preenchimento manual quando a consulta falha', fakeAsync(() => {

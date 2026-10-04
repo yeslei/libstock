@@ -31,8 +31,8 @@
           />
         </div>
         <p class="field__hint" id="book-isbn-hint">
-          Aceita ISBN-10 ou ISBN-13, com espaços ou hífens. Ele será usado para completar os
-          dados ausentes.
+          Aceita ISBN-10 ou ISBN-13, com espaços ou hífens. Ele será usado para sugerir título, autor e capa
+          apenas nos campos que ficarem vazios.
         </p>
         @if (isbnError(); as message) {
           <p class="field__error" id="book-isbn-error" aria-live="polite">{{ message }}</p>
@@ -98,7 +98,6 @@
             maxlength="255"
             [attr.aria-invalid]="titleError() !== null"
             [attr.aria-describedby]="titleError() ? 'book-title-error' : null"
-            [attr.readonly]="metadataLocked() ? true : null"
           />
         </div>
         @if (titleError(); as message) {
@@ -119,7 +118,6 @@
             maxlength="255"
             [attr.aria-invalid]="authorError() !== null"
             [attr.aria-describedby]="authorError() ? 'book-author-error' : null"
-            [attr.readonly]="metadataLocked() ? true : null"
           />
         </div>
         @if (authorError(); as message) {
@@ -140,7 +138,6 @@
             maxlength="100"
             [attr.aria-invalid]="genreError() !== null"
             [attr.aria-describedby]="genreError() ? 'book-genre-error' : null"
-            [attr.readonly]="metadataLocked() ? true : null"
           />
         </div>
         @if (genreError(); as message) {

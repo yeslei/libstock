@@ -58,5 +58,9 @@ export interface BookMetadata {
   readonly isbn: string;
   readonly title: string;
   readonly author: string;
+  /** Informativo (Issue #176): a categoria externa nunca vira categoria do acervo. */
   readonly genre: string | null;
+  readonly cover_url?: string | null;
+  readonly publisher?: string | null;
+  readonly publication_year?: number | null;
 }

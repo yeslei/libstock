@@ -89,7 +89,6 @@ export class BookCreateComponent {
   protected readonly imageFailed = signal(false);
   protected readonly metadataState = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   protected readonly metadataMessage = signal<string | null>(null);
-  protected readonly metadataLocked = signal(false);
 
   constructor() {
     this.form.controls.isbn.valueChanges
@@ -217,24 +216,34 @@ export class BookCreateComponent {
     };
   }
 
+  /**
+   * Issue #176: a consulta externa é só uma sugestão. Preenche título e autor apenas quando
+   * estão vazios, nunca bloqueia a edição e nunca define a categoria do acervo.
+   */
   private applyMetadata(metadata: BookMetadata): void {
-    this.form.patchValue({ title: metadata.title, author: metadata.author, genre: metadata.genre ?? '' });
-    this.form.controls.title.disable();
-    this.form.controls.author.disable();
-    this.form.controls.genre.disable();
-    this.metadataLocked.set(true);
+    const { title, author, coverUrl } = this.form.controls;
+    const filled: string[] = [];
+    if (!title.value.trim()) {
+      title.setValue(metadata.title);
+      filled.push('título');
+    }
+    if (!author.value.trim()) {
+      author.setValue(metadata.author);
+      filled.push('autor');
+    }
+    if (!coverUrl.value.trim() && metadata.cover_url) {
+      coverUrl.setValue(metadata.cover_url);
+      filled.push('capa');
+    }
     this.metadataState.set('loaded');
-    this.metadataMessage.set('Dados preenchidos pelo Google Books e bloqueados para evitar inconsistências.');
+    this.metadataMessage.set(
+      filled.length
+        ? `Sugestão do Google Books aplicada em campos vazios (${filled.join(', ')}). Confira antes de salvar.`
+        : 'Os dados informados foram mantidos; o Google Books só preenche campos vazios.',
+    );
   }
 
-  private unlockMetadata(clearLockedValues = true): void {
-    if (this.metadataLocked() && clearLockedValues) {
-      this.form.patchValue({ title: '', author: '', genre: '' }, { emitEvent: false });
-    }
-    this.form.controls.title.enable({ emitEvent: false });
-    this.form.controls.author.enable({ emitEvent: false });
-    this.form.controls.genre.enable({ emitEvent: false });
-    this.metadataLocked.set(false);
+  private unlockMetadata(): void {
     this.metadataState.set('idle');
     this.metadataMessage.set(null);
   }
