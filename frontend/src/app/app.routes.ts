@@ -49,6 +49,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-catalog.component').then(m => m.CounterCatalogComponent),
       },
       {
+        path: 'acervo/nova', title: 'Nova obra · Balcão · LibStock',
+        loadComponent: () => import('./features/books/book-create/book-create.component').then(m => m.BookCreateComponent),
+      },
+      {
         path: 'acervo/:id/exemplares/novo', title: 'Novo exemplar · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-copy-create.component').then(m => m.CounterCopyCreateComponent),
       },
@@ -153,44 +157,11 @@ export const routes: Routes = [
         (m) => m.GenreBooksComponent,
       ),
   },
-  {
-    path: 'obras/nova',
-    canActivate: [authGuard, roleGuard],
-    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
-    title: 'Cadastrar obra · LibStock',
-    loadComponent: () =>
-      import('./features/books/book-create/book-create.component').then(
-        (m) => m.BookCreateComponent,
-      ),
-  },
-  {
-    path: 'obras/:id/exemplares/novo',
-    canActivate: [authGuard, roleGuard],
-    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
-    title: 'Cadastrar exemplar · LibStock',
-    loadComponent: () =>
-      import('./features/copies/copy-create/copy-create.component').then(
-        (m) => m.CopyCreateComponent,
-      ),
-  },
-  {
-    path: 'gestao/acervo',
-    canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
-    title: 'Cadastrar exemplar · LibStock',
-    loadComponent: () =>
-      import('./features/stock/stock-management/stock-management.component').then(
-        (m) => m.StockManagementComponent,
-      ),
-  },
-  {
-    path: 'gestao/acervo/obras/:id/editar',
-    canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
-    title: 'Editar obra · LibStock',
-    loadComponent: () =>
-      import('./features/books/book-edit/book-edit.component').then((m) => m.BookEditComponent),
-  },
+  // Issue #169: o cadastro de obra e exemplar passou para o balcão; os endereços antigos redirecionam para não quebrar links salvos.
+  { path: 'obras/nova', pathMatch: 'full', redirectTo: '/balcao/acervo/nova' },
+  { path: 'obras/:id/exemplares/novo', pathMatch: 'full', redirectTo: '/balcao/acervo/:id/exemplares/novo' },
+  { path: 'gestao/acervo', pathMatch: 'full', redirectTo: '/balcao/acervo' },
+  { path: 'gestao/acervo/obras/:id/editar', pathMatch: 'full', redirectTo: '/balcao/acervo/:id' },
   {
     path: 'painel',
     pathMatch: 'full',

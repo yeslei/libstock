@@ -63,3 +63,28 @@ describe('Rotas do balcão por papel (Issue #169)', () => {
     expect(await open('SELLER', '/balcao/inexistente')).toBe('/balcao/painel');
   });
 });
+
+describe('Endereços antigos de cadastro (Issue #169)', () => {
+  async function open(url: string): Promise<string> {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(withStubs(routes)),
+        { provide: AuthService, useValue: { restoreSession: () => Promise.resolve() } },
+      ],
+    });
+    TestBed.inject(TokenStoreService).setSession('t', { id: 1, name: 'F', email: 'f@x.dev', role_codes: ['STOCK_KEEPER'], created_at: '' });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl(url);
+    return router.url;
+  }
+
+  it('/obras/nova abre o cadastro de obra do balcão', async () => expect(await open('/obras/nova')).toBe('/balcao/acervo/nova'));
+  it('/obras/:id/exemplares/novo abre o novo exemplar do balcão', async () => {
+    expect(await open('/obras/12/exemplares/novo')).toBe('/balcao/acervo/12/exemplares/novo');
+  });
+  it('/gestao/acervo abre o acervo do balcão', async () => expect(await open('/gestao/acervo')).toBe('/balcao/acervo'));
+  it('/gestao/acervo/obras/:id/editar abre o detalhe da obra no balcão', async () => {
+    expect(await open('/gestao/acervo/obras/12/editar')).toBe('/balcao/acervo/12');
+  });
+  it('o estoquista acessa /balcao/acervo/nova', async () => expect(await open('/balcao/acervo/nova')).toBe('/balcao/acervo/nova'));
+});
