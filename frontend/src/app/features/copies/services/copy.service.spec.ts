@@ -79,4 +79,21 @@ describe('CopyService', () => {
       expect(status).toBe(404);
     });
   });
+
+  it('envia PATCH só com os campos informados no contrato snake_case, sem o código', () => {
+    let result: unknown;
+    service.update(5, { destination: 'COMMERCIAL', salePrice: 12.5 }).subscribe((copy) => (result = copy));
+    const request = http.expectOne(`${COPIES_API}/5`);
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({ destination: 'COMMERCIAL', sale_price: 12.5 });
+    request.flush({ id: 5, book_id: 8, barcode: 'A-5', destination: 'COMMERCIAL', condition: null, sale_price: 12.5, acquired_at: null, status: 'AVAILABLE', is_active: true });
+    expect(result).toEqual(jasmine.objectContaining({ id: 5, bookId: 8, salePrice: 12.5 }));
+  });
+
+  it('PATCH de conversão para empréstimo não envia preço e permite limpar a condição', () => {
+    service.update(5, { destination: 'DIDACTIC', condition: null }).subscribe();
+    const request = http.expectOne(`${COPIES_API}/5`);
+    expect(request.request.body).toEqual({ destination: 'DIDACTIC', condition: null });
+    request.flush({ id: 5, book_id: 8, barcode: 'A-5', destination: 'DIDACTIC', condition: null, sale_price: null, acquired_at: null, status: 'AVAILABLE', is_active: true });
+  });
 });

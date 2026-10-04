@@ -55,12 +55,21 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   desk_query_error: 'Não foi possível consultar o balcão. Tente novamente.',
   // Exclusão de exemplar e inativação de obra (Issue #135).
   copy_not_found: 'O exemplar não foi encontrado. Atualize a obra.',
-  copy_not_available: 'Este exemplar não está disponível e não pode ser excluído.',
+  copy_not_available: 'Este exemplar não está disponível para esta operação. Atualize a obra.',
   copy_has_history: 'Este exemplar possui histórico (empréstimo, venda, reserva ou solicitação) e não pode ser excluído.',
   last_active_copy: 'Este é o último exemplar ativo de uma obra ativa e não pode ser excluído.',
   copy_delete_persistence_error: 'Não foi possível excluir o exemplar. Nada foi alterado; tente novamente.',
   copy_without_price: 'Este exemplar comercial não tem preço de venda cadastrado e não pode ser vendido.',
   book_inactive: 'A obra deste exemplar está inativa e não aceita novas operações.',
+  // Acervo administrado pelo vendedor (Issue #151).
+  book_without_active_copy: 'A obra não pode ser reativada sem ao menos um exemplar ativo.',
+  copy_inactive: 'Este exemplar está inativo e não pode ser editado.',
+  copy_allocated: 'Este exemplar está destinado a uma reserva de compra e não pode ser editado.',
+  copy_needed_for_requests: 'Este é o último exemplar didático livre da obra e há solicitação de retirada pendente. Atenda ou cancele a solicitação antes de converter para venda.',
+  copy_in_operation: 'Este exemplar está em uma venda em andamento e não pode ser editado.',
+  copy_sale_price_required: 'Exemplar destinado à venda exige preço de venda maior que zero.',
+  copy_sale_price_not_allowed: 'Exemplar didático não pode ter preço de venda.',
+  copy_update_persistence_error: 'Não foi possível atualizar o exemplar. Nada foi alterado; tente novamente.',
   book_has_active_operations: 'Esta obra possui operações em andamento e não pode ser inativada.',
 };
 

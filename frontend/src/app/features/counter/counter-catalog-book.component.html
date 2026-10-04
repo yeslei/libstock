@@ -72,8 +72,6 @@
                 <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || genreTooLong() || !changed(s.data)" (click)="askSaveGenre(s.data)">Salvar alteração</button>
                 @if (s.data.is_active) {
                   <button class="btn btn--danger" type="button" [disabled]="flow.submitting()" (click)="askDeactivate(s.data)">Inativar obra</button>
-                } @else {
-                  <p class="note">Obra inativa. A reativação ainda não está disponível.</p>
                 }
               </div>
             </article>
@@ -85,7 +83,16 @@
               <p>Status: Inativa</p>
               <p>Exemplares vinculados: {{ s.data.total_copies }}</p>
               <p>Disponibilidade operacional: indisponível</p>
-              <a class="btn btn--primary" routerLink="/balcao/acervo">Voltar ao acervo</a>
+              @if (canEdit) {
+                @let reactivateReason = reactivateBlockReason(s.data);
+                <div class="actions">
+                  <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !!reactivateReason" [attr.title]="reactivateReason" [attr.aria-describedby]="reactivateReason ? 'reativar-motivo' : null" (click)="askReactivate(s.data)">Reativar obra</button>
+                  <a class="btn" routerLink="/balcao/acervo">Voltar ao acervo</a>
+                </div>
+                @if (reactivateReason) { <span class="hint" id="reativar-motivo">{{ reactivateReason }}</span> }
+              } @else {
+                <a class="btn btn--primary" routerLink="/balcao/acervo">Voltar ao acervo</a>
+              }
             </article>
           }
 
@@ -106,7 +113,7 @@
                       <th scope="col">Código</th>
                       <th scope="col">Finalidade</th>
                       <th scope="col">Status</th>
-                      @if (canDeleteCopy) { <th scope="col">Ações</th> }
+                      @if (canEditCopy || canDeleteCopy) { <th scope="col">Ações</th> }
                     </tr>
                   </thead>
                   <tbody>
@@ -115,8 +122,11 @@
                         <td>{{ copy.barcode }}</td>
                         <td>{{ destinationLabel(copy.destination) }}</td>
                         <td><span class="pill">{{ copyStatusLabel(copy) }}</span></td>
-                        @if (canDeleteCopy) {
+                        @if (canEditCopy || canDeleteCopy) {
                           <td>
+                            @let editReason = editCopyBlockReason(copy);
+                            <button class="btn" type="button" [disabled]="flow.submitting() || !!editReason" [attr.title]="editReason" [attr.aria-describedby]="editReason ? 'editar-motivo-' + copy.id : null" [attr.aria-label]="'Editar exemplar ' + copy.barcode" (click)="startEditingCopy(copy)">Editar</button>
+                            @if (editReason) { <span class="hint" [id]="'editar-motivo-' + copy.id">{{ editReason }}</span> }
                             @let reason = deleteCopyBlockReason(s.data, copy);
                             <button class="btn btn--danger" type="button" [disabled]="flow.submitting() || !!reason" [attr.title]="reason" [attr.aria-describedby]="reason ? 'excluir-motivo-' + copy.id : null" (click)="askDeleteCopy(s.data, copy)">Excluir exemplar</button>
                             @if (reason) { <span class="hint" [id]="'excluir-motivo-' + copy.id">{{ reason }}</span> }
@@ -129,6 +139,42 @@
               </div>
             }
           </article>
+          @if (editingCopy(s.data); as editing) {
+          <article class="card" aria-labelledby="editar-exemplar-titulo" data-copy-panel>
+            <p class="note">Editar exemplar #{{ editing.barcode }}</p>
+            <h2 id="editar-exemplar-titulo">Editando exemplar #{{ editing.barcode }}</h2>
+            <p class="note">Obra: {{ s.data.title }}</p>
+            <div class="field">
+              <label for="copy-barcode">Código do exemplar</label>
+              <input id="copy-barcode" type="text" [value]="editing.barcode" readonly aria-describedby="copy-barcode-help" />
+              <span id="copy-barcode-help">O código identifica a cópia e não pode ser alterado.</span>
+            </div>
+            <div class="field">
+              <label for="copy-destination">Finalidade do acervo</label>
+              <select id="copy-destination" [value]="copyDestination()" (change)="setCopyDestination($event)">
+                <option value="DIDACTIC" [selected]="copyDestination() === 'DIDACTIC'">Empréstimo</option>
+                <option value="COMMERCIAL" [selected]="copyDestination() === 'COMMERCIAL'">Venda</option>
+              </select>
+            </div>
+            @if (copyDestination() === 'COMMERCIAL') {
+              <div class="field" [class.field--error]="priceError()">
+                <label for="copy-price">Preço de venda (R$)</label>
+                <input id="copy-price" type="text" inputmode="decimal" autocomplete="off" [value]="copyPrice()" (input)="setCopyPrice($event)" [attr.aria-invalid]="priceError() ? 'true' : null" />
+                @if (priceError(); as message) { <span class="field__error" role="alert">{{ message }}</span> }
+              </div>
+            }
+            <div class="field" [class.field--error]="conditionTooLong()">
+              <label for="copy-condition">Condição</label>
+              <input id="copy-condition" type="text" autocomplete="off" [value]="copyCondition()" (input)="setCopyCondition($event)" [attr.aria-invalid]="conditionTooLong() ? 'true' : null" />
+              @if (conditionTooLong()) { <span class="field__error" role="alert">A condição aceita até {{ conditionMax }} caracteres.</span> }
+            </div>
+            <p class="note">{{ conversionNote(editing) }}</p>
+            <div class="actions">
+              <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !!priceError() || conditionTooLong() || !copyChanged(editing)" (click)="askSaveCopy(s.data, editing)">Salvar exemplar</button>
+              <button class="btn" type="button" [disabled]="flow.submitting()" (click)="cancelEditingCopy()">Cancelar</button>
+            </div>
+          </article>
+          }
         </div>
 
         @if (flow.confirming(); as c) {

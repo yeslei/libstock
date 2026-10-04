@@ -88,9 +88,9 @@ class ManagementServiceStub:
 
 
 @pytest.mark.parametrize("method,path", [("get", "/api/v1/books/1"), ("patch", "/api/v1/books/1")])
-def test_management_endpoints_reject_seller(method, path) -> None:
+def test_management_endpoints_reject_client_user(method, path) -> None:
     app.dependency_overrides[get_book_service] = ManagementServiceStub
-    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=7, role_codes=["SELLER"])
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=7, role_codes=["USER"])
     try:
         client = TestClient(app)
         response = client.get(path) if method == "get" else client.patch(path, json={"title": "Atualizada"})
@@ -98,6 +98,18 @@ def test_management_endpoints_reject_seller(method, path) -> None:
         app.dependency_overrides.clear()
     assert response.status_code == 403
     assert response.json()["code"] == "permission_denied"
+
+
+@pytest.mark.parametrize("method,path", [("get", "/api/v1/books/1"), ("patch", "/api/v1/books/1")])
+def test_seller_administers_the_catalog_and_can_read_and_update_book(method, path) -> None:
+    app.dependency_overrides[get_book_service] = ManagementServiceStub
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=7, role_codes=["SELLER"])
+    try:
+        client = TestClient(app)
+        response = client.get(path) if method == "get" else client.patch(path, json={"title": "Atualizada"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
 
 
 def test_stock_keeper_can_read_and_update_book() -> None:

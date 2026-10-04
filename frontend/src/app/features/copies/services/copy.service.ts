@@ -6,6 +6,7 @@ import {
   CopyCreateRequest,
   CopyDeleteResult,
   CopyResponse,
+  CopyUpdateRequest,
   copyDeleteResultFromApi,
   copyResponseFromApi,
 } from '../models/copy.model';
@@ -26,6 +27,18 @@ export class CopyService {
         sale_price: payload.salePrice,
         acquired_at: payload.acquiredAt,
       })
+      .pipe(map(copyResponseFromApi));
+  }
+
+  /** Edita ou converte exemplar disponível e sem operação; só os campos informados vão no corpo. */
+  update(copyId: number, payload: CopyUpdateRequest): Observable<CopyResponse> {
+    const body: Record<string, unknown> = {};
+    if (payload.destination !== undefined) body['destination'] = payload.destination;
+    if (payload.condition !== undefined) body['condition'] = payload.condition;
+    if (payload.salePrice !== undefined) body['sale_price'] = payload.salePrice;
+    if (payload.acquiredAt !== undefined) body['acquired_at'] = payload.acquiredAt;
+    return this.http
+      .patch<Parameters<typeof copyResponseFromApi>[0]>(`${COPIES_API}/${copyId}`, body)
       .pipe(map(copyResponseFromApi));
   }
 
