@@ -133,6 +133,36 @@ backend e não gerencia o esquema. Toda alteração estrutural deve ser criada e
 - `PATCH /api/v1/books/{book_id}` com `is_active=false`: bloqueado com 409 `book_has_active_operations` enquanto houver empréstimo `OPEN` de qualquer exemplar da obra, solicitação de retirada pendente ou reserva de compra `WAITING`/`NOTIFIED`; `details.counts` (`open_loans`, `pending_loan_requests`, `purchase_reservations`) e `details.links` (`type`, `copy_barcode` e, só para `ADMINISTRATOR`/`SELLER`, `client_name`). `POST /api/v1/loans/` e `POST /api/v1/sales/` recusam obra inativa com 409 `book_inactive`, travando o livro antes do exemplar.
 - `POST /api/v1/loans/` (`SELLER`, `ADMINISTRATOR`; corpo `{client_id, copy_id}`): empréstimo direto com `due_date` um mês de calendário após `loan_date` em America/Sao_Paulo (ajuste de fim de mês igual ao da retirada V2). Aceita somente exemplar didático, disponível e ativo de obra ativa; erros: 404 exemplar não encontrado, 409 exemplar indisponível, 409 `copy_not_for_loan` (exemplar comercial), 409 `book_inactive`, `client_not_found` (404), `client_inactive` (403), `client_has_pending` (409). O atraso, aqui e em `GET /api/v1/clients/{id}/pendencies` (que sincroniza a penalidade), usa a data de negócio de America/Sao_Paulo, como a V2.
 
+### Categorias da obra, validação e códigos de erro (Issues #174, #175 e #176)
+
+- `POST /api/v1/books/` e `PATCH /api/v1/books/{book_id}` aceitam `genre_ids: list[int]` (ids de `GET /api/v1/catalog/genres?all=true`). Sincronizam `book_genres` na mesma transação da obra e com auditoria do funcionário. No PATCH, `[]` remove todas as categorias, `null` é 422 e a ausência do campo não altera nada. Id inexistente: 404 `genre_not_found` com `details.missing_ids`. A resposta de obra traz `genres: [{id, name, slug}]`. O texto `genre` é mantido por compatibilidade e, quando `genre_ids` é enviado, espelha os nomes escolhidos (até 100 caracteres); a página pública de categoria lê `book_genres`. Detalhes em BUSINESS_RULES.md, seção 22.
+- Migration `20261004_0017` (dados, reversível): associa obras sem `book_genres` às categorias cujo nome coincide com `genre` (sem diferenciar maiúsculas e acentos; vírgula ou `;` separa várias). Rastreia as associações criadas em `audit_logs` (`source=migration_20261004_0017`); o downgrade remove só elas.
+- Cadastro com ISBN (Issue #176): título, autor, categorias e demais campos informados prevalecem; o Google Books só preenche campos vazios (título, autor, `cover_url`, `publisher`, `publication_year`) e nunca categorias. `GET /api/v1/books/metadata/{isbn}` devolve a sugestão (`title`, `author`, `genre` informativo, `cover_url`, `publisher`, `publication_year`).
+- `POST /api/v1/sales/`: `copy_id` repetido nos itens é 422 `duplicate_sale_item`.
+- Preço de exemplar comercial maior que zero na inclusão (`POST /copies/`, `/copies/batch`, exemplar inicial de `POST /books/`) e na edição: 422 `copy_sale_price_required`.
+- `GET /api/v1/staff/clients?q=` (menos de 2 caracteres) e `GET /api/v1/staff/copies?q=` em branco chegam ao serviço: 422 `search_term_too_short` e `search_term_required`.
+- `PATCH /api/v1/admin/books/{id}/featured` devolve `CatalogBookResponse` com as ofertas reais da obra.
+
+Formato de erro: `{detail, code, details?}`. O 422 de validação (qualquer rota) responde `{detail: [{loc, msg, type}], code: "validation_error"}` e nunca ecoa a entrada: sem `input` nem `ctx`, e o nome de campo desconhecido aparece como `campo_desconhecido`.
+
+| Rota | Status | `code` |
+| --- | --- | --- |
+| `/copies/`, `/copies/batch` | 404 | `book_not_found` (obra inexistente ou inativa) |
+| `/copies/`, `/copies/batch` | 409 | `duplicate_barcode` |
+| `/copies/`, `/copies/batch` | 422 | `copy_sale_price_required` |
+| `/copies/`, `/copies/batch` | 500 | `copy_persistence_error` |
+| `/sales/` | 422 | `duplicate_sale_item` |
+| `/sales/` | 404 | `copy_not_found`, `copy_inactive` |
+| `/sales/` | 409 | `copy_not_available`, `copy_not_for_sale`, `copy_reserved`, `copy_without_price`, `book_inactive`, `sale_conflict` |
+| `/sales/` | 500 | `sale_persistence_error` |
+| `/loans/` | 404 | `copy_not_found` |
+| `/loans/` | 409 | `copy_not_available`, `copy_not_for_loan`, `book_inactive`, `loan_conflict` |
+| `/loans/` | 500 | `loan_persistence_error` |
+| `/loans/{id}/return` | 404 | `loan_not_found`, `copy_not_found` |
+| `/loans/{id}/return` | 409 | `loan_already_closed`, `loan_return_conflict` |
+| `/loans/{id}/return` | 500 | `loan_return_persistence_error` |
+| qualquer | 422 | `validation_error` |
+
 Erros de domínio com dados estruturados respondem `{detail, code, details}`; `details` só existe nesses casos. Regras em [BUSINESS_RULES.md](../docs/BUSINESS_RULES.md), seção 21.
 
 ## Dados demonstrativos no banco local
