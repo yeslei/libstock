@@ -13,6 +13,11 @@ class ApplicationError(Exception):
         # Dados estruturados opcionais (ex.: motivos de um bloqueio de domínio).
         self.details = details
 
+    @property
+    def detail(self) -> str:
+        """Alias de `message`, no nome do campo `detail` da resposta {detail, code, details?}."""
+        return self.message
+
 
 class DuplicateEmailError(ApplicationError):
     def __init__(self) -> None:
@@ -64,8 +69,8 @@ class RefreshTokenReuseError(ApplicationError):
 
 
 class BookNotFoundError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Livro não encontrado.", "book_not_found", 404)
+    def __init__(self, message: str = "Livro não encontrado.") -> None:
+        super().__init__(message, "book_not_found", 404)
 
 
 class DuplicateIsbnError(ApplicationError):
@@ -74,8 +79,8 @@ class DuplicateIsbnError(ApplicationError):
 
 
 class DuplicateBarcodeError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Código de barras já cadastrado.", "duplicate_barcode", 409)
+    def __init__(self, message: str = "Código de barras já cadastrado.") -> None:
+        super().__init__(message, "duplicate_barcode", 409)
 
 
 class EmployeeRecordRequiredError(ApplicationError):
@@ -289,8 +294,8 @@ class CopyReservedError(ApplicationError):
 
 
 class CopyNotFoundError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Exemplar não encontrado.", "copy_not_found", 404)
+    def __init__(self, message: str = "Exemplar não encontrado.") -> None:
+        super().__init__(message, "copy_not_found", 404)
 
 
 class CopyDeletionBlockedError(ApplicationError):
@@ -385,3 +390,85 @@ class CopyUpdatePersistenceError(ApplicationError):
 # SQLSTATEs próprios do gatilho `guard_copy_integrity` (migration 20261003_0014).
 SQLSTATE_COPY_DESTINATION_FORBIDDEN = "LS001"
 SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE = "LS002"
+
+
+# ---- Erros de /copies/, /sales/ e /loans/ (Issue #175, item 4): `code` estável em todos ----
+
+
+class DuplicateSaleItemError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "A venda não pode repetir o mesmo exemplar nos itens.",
+            "duplicate_sale_item",
+            422,
+        )
+
+
+class CopyInactiveError(ApplicationError):
+    """Exemplar inativo em operação de circulação (404 por compatibilidade com o contrato anterior)."""
+
+    def __init__(self, message: str = "Um ou mais exemplares estão inativos.") -> None:
+        super().__init__(message, "copy_inactive", 404)
+
+
+class CopyNotAvailableError(ApplicationError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, "copy_not_available", 409)
+
+
+class CopyNotForSaleError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Exemplares didáticos não podem ser vendidos.", "copy_not_for_sale", 409)
+
+
+class SaleConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Não foi possível registrar a venda.", "sale_conflict", 409)
+
+
+class SalePersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Não foi possível registrar a venda.", "sale_persistence_error", 500)
+
+
+class LoanConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível registrar o empréstimo porque o exemplar já possui um empréstimo em aberto.",
+            "loan_conflict",
+            409,
+        )
+
+
+class LoanPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Não foi possível registrar o empréstimo.", "loan_persistence_error", 500)
+
+
+class LoanNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Empréstimo não encontrado.", "loan_not_found", 404)
+
+
+class LoanNotOpenError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Empréstimo não está aberto para devolução.", "loan_already_closed", 409
+        )
+
+
+class LoanReturnConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Não foi possível registrar a devolução.", "loan_return_conflict", 409)
+
+
+class LoanReturnPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível registrar a devolução.", "loan_return_persistence_error", 500
+        )
+
+
+class CopyPersistenceError(ApplicationError):
+    def __init__(self, message: str = "Não foi possível cadastrar o exemplar.") -> None:
+        super().__init__(message, "copy_persistence_error", 500)

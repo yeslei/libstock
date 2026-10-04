@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException, status
+from fastapi import status
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -262,7 +262,7 @@ def test_service_rejeita_exemplar_inexistente():
     repository.client_active_state.return_value = True
     repository.find_copies_for_sale.return_value = [_copy(15)]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -302,7 +302,7 @@ def test_service_rejeita_exemplar_indisponivel_ou_inativo(
         _copy(16),
     ]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -330,7 +330,7 @@ def test_service_trata_erro_de_integridade_com_rollback():
         Exception("integrity error"),
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -357,7 +357,7 @@ def test_service_trata_falha_de_banco_com_rollback():
         "database error"
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
@@ -432,7 +432,7 @@ def test_service_bloqueia_venda_de_exemplar_didatico():
         ),
     ]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             SaleCreate(
                 client_id=42,
@@ -470,7 +470,7 @@ def test_service_bloqueia_venda_comercial_quando_um_exemplar_e_didatico():
         ),
     ]
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ApplicationError) as exc:
         _service(repository, db).create_sale(
             _sale_data(),
             employee_id=7,
