@@ -129,20 +129,37 @@ describe('Balcão: registrar devolução', () => {
   const dialog = (root: HTMLElement) => root.querySelector('dialog');
   const submitButton = (root: HTMLElement) => dialog(root)!.querySelector('.confirm__submit') as HTMLButtonElement;
 
-  it('não consulta antes da busca e exige o código ou o ISBN', () => {
-    const { fixture, root, service } = setup(CounterReturnsComponent, () => undefined);
+  const cards = (root: HTMLElement) => Array.from(root.querySelectorAll('article'));
+
+  it('abre listando os empréstimos em aberto, na ordem do backend (atrasados primeiro), sem exigir termo', () => {
+    const { root, service } = setup(CounterReturnsComponent, (s) =>
+      s.listLoans.and.returnValue(of([
+        loan({ id: 1, copy_barcode: 'A-1', days_late: 9 }),
+        loan({ id: 2, copy_barcode: 'B-2', days_late: 2 }),
+        loan({ id: 3, copy_barcode: 'C-3', status: 'ACTIVE', days_late: 0, due_date: '2026-10-20T12:00:00Z' }),
+      ])),
+    );
     expect(root.querySelector('h1')?.textContent).toBe('Registrar devolução');
-    expect(root.querySelector('input')?.getAttribute('placeholder')).toBe('Código do exemplar ou ISBN');
-    expect(service.listLoans).not.toHaveBeenCalled();
-    submitSearch(fixture, root, '   ');
-    expect(service.listLoans).not.toHaveBeenCalled();
-    expect(root.querySelector('[role="alert"]')?.textContent).toContain('Informe o código do exemplar ou o ISBN.');
+    expect(root.querySelector('input')?.getAttribute('placeholder')).toBe('Código do exemplar, ISBN, cliente ou obra');
+    expect(service.listLoans).toHaveBeenCalledOnceWith({ q: '' });
+    expect(cards(root).map((c) => c.querySelector('.result__copy')?.textContent)).toEqual([
+      'Exemplar A-1', 'Exemplar B-2', 'Exemplar C-3',
+    ]);
+    expect(root.querySelector('.note')).toBeNull();
+    expect(root.textContent).not.toContain('Informe o código');
   });
 
-  it('busca por código ou ISBN e mostra obra, exemplar, cliente e devolução prevista', () => {
+  it('avisa quando a lista atinge o limite', () => {
+    const many = Array.from({ length: 50 }, (_, i) => loan({ id: i + 1 }));
+    const { root } = setup(CounterReturnsComponent, (s) => s.listLoans.and.returnValue(of(many)));
+    expect(root.querySelector('.note')?.textContent).toContain('Mostrando os primeiros 50');
+  });
+
+  it('filtra por termo e mostra obra, exemplar, cliente e devolução prevista', () => {
     const { fixture, root, service } = setup(CounterReturnsComponent, (s) => s.listLoans.and.returnValue(of([loan()])));
     submitSearch(fixture, root, ' 9788535902778 ');
-    expect(service.listLoans).toHaveBeenCalledOnceWith({ q: '9788535902778' });
+    expect(service.listLoans).toHaveBeenCalledTimes(2);
+    expect(service.listLoans).toHaveBeenCalledWith({ q: '9788535902778' });
     const card = root.querySelector('article')!;
     expect(card.textContent).toContain('Dom Casmurro');
     expect(card.textContent).toContain('Exemplar D-001');
@@ -151,14 +168,24 @@ describe('Balcão: registrar devolução', () => {
     expect(card.textContent).toContain('Atrasado há 2 dia(s)');
   });
 
-  it('mostra carregamento, vazio e erro de forma distinta', () => {
+  it('termo vazio volta à lista padrão', () => {
+    const { fixture, root, service } = setup(CounterReturnsComponent, (s) => s.listLoans.and.returnValue(of([loan()])));
+    submitSearch(fixture, root, 'Ana');
+    submitSearch(fixture, root, '   ');
+    expect(service.listLoans.calls.allArgs()).toEqual([[{ q: '' }], [{ q: 'Ana' }], [{ q: '' }]]);
+    expect(root.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('mostra carregamento, vazio com e sem termo e erro de forma distinta', () => {
     const pending = new Subject<StaffLoan[]>();
     const { fixture, root, service } = setup(CounterReturnsComponent, (s) => s.listLoans.and.returnValue(pending));
-    submitSearch(fixture, root, 'X-1');
-    expect(root.textContent).toContain('Buscando empréstimo');
+    expect(root.textContent).toContain('Carregando empréstimos');
     pending.next([]);
     fixture.detectChanges();
-    expect(root.querySelector('.empty')?.textContent).toContain('Nenhum empréstimo ativo encontrado para “X-1”');
+    expect(root.querySelector('.empty')?.textContent).toContain('Não há empréstimos em aberto.');
+    service.listLoans.and.returnValue(of([]));
+    submitSearch(fixture, root, 'X-1');
+    expect(root.querySelector('.empty')?.textContent).toContain('Nenhum empréstimo em aberto para “X-1”');
     service.listLoans.and.returnValue(throwError(() => ({ detail: 'Falha ao consultar.' })));
     submitSearch(fixture, root, 'X-2');
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('Falha ao consultar.');
@@ -167,7 +194,6 @@ describe('Balcão: registrar devolução', () => {
 
   it('pede confirmação antes do POST e cancelar não envia', () => {
     const { fixture, root, service } = setup(CounterReturnsComponent, (s) => s.listLoans.and.returnValue(of([loan()])));
-    submitSearch(fixture, root, 'D-001');
     click(fixture, button(root, 'Confirmar devolução'));
     expect(dialog(root)?.textContent).toContain('Confirmar devolução?');
     expect(dialog(root)?.textContent).toContain('Empréstimo em atraso há 2 dia(s).');
@@ -182,7 +208,6 @@ describe('Balcão: registrar devolução', () => {
       s.listLoans.and.returnValue(of([loan()]));
       s.confirmReturn.and.returnValue(response);
     });
-    submitSearch(fixture, root, 'D-001');
     click(fixture, button(root, 'Confirmar devolução'));
     const submit = submitButton(root);
     click(fixture, submit);
@@ -207,7 +232,6 @@ describe('Balcão: registrar devolução', () => {
       s.listLoans.and.returnValue(of([loan({ status: 'ACTIVE', days_late: 0 })]));
       s.confirmReturn.and.returnValue(throwError(() => ({ detail: 'Empréstimo já encerrado.', code: 'loan_already_closed' })));
     });
-    submitSearch(fixture, root, 'D-001');
     click(fixture, button(root, 'Confirmar devolução'));
     expect(dialog(root)?.textContent).toContain('Empréstimo dentro do prazo.');
     click(fixture, submitButton(root));
