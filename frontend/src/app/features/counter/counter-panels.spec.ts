@@ -11,7 +11,6 @@ import { CounterContext } from './counter-context.service';
 import { CounterClientsPageComponent } from './counter-pages';
 import { PickupsPanelComponent } from './pickups-panel.component';
 import { ReservationsPanelComponent } from './reservations-panel.component';
-import { ReturnsPanelComponent } from './returns-panel.component';
 
 const client = (over: Partial<StaffClient> = {}): StaffClient => ({
   id: 3, name: 'Ana Souza', email: 'ana@x.dev', is_active: true, is_penalized: false,
@@ -198,44 +197,6 @@ describe('Balcão: retiradas', () => {
   });
 });
 
-describe('Balcão: devoluções', () => {
-  it('confirma devolução somente depois do diálogo e recarrega', () => {
-    const { fixture, root, service } = setup(ReturnsPanelComponent, (s) => {
-      s.listLoans.and.returnValue(of([loan()]));
-      s.confirmReturn.and.returnValue(of({ id: 21 }));
-    });
-    expect(root.textContent).toContain('Em atraso há 2 dia(s)');
-    expect(root.textContent).toContain('D-001');
-    click(fixture, button(root, 'Confirmar devolução'));
-    expect(service.confirmReturn).not.toHaveBeenCalled();
-    service.listLoans.and.returnValue(of([]));
-    click(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
-    expect(service.confirmReturn).toHaveBeenCalledOnceWith(21);
-    expect(root.querySelector('[data-feedback]')?.textContent).toContain('Devolução confirmada');
-    expect(root.textContent).toContain('Nenhum empréstimo ativo encontrado.');
-  });
-
-  it('exibe erro de domínio quando o empréstimo já foi encerrado', () => {
-    const { fixture, root } = setup(ReturnsPanelComponent, (s) => {
-      s.listLoans.and.returnValue(of([loan({ status: 'ACTIVE', days_late: 0 })]));
-      s.confirmReturn.and.returnValue(throwError(() => ({ detail: 'Este empréstimo já foi encerrado.', code: 'loan_already_closed' })));
-    });
-    click(fixture, button(root, 'Confirmar devolução'));
-    click(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
-    expect(root.querySelector('[role="alert"]')?.textContent).toContain('já foi encerrado');
-    expect(root.textContent).not.toContain('Devolução confirmada');
-  });
-
-  it('busca pelo termo informado', () => {
-    const { fixture, root, service } = setup(ReturnsPanelComponent, (s) => s.listLoans.and.returnValue(of([])));
-    const input = root.querySelector('input[type="search"]') as HTMLInputElement;
-    input.value = 'D-001'; input.dispatchEvent(new Event('input'));
-    root.querySelector('form')!.dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
-    expect(service.listLoans.calls.mostRecent().args[0]).toEqual({ q: 'D-001', clientId: undefined });
-  });
-});
-
 describe('Balcão: reservas de compra', () => {
   it('permite destinar exemplar à primeira reserva e confirma antes de enviar', () => {
     const { fixture, root, service } = setup(ReservationsPanelComponent, (s) => {
@@ -370,23 +331,11 @@ describe('Balcão: clientes e navegação', () => {
     search(fixture, root, 'ana');
     click(fixture, button(root, 'Empréstimos'));
     expect(TestBed.inject(CounterContext).client()?.id).toBe(3);
-    expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/balcao/devolucoes');
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/balcao/emprestimos/ativos');
     click(fixture, button(root, 'Solicitações'));
     expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/emprestimos/solicitacoes');
     click(fixture, button(root, 'Reservas'));
     expect(router.navigateByUrl).toHaveBeenCalledWith('/balcao/vendas');
-  });
-
-  it('filtra empréstimos pelo cliente escolhido e permite remover o filtro', () => {
-    const { fixture, root, service } = setup(ReturnsPanelComponent, (s) => s.listLoans.and.returnValue(of([])));
-    let cleared = 0;
-    fixture.componentInstance.clearClient.subscribe(() => cleared++);
-    fixture.componentRef.setInput('client', client());
-    fixture.detectChanges();
-    expect(service.listLoans).toHaveBeenCalledWith({ q: '', clientId: 3 });
-    expect(root.querySelector('.chip')?.textContent).toContain('Ana Souza');
-    click(fixture, button(root, 'Remover filtro'));
-    expect(cleared).toBe(1);
   });
 });
 

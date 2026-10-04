@@ -24,6 +24,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-dashboard.component').then(m => m.CounterDashboardComponent),
       },
       {
+        path: 'acervo', pathMatch: 'full', title: 'Acervo · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-catalog.component').then(m => m.CounterCatalogComponent),
+      },
+      {
+        path: 'acervo/:id', title: 'Obra · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-catalog-book.component').then(m => m.CounterCatalogBookComponent),
+      },
+      {
         path: 'clientes', title: 'Clientes · Balcão · LibStock',
         loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterClientsPageComponent),
       },
@@ -37,11 +45,11 @@ export const routes: Routes = [
       },
       {
         path: 'emprestimos/ativos', title: 'Empréstimos ativos · Balcão · LibStock',
-        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReturnsPageComponent),
+        loadComponent: () => import('./features/counter/counter-active-loans.component').then(m => m.CounterActiveLoansComponent),
       },
       {
-        path: 'devolucoes', title: 'Devoluções · Balcão · LibStock',
-        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReturnsPageComponent),
+        path: 'devolucoes', title: 'Registrar devolução · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-returns.component').then(m => m.CounterReturnsComponent),
       },
       {
         path: 'vendas', title: 'Vendas · Balcão · LibStock',

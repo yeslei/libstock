@@ -2,7 +2,11 @@
 from datetime import date, datetime
 from typing import Literal
 
+from decimal import Decimal
+
 from pydantic import BaseModel
+
+from app.models.domain import CopyStatus, DestinationType
 
 
 class StaffClient(BaseModel):
@@ -81,3 +85,58 @@ class StaffDashboard(BaseModel):
     returns_today: int
     waiting_reservations: int
     pendencies: int
+
+
+class StaffCatalogBook(BaseModel):
+    """Obra do acervo para consulta do balcão; contagens consideram exemplares ativos e não vendidos."""
+    id: int
+    title: str
+    author: str
+    isbn: str | None
+    genre: str | None
+    is_active: bool
+    total_copies: int
+    didactic_copies: int
+    commercial_copies: int
+
+
+class StaffCatalogCopy(BaseModel):
+    id: int
+    barcode: str
+    destination: DestinationType
+    status: CopyStatus
+    condition: str | None
+    sale_price: Decimal | None
+    is_active: bool
+    free: bool
+    allocated_for_purchase: bool
+
+
+class StaffCatalogBookDetail(StaffCatalogBook):
+    copies: list[StaffCatalogCopy]
+
+
+SaleBlock = Literal['DIDACTIC', 'NOT_AVAILABLE']
+
+
+class StaffCopyBook(BaseModel):
+    id: int
+    title: str
+    author: str
+    isbn: str | None
+    is_active: bool
+
+
+class StaffCopyLookup(BaseModel):
+    """Exemplar localizado por código, ISBN ou título, com a situação de venda decidida no backend."""
+    id: int
+    barcode: str
+    destination: DestinationType
+    status: CopyStatus
+    condition: str | None
+    sale_price: Decimal | None
+    book: StaffCopyBook
+    free: bool
+    free_commercial_copies: int
+    sellable: bool
+    sale_block_reason: SaleBlock | None

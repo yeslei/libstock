@@ -1,0 +1,60 @@
+<section class="page" aria-labelledby="acervo-titulo">
+  <p class="page__eyebrow">FUNCIONÁRIO · ACERVO</p>
+  <h1 id="acervo-titulo">Acervo</h1>
+  <p class="page__intro">Obras cadastradas</p>
+
+  <form class="search" role="search" (submit)="search($event)">
+    <label class="sr-only" for="catalog-q">Buscar por título, autor ou ISBN</label>
+    <input id="catalog-q" type="search" maxlength="100" placeholder="Buscar por título, autor ou ISBN" [value]="term()" (input)="setTerm($event)" />
+    <button class="btn btn--primary" type="submit">Buscar</button>
+    @if (canCreate) {
+      <a class="btn btn--primary" routerLink="/obras/nova">+ Nova obra</a>
+    }
+  </form>
+
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') { <p class="loading" role="status"><app-spinner /> Carregando acervo…</p> }
+      @case ('error') {
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        @if (!s.data.length) {
+          <p class="empty" role="status">Nenhuma obra encontrada.</p>
+        } @else {
+          @if (s.data.length >= limit) {
+            <p class="note" role="status">Mostrando as primeiras {{ limit }} obras. Refine a busca para ver as demais.</p>
+          }
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">Obras cadastradas</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Obra / título</th>
+                  <th scope="col">Autor</th>
+                  <th scope="col">Categoria</th>
+                  <th scope="col">Exemplares</th>
+                  <th scope="col">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (book of s.data; track book.id) {
+                  <tr>
+                    <td>
+                      <span class="row__title">{{ book.title }}</span>
+                      <span class="row__sub">{{ book.is_active ? 'Obra cadastrada' : 'Obra inativa' }}</span>
+                    </td>
+                    <td>{{ book.author }}</td>
+                    <td>@if (book.genre) { <span class="badge">{{ book.genre }}</span> } @else { — }</td>
+                    <td><span class="pill">{{ copiesLabel(book) }}</span></td>
+                    <td><a class="link-btn" [routerLink]="['/balcao/acervo', book.id]" [attr.aria-label]="'Ver obra ' + book.title">Ver obra →</a></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    }
+  }
+</section>

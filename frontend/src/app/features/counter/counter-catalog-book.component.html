@@ -1,0 +1,90 @@
+<section class="page" aria-labelledby="obra-titulo">
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo</a>
+        <p class="loading" role="status"><app-spinner /> Carregando obra…</p>
+      }
+      @case ('error') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo</a>
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo / {{ s.data.title }}</a>
+        <h1 id="obra-titulo">{{ s.data.title }}</h1>
+        <p class="page__intro">{{ s.data.author }}@if (s.data.isbn) { • ISBN {{ s.data.isbn }} }</p>
+
+        <div data-feedback tabindex="-1">
+          @if (flow.feedback(); as f) { <app-alert [message]="f.message" [variant]="f.kind" /> }
+        </div>
+
+        <div class="stack">
+          <article class="card" aria-labelledby="dados-titulo">
+            <h2 id="dados-titulo">Dados da obra</h2>
+            <p>Categoria literária: {{ s.data.genre || '—' }}</p>
+            <p>Destinação dos exemplares: {{ s.data.didactic_copies }} para empréstimo · {{ s.data.commercial_copies }} para venda</p>
+            <p>Status da obra: {{ s.data.is_active ? 'Ativa' : 'Inativa' }}</p>
+            <p>Quantidade total: {{ s.data.total_copies === 1 ? '1 exemplar' : s.data.total_copies + ' exemplares' }}</p>
+            @if (canEdit && !editing()) {
+              <button class="btn btn--primary" type="button" (click)="startEditing()">Editar obra</button>
+            }
+          </article>
+
+          @if (canEdit && editing()) {
+            <article class="card" aria-labelledby="editar-titulo">
+              <h2 id="editar-titulo">Editar obra</h2>
+              <div class="field" [class.field--error]="genreTooLong()">
+                <label for="book-genre">Categoria literária</label>
+                <input id="book-genre" type="text" [value]="genre()" (input)="setGenre($event)" [attr.aria-invalid]="genreTooLong()" />
+                @if (genreTooLong()) { <span class="field__error" role="alert">A categoria aceita até {{ genreMax }} caracteres.</span> }
+              </div>
+              <p class="note">A destinação é definida em cada exemplar; a conversão de destinação ainda não está disponível.</p>
+              <div class="actions">
+                <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || genreTooLong() || !changed(s.data)" (click)="askSaveGenre(s.data)">Salvar alteração</button>
+                @if (s.data.is_active) {
+                  <button class="btn btn--danger" type="button" [disabled]="flow.submitting()" (click)="askDeactivate(s.data)">Inativar obra</button>
+                } @else {
+                  <p class="note">Obra inativa. A reativação ainda não está disponível.</p>
+                }
+              </div>
+            </article>
+          }
+
+          <article class="card" aria-labelledby="exemplares-titulo">
+            <h2 id="exemplares-titulo">Exemplares de “{{ s.data.title }}”</h2>
+            <p class="note">A obra guarda os dados bibliográficos. Cada exemplar possui código, finalidade e status próprios.</p>
+            @if (!s.data.copies.length) {
+              <p class="empty" role="status">Nenhum exemplar cadastrado para esta obra.</p>
+            } @else {
+              <div class="table-wrap">
+                <table>
+                  <caption class="sr-only">Exemplares da obra</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Código</th>
+                      <th scope="col">Finalidade</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (copy of s.data.copies; track copy.id) {
+                      <tr>
+                        <td>{{ copy.barcode }}</td>
+                        <td>{{ destinationLabel(copy.destination) }}</td>
+                        <td><span class="pill">{{ copyStatusLabel(copy) }}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </article>
+        </div>
+
+        @if (flow.confirming(); as c) {
+          <app-confirm-dialog [title]="c.title" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="flow.submitting()" (confirmed)="flow.confirm()" (cancelled)="flow.cancel()" />
+        }
+      }
+    }
+  }
+</section>
