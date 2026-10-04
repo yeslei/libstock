@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { ClientTrackingComponent } from './client-tracking.component';
 import { ClientTrackingService } from './client-tracking.service';
 
@@ -89,5 +90,64 @@ describe('Acompanhamento do cliente', () => {
     expect(getLoans).toHaveBeenCalledTimes(2);
     expect(root.textContent).toContain('Dom Casmurro');
     expect(root.textContent).not.toContain('Tentar novamente');
+  });
+
+  describe("cancelamento de reserva (Issue #150)", () => {
+    const waiting = { id: 1, book_id: 42, title: "Sapiens", author: "Autor", cover_url: null, status: "WAITING", queue_position: 2 };
+    const notified = { id: 2, book_id: 43, title: "Livro", author: "Autor", cover_url: null, status: "NOTIFIED", copy_barcode: "0032", available_since: "2026-10-03T12:00:00Z", expires_at: "2026-10-09T02:59:59.999Z", expired: false };
+    async function renderReservations(items: any[], cancel: any) {
+      const service = { getLoans: () => of([]), getReservations: jasmine.createSpy().and.returnValue(of(items)), cancelReservation: cancel };
+      await TestBed.configureTestingModule({ imports: [ClientTrackingComponent], providers: [provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { data: { tracking: "reservations" } } } },
+        { provide: ClientTrackingService, useValue: service }] }).compileComponents();
+      const fixture = TestBed.createComponent(ClientTrackingComponent); fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      const click = (el: Element | null) => { (el as HTMLElement).click(); fixture.detectChanges(); };
+      const cancelButton = (n = 0) => root.querySelectorAll("button.cancel")[n];
+      return { fixture, service, root, click, cancelButton };
+    }
+
+    it("mostra o prazo real e cancela somente após confirmar, sem envio duplo, com sucesso após o 2xx", async () => {
+      const response = new Subject<{ id: number }>();
+      const { root, service, click, cancelButton, fixture } = await renderReservations([notified], jasmine.createSpy().and.returnValue(response));
+      expect(root.textContent).toContain("Retire até 08/10/2026");
+      click(cancelButton());
+      expect(service.cancelReservation).not.toHaveBeenCalled();
+      expect(root.querySelector("dialog")!.textContent).toContain("O exemplar destinado a você será liberado");
+      const submit = root.querySelector("dialog .confirm__submit");
+      click(submit); click(submit);
+      expect(service.cancelReservation).toHaveBeenCalledOnceWith(2);
+      expect(snackbarMessage()).toBe("");
+      response.next({ id: 2 }); response.complete(); fixture.detectChanges();
+      expect(snackbarMessage()).toBe("Reserva cancelada.");
+      expect(snackbarVariant()).toBe("success");
+      expect(service.getReservations).toHaveBeenCalledTimes(2);
+    });
+
+    it("cancelar a reserva aguardando pede confirmação e permite desistir", async () => {
+      const { root, service, click, cancelButton } = await renderReservations([waiting], jasmine.createSpy());
+      click(cancelButton());
+      expect(root.querySelector("dialog")!.textContent).toContain("Você sairá da fila de compra");
+      click(root.querySelector("dialog .confirm__cancel"));
+      expect(root.querySelector("dialog")).toBeNull();
+      expect(service.cancelReservation).not.toHaveBeenCalled();
+    });
+
+    it("mostra a recusa de estado final sem sucesso e recarrega a lista", async () => {
+      const cancel = jasmine.createSpy().and.returnValue(throwError(() => ({ detail: "Esta reserva já foi encerrada e não pode ser cancelada.", code: "reservation_not_cancellable", status: 409 })));
+      const { service, click, cancelButton, root } = await renderReservations([waiting], cancel);
+      click(cancelButton());
+      click(root.querySelector("dialog .confirm__submit"));
+      expect(snackbarMessage()).toContain("já foi encerrada");
+      expect(snackbarVariant()).toBe("warning");
+      expect(service.getReservations).toHaveBeenCalledTimes(2);
+    });
+
+    it("reserva destinada vencida informa o encerramento e não oferece cancelar", async () => {
+      const { root, cancelButton } = await renderReservations([{ ...notified, expired: true }], jasmine.createSpy());
+      expect(root.textContent).toContain("Prazo de retirada encerrado em 08/10/2026");
+      expect(root.textContent).toContain("O prazo de retirada terminou");
+      expect(cancelButton()).toBeUndefined();
+    });
   });
 });

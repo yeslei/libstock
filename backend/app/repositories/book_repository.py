@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -14,6 +16,7 @@ from app.models.domain import (
 )
 from app.models.loan_request import LoanRequest
 from app.models.user import User
+from app.repositories.reservation_expiry import expire_due_reservations
 from app.schemas.book_schema import BookCreate, BookUpdate, InitialCopyCreate
 
 
@@ -111,14 +114,17 @@ class BookRepository:
             .all()
         )
 
-    def lock_book_for_inactivation(self, book_id: int) -> Book | None:
-        """Trava o livro e seus exemplares, serializando com empréstimos e vendas concorrentes."""
+    def lock_book_for_inactivation(self, book_id: int, now: datetime) -> Book | None:
+        """Trava o livro, expira as reservas vencidas e trava os exemplares (livro, reservas, exemplares),
+        serializando com empréstimos, vendas e destinações concorrentes."""
         book = self.db.scalar(
             select(Book)
             .where(Book.id == book_id)
             .with_for_update()
             .execution_options(populate_existing=True)
         )
+        if book is not None:
+            expire_due_reservations(self.db, book_id, now)
         self.db.execute(
             select(Copy.id).where(Copy.book_id == book_id).order_by(Copy.id).with_for_update()
         )

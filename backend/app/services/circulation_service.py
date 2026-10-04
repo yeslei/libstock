@@ -1,11 +1,11 @@
 from datetime import datetime
 from functools import wraps
 from sqlalchemy.exc import SQLAlchemyError
-from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today, loan_due_at
+from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today, loan_due_at, reservation_pickup_deadline
 from app.core.exceptions import ApplicationError, BookNotFoundError
 from app.models.domain import CopyStatus, DestinationType, LoanStatus, ReservationStatus, SaleStatus
 from app.repositories.circulation_repository import CirculationRepository
-from app.services.client_eligibility import require_eligible_client
+from app.services.client_eligibility import is_client_locked_eligible, require_eligible_client
 
 
 def transactional(operation):
@@ -76,16 +76,23 @@ class CirculationService:
         book = self.repository.lock_book(book_id)
         if book is None or not book.is_active:
             raise BookNotFoundError()
-        reservation = self.repository.first_waiting(book_id)
-        if reservation is None:
+        now = datetime.now(ZONE)
+        self.repository.expire_due_reservations(book_id, now)
+        waiting = self.repository.waiting_queue(book_id)
+        if not waiting:
             raise ApplicationError('Não há reserva aguardando disponibilidade.', 'reservation_not_found', 404)
-        self.validate_client(reservation.client_id)
+        today = business_today()
+        reservation = next((item for item in waiting
+                            if is_client_locked_eligible(self.repository, item.client_id, today)), None)
+        if reservation is None:
+            raise ApplicationError('Nenhuma reserva da fila possui cliente elegível.', 'no_eligible_reservation', 409)
         copy = self.repository.lock_free_copy(book_id, DestinationType.COMMERCIAL)
         if copy is None:
             raise ApplicationError('Não há exemplar comercial disponível.', 'purchase_unavailable', 409)
         reservation.allocated_copy_id = copy.id
         reservation.status = ReservationStatus.NOTIFIED
-        reservation.notified_at = datetime.now(ZONE)
+        reservation.notified_at = now
+        reservation.expires_at = reservation_pickup_deadline(now)
         self.repository.flush()
         return {'id': reservation.id}
 
@@ -101,9 +108,13 @@ class CirculationService:
         reservation = self.repository.find_reservation(reservation_id, lock=True)
         if reservation.status != ReservationStatus.NOTIFIED or reservation.allocated_copy_id is None:
             raise ApplicationError('Reserva ainda não está disponível para retirada.', 'reservation_not_ready', 409)
-        self.validate_client(reservation.client_id)
         if reservation.expires_at is not None and reservation.expires_at < datetime.now(ZONE):
+            # A expiração precisa ser efetivada mesmo com a venda recusada: confirma antes de responder o erro.
+            reservation.status = ReservationStatus.EXPIRED
+            self.repository.flush()
+            self.db.commit()
             raise ApplicationError('O prazo de retirada expirou.', 'reservation_expired', 409)
+        self.validate_client(reservation.client_id)
         copy = self.repository.lock_allocated_copy(reservation.allocated_copy_id)
         if copy is None or copy.destination != DestinationType.COMMERCIAL or not copy.is_active or copy.status != CopyStatus.AVAILABLE:
             raise ApplicationError('Exemplar comercial indisponível.', 'purchase_unavailable', 409)
@@ -111,3 +122,43 @@ class CirculationService:
         sale.status = SaleStatus.CONFIRMED
         self.repository.flush()
         return {'id': sale.id}
+
+    def _cancel(self, reservation_id, actor_id, *, client_scope, reason=None):
+        reservation = self.repository.find_reservation(reservation_id)
+        if reservation is None or (client_scope and reservation.client_id != actor_id):
+            raise ApplicationError('Reserva não encontrada.', 'reservation_not_found', 404)
+        self.repository.lock_book(reservation.book_id)
+        reservation = self.repository.find_reservation(reservation_id, lock=True)
+        if (reservation.status == ReservationStatus.NOTIFIED and reservation.expires_at is not None
+                and reservation.expires_at < datetime.now(ZONE)):
+            reservation.status = ReservationStatus.EXPIRED
+            self.repository.flush()
+            self.db.commit()
+        if reservation.status not in (ReservationStatus.WAITING, ReservationStatus.NOTIFIED):
+            raise ApplicationError('A reserva já foi encerrada e não pode ser cancelada.', 'reservation_not_cancellable',
+                                   409, {'status': reservation.status.value})
+        reservation.status = ReservationStatus.CANCELLED
+        self.repository.flush()
+        self.repository.record_cancellation(reservation.id, actor_id, 'USER' if client_scope else 'STAFF', reason)
+        return {'id': reservation.id}
+
+    @transactional
+    def cancel_reservation_by_staff(self, reservation_id, actor_id, reason=None):
+        self.require_employee(actor_id)
+        return self._cancel(reservation_id, actor_id, client_scope=False, reason=reason)
+
+    @transactional
+    def cancel_own_reservation(self, reservation_id, client_id):
+        if not self.repository.client_exists(client_id):
+            raise ApplicationError('É necessário um cadastro de cliente.', 'client_required', 403)
+        return self._cancel(reservation_id, client_id, client_scope=True)
+
+    @transactional
+    def expire_due_reservations(self, actor_id):
+        self.require_employee(actor_id)
+        now = datetime.now(ZONE)
+        expired = 0
+        for book_id in self.repository.books_with_due_reservations(now):
+            self.repository.lock_book(book_id)
+            expired += self.repository.expire_due_reservations(book_id, now)
+        return {'expired': expired}

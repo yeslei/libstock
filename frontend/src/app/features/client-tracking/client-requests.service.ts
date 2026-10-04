@@ -10,7 +10,10 @@ export interface LoanRequestResponse {
   readonly created_at: string;
 }
 
-export type PurchaseRequestResponse = Omit<LoanRequestResponse, 'due_date'>;
+export type PurchaseRequestResponse = Omit<LoanRequestResponse, 'due_date'> & {
+  /** NOTIFIED: exemplar destinado com prazo de retirada; WAITING: entrou no fim da fila de compra. */
+  readonly reservation_status?: 'NOTIFIED' | 'WAITING' | null;
+};
 
 export interface PurchaseReservationResponse {
   readonly id: number;

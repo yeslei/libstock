@@ -81,6 +81,22 @@ describe('CounterService', () => {
     request.flush({ id: 3 });
   });
 
+  it("cancela reserva com motivo opcional e efetiva a expiração por POST", () => {
+    service.cancelReservation(6).subscribe();
+    service.cancelReservation(7, "  Cliente desistiu  ").subscribe();
+    service.expireDueReservations().subscribe();
+    const plain = http.expectOne((r) => r.url === "/api/v1/staff/purchase-reservations/6/cancel");
+    expect(plain.request.method).toBe("POST");
+    expect(plain.request.body).toEqual({});
+    plain.flush({ id: 6 });
+    const withReason = http.expectOne("/api/v1/staff/purchase-reservations/7/cancel");
+    expect(withReason.request.body).toEqual({ reason: "Cliente desistiu" });
+    withReason.flush({ id: 7 });
+    const expire = http.expectOne("/api/v1/staff/purchase-reservations/expire");
+    expect(expire.request.method).toBe("POST");
+    expire.flush({ expired: 0 });
+  });
+
   it('usa POST V2 para devolução, destinação e venda', () => {
     service.confirmReturn(4).subscribe();
     service.allocatePurchase(8).subscribe();

@@ -1,10 +1,12 @@
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ApplicationError, BookInactiveError, CopyWithoutPriceError
+from app.core.business_dates import BUSINESS_ZONE as ZONE
+from app.core.exceptions import ApplicationError, BookInactiveError, CopyReservedError, CopyWithoutPriceError
 from app.models.domain import CopyStatus, DestinationType
 from app.repositories.sale_repository import SaleRepository
 from app.schemas.sale_schema import SaleCreate, SaleItemResponse, SaleResponse
@@ -38,7 +40,10 @@ class SaleService:
             copy_ids = [item.copy_id for item in sale_data.items]
 
             books = self.repository.lock_books_for_copies(copy_ids)
+            # Reservas vencidas liberam o exemplar: efetiva a expiração antes de travar os exemplares.
+            self.repository.expire_due_reservations(books.keys(), datetime.now(ZONE))
             copies = self.repository.find_copies_for_sale(copy_ids)
+            reserved = self.repository.reserved_copy_ids(copy_ids)
 
             copies_by_id = {copy.id: copy for copy in copies}
 
@@ -64,6 +69,9 @@ class SaleService:
                         status_code=409,
                         detail="Um ou mais exemplares não estão disponíveis para venda.",
                     )
+
+                if copy.id in reserved:
+                    raise CopyReservedError()
 
                 if copy.destination == DestinationType.DIDACTIC:
                     raise HTTPException(

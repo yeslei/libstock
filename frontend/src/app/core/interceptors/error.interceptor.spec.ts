@@ -65,6 +65,12 @@ describe('errorInterceptor', () => {
     expect(error.details).toEqual(details);
   });
 
+  it('mapeia o limite da data de retirada e o exemplar reservado na venda direta', () => {
+    expect(fail(422, { detail: 'x', code: 'pickup_date_after_deadline' }).detail)
+      .toBe('A data de retirada não pode ultrapassar o prazo de retirada da reserva (5 dias corridos).');
+    expect(fail(409, { detail: 'x', code: 'copy_reserved' }).detail).toContain('destinado a uma reserva de compra');
+  });
+
   it('não inventa details quando o corpo não os traz', () => {
     expect(fail(409, { detail: 'Já existe.', code: 'outro' }).details).toBeUndefined();
   });

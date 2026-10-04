@@ -78,6 +78,8 @@ def test_filters_and_actor_are_forwarded(api):
 def make_service():
     repo = Mock(spec=StaffDeskRepository)
     repo.is_active_employee.return_value = True
+    repo.waiting_queues.return_value = []
+    repo.expired_notified_counts.return_value = {}
     return StaffDeskService(Mock(), repo), repo
 
 
@@ -170,20 +172,39 @@ def reservation_row(id, status, position, *, client=None, book=None, barcode=Non
 INACTIVE_BOOK = NS(id=1, title='A', author='X', is_active=False)
 
 
-@pytest.mark.parametrize('row,free,expected', [
-    (reservation_row(1, ReservationStatus.WAITING, 1), 1, (True, None)),
-    (reservation_row(1, ReservationStatus.WAITING, 1), 0, (False, 'NO_FREE_COPY')),
-    (reservation_row(1, ReservationStatus.WAITING, 1, client=client_row(client_penalized=True)), 1, (False, 'CLIENT_INELIGIBLE')),
-    (reservation_row(1, ReservationStatus.WAITING, 2), 1, (False, 'NOT_FIRST_IN_QUEUE')),
-    (reservation_row(1, ReservationStatus.WAITING, 1, book=INACTIVE_BOOK), 1, (False, 'BOOK_INACTIVE')),
+def queued(reservation_id, **client):
+    return {'reservation_id': reservation_id, 'book_id': 1, **client_row(**client)}
+
+
+@pytest.mark.parametrize('row,queue,free,expected', [
+    (reservation_row(1, ReservationStatus.WAITING, 1), [queued(1)], 1, (True, None)),
+    (reservation_row(1, ReservationStatus.WAITING, 1), [queued(1)], 0, (False, 'NO_FREE_COPY')),
+    (reservation_row(1, ReservationStatus.WAITING, 1, client=client_row(client_penalized=True)),
+     [queued(1, client_penalized=True)], 1, (False, 'CLIENT_INELIGIBLE')),
+    # eligible earlier in the queue: this one is not the first eligible
+    (reservation_row(2, ReservationStatus.WAITING, 2), [queued(1), queued(2)], 1, (False, 'NOT_FIRST_ELIGIBLE')),
+    # ineligible earlier in the queue is skipped: this one is the first eligible
+    (reservation_row(2, ReservationStatus.WAITING, 2), [queued(1, client_penalized=True), queued(2)], 1, (True, None)),
+    (reservation_row(1, ReservationStatus.WAITING, 1, book=INACTIVE_BOOK), [queued(1)], 1, (False, 'BOOK_INACTIVE')),
 ])
-def test_allocation_flags_follow_service_rules_without_skipping_queue(row, free, expected):
+def test_allocation_flags_target_first_eligible_reservation(row, queue, free, expected):
     service, repo = make_service()
     repo.active_reservations.return_value = [row]
+    repo.waiting_queues.return_value = queue
     repo.free_commercial_counts.return_value = {1: free} if free else {}
     item = service.purchase_reservations(7, None, None, None, 50)[0]
     assert (item.can_allocate, item.allocation_blocked_reason) == expected
     assert item.free_commercial_copies == free
+
+
+def test_expired_unreleased_allocation_counts_as_releasable_copy_for_waiting_first():
+    service, repo = make_service()
+    repo.active_reservations.return_value = [reservation_row(1, ReservationStatus.WAITING, 1)]
+    repo.waiting_queues.return_value = [queued(1)]
+    repo.free_commercial_counts.return_value = {}
+    repo.expired_notified_counts.return_value = {1: 1}
+    item = service.purchase_reservations(7, None, None, None, 50)[0]
+    assert (item.free_commercial_copies, item.can_allocate) == (1, True)
 
 
 def test_notified_reservation_exposes_allocation_without_inventing_deadline():

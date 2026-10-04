@@ -27,3 +27,6 @@ h2 a:hover { text-decoration: underline; }
 .loading { display: flex; gap: $space-2; align-items: center; }
 a:focus-visible, button:focus-visible { @include focus-ring; }
 @media (max-width: 599px) { .tracking-card { gap: $space-3; padding: $space-4; } .cover { width: 64px; height: 96px; flex-basis: 64px; } .card-heading { flex-direction: column; gap: $space-2; } h1 { font-size: 26px; } h2 { font-size: 16px; } .status { white-space: normal; } .dates { margin: $space-4 0; } }
+.actions { margin: $space-4 0 0; }
+.cancel { padding: $space-2 $space-4; border: 1px solid $client-border; border-radius: 8px; background: #fff; color: $error; font: inherit; font-size: 12px; cursor: pointer; }
+.cancel:disabled { cursor: not-allowed; opacity: .55; }

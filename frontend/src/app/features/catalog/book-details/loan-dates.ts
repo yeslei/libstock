@@ -6,6 +6,16 @@ export function todayInSaoPaulo(): string {
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
+/** Dias corridos de prazo de retirada de uma reserva de compra (mesma regra de `reservation_pickup_deadline`). */
+export const PICKUP_DEADLINE_DAYS = 5;
+
+/** Última data de retirada aceita numa solicitação de compra com exemplar destinado: hoje (America/Sao_Paulo) + 5 dias. */
+export function pickupDeadline(today: string = todayInSaoPaulo()): string {
+  const [year, month, day] = today.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + PICKUP_DEADLINE_DAYS));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
 export function nextMonth(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
   const [year, month, day] = value.split('-').map(Number);
