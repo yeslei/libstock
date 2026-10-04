@@ -59,7 +59,7 @@
               @case ('loaded') {
                 @if (!s.data.length) {
                   <p class="empty" role="status">
-                    @if (lastCopyTerm) { Nenhum exemplar encontrado. Confira o código, o ISBN ou o título. } @else { Nenhum exemplar didático disponível no momento. }
+                    @if (lastCopyTerm) { Nenhum exemplar disponível para “{{ lastCopyTerm }}”. } @else { Nenhum exemplar didático disponível no momento. }
                   </p>
                 } @else {
                   <ul class="results" aria-label="Exemplares encontrados">
@@ -70,7 +70,7 @@
                           <p class="result__meta">
                             Exemplar #{{ item.barcode }} ·
                             @if (isLoanable(item)) { Disponível · destinado a empréstimo }
-                            @else { Não disponível para empréstimo: {{ notLoanableReason(item) }} }
+                            @else { Não disponível para empréstimo: {{ notLoanableReason() }} }
                           </p>
                         </div>
                         <button class="btn" type="button" [disabled]="!isLoanable(item)" (click)="selectCopy(item)">Selecionar</button>

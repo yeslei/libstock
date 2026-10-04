@@ -57,38 +57,24 @@
       @case ('loaded') {
         @if (!s.data.length) {
           <p class="empty" role="status">
-            @if (searched()) { Nenhum exemplar encontrado para “{{ searched() }}”. Confira o código, o ISBN ou o título. } @else { Nenhum exemplar comercial disponível para venda no momento. }
+            @if (searched()) { Nenhum exemplar disponível para “{{ searched() }}”. } @else { Nenhum exemplar comercial disponível para venda no momento. }
           </p>
         } @else {
           <ul class="results">
             @for (copy of s.data; track copy.id) {
               <li>
-                @if (copy.sale_block_reason === 'DIDACTIC') {
-                  <article class="card card--danger result" [attr.aria-labelledby]="'copy-' + copy.id">
+                <article class="card result result--sellable" [attr.aria-labelledby]="'copy-' + copy.id">
+                  <div>
                     <h2 [id]="'copy-' + copy.id">{{ copy.book.title }}</h2>
-                    <p class="result__meta">Exemplar {{ copy.barcode }} • Didático</p>
-                    <p class="result__block" role="alert">Venda não permitida. Exemplares didáticos não podem ser vendidos.</p>
-                  </article>
-                } @else if (!copy.sellable) {
-                  <article class="card card--muted result" [attr.aria-labelledby]="'copy-' + copy.id">
-                    <h2 [id]="'copy-' + copy.id">{{ copy.book.title }}</h2>
-                    <p class="result__meta">Exemplar {{ copy.barcode }} • Comercial</p>
-                    <p class="result__block">Indisponível para venda no momento: {{ unavailableReason(copy) }}.</p>
-                  </article>
-                } @else {
-                  <article class="card result result--sellable" [attr.aria-labelledby]="'copy-' + copy.id">
-                    <div>
-                      <h2 [id]="'copy-' + copy.id">{{ copy.book.title }}</h2>
-                      <p class="result__ok">Comercial <span aria-hidden="true">•</span> Disponível para venda</p>
-                      <p class="result__meta">Exemplar {{ copy.barcode }} • {{ copy.free_commercial_copies }} exemplar(es) comercial(is) livre(s) da obra</p>
-                      <p class="result__price">{{ copy.sale_price === null ? 'Preço não cadastrado' : price(copy.sale_price) }}</p>
-                      @if (!canRegister(copy)) {
-                        <p class="note note--danger">Sem preço de venda cadastrado, a venda não pode ser registrada.</p>
-                      }
-                    </div>
-                    <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !client() || !canRegister(copy)" (click)="registerSale(copy)">Registrar venda</button>
-                  </article>
-                }
+                    <p class="result__ok">Comercial <span aria-hidden="true">•</span> Disponível para venda</p>
+                    <p class="result__meta">Exemplar {{ copy.barcode }} • {{ copy.free_commercial_copies }} exemplar(es) comercial(is) livre(s) da obra</p>
+                    <p class="result__price">{{ copy.sale_price === null ? 'Preço não cadastrado' : price(copy.sale_price) }}</p>
+                    @if (!canRegister(copy)) {
+                      <p class="note note--danger">Sem preço de venda cadastrado, a venda não pode ser registrada.</p>
+                    }
+                  </div>
+                  <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !client() || !canRegister(copy)" (click)="registerSale(copy)">Registrar venda</button>
+                </article>
               </li>
             }
           </ul>

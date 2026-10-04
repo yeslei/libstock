@@ -46,22 +46,15 @@ interface Completed {
 /** Lista padrão de exemplares do empréstimo direto (Issue #172): didáticos disponíveis. */
 const LOANABLE_LIST: CopyListFilter = { destination: 'DIDACTIC', available: true };
 
-const NOT_LOANABLE: Readonly<Record<string, string>> = {
-  BORROWED: 'emprestado',
-  RESERVED: 'reservado',
-  SOLD: 'vendido',
-  INACTIVE: 'inativo',
-};
 
 /** Exemplar didático livre (mesma definição de disponibilidade da retirada V2) de obra ativa. */
 export function isLoanable(copy: StaffCopyLookup): boolean {
   return copy.destination === 'DIDACTIC' && copy.free && copy.book.is_active;
 }
 
-function notLoanableReason(copy: StaffCopyLookup): string {
-  if (copy.destination === 'COMMERCIAL') return 'exemplar destinado à venda';
-  if (!copy.book.is_active) return 'obra inativa';
-  return NOT_LOANABLE[copy.status] ?? 'indisponível no momento';
+/** A lista já traz só didáticos livres; resta a obra inativa, que o backend não exclui. */
+function notLoanableReason(): string {
+  return 'obra inativa';
 }
 
 /**
@@ -118,7 +111,7 @@ export class CounterLoanCreateComponent {
       .pipe(
         switchMap((term) =>
           toLoadState(
-            term ? this.service.lookupCopies(term) : this.service.listCopies(LOANABLE_LIST),
+            this.service.listCopies(LOANABLE_LIST, term),
             'Não foi possível buscar os exemplares. Tente novamente.',
           ),
         ),

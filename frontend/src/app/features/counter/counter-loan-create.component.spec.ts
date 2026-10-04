@@ -24,9 +24,8 @@ const created: LoanRegistration = {
 };
 
 function setup(configure: (service: jasmine.SpyObj<CounterService>) => void = () => undefined) {
-  const service = jasmine.createSpyObj<CounterService>('CounterService', ['searchClients', 'lookupCopies', 'listCopies', 'registerLoan']);
+  const service = jasmine.createSpyObj<CounterService>('CounterService', ['searchClients', 'listCopies', 'registerLoan']);
   service.searchClients.and.returnValue(of([client()]));
-  service.lookupCopies.and.returnValue(of([copy()]));
   service.listCopies.and.returnValue(of([copy()]));
   configure(service);
   TestBed.configureTestingModule({
@@ -80,8 +79,7 @@ describe('Balcão: novo empréstimo', () => {
     const { root, service } = setup();
     expect(root.querySelector('h1')?.textContent).toBe('Novo empréstimo no balcão');
     expect(service.searchClients).toHaveBeenCalledOnceWith(undefined);
-    expect(service.listCopies).toHaveBeenCalledOnceWith({ destination: 'DIDACTIC', available: true });
-    expect(service.lookupCopies).not.toHaveBeenCalled();
+    expect(service.listCopies).toHaveBeenCalledOnceWith({ destination: 'DIDACTIC', available: true }, '');
     expect(root.textContent).toContain('Maria Silva');
     expect(root.textContent).toContain('Dom Casmurro');
     expect(button(root, 'Revisar empréstimo').disabled).toBeTrue();
@@ -101,16 +99,15 @@ describe('Balcão: novo empréstimo', () => {
     expect(service.searchClients).toHaveBeenCalledTimes(2);
     expect(service.searchClients.calls.mostRecent().args).toEqual([undefined]);
     submit(fixture, root.querySelector('#loan-copy')!.closest('form') as HTMLFormElement);
-    expect(service.lookupCopies).not.toHaveBeenCalled();
     expect(service.listCopies).toHaveBeenCalledTimes(2);
   });
 
-  it('filtra clientes e exemplares pela busca, sem repetir a lista padrão', () => {
+  it('filtra clientes e a lista de didáticos disponíveis (q, destination e available) pela busca', () => {
     const { fixture, root, service } = setup();
     fill(fixture, root);
     expect(service.searchClients.calls.allArgs()).toEqual([[undefined], ['maria']]);
-    expect(service.lookupCopies).toHaveBeenCalledOnceWith('casmurro');
-    expect(service.listCopies).toHaveBeenCalledTimes(1);
+    expect(service.listCopies.calls.mostRecent().args).toEqual([{ destination: 'DIDACTIC', available: true }, 'casmurro']);
+    expect(service.listCopies).toHaveBeenCalledTimes(2);
   });
 
   it('mostra carregando, vazio, erro e aviso de limite nas listas padrão', () => {
@@ -136,7 +133,7 @@ describe('Balcão: novo empréstimo', () => {
     const { fixture, root, service } = setup();
     fill(fixture, root);
     expect(service.searchClients).toHaveBeenCalledWith('maria');
-    expect(service.lookupCopies).toHaveBeenCalledOnceWith('casmurro');
+    expect(service.listCopies.calls.mostRecent().args).toEqual([{ destination: 'DIDACTIC', available: true }, 'casmurro']);
     expect(root.textContent).toContain('Cliente apto');
     expect(root.textContent).toContain('Conta ativa · sem pendências.');
     expect(root.textContent).toContain('#00101');
@@ -153,26 +150,32 @@ describe('Balcão: novo empréstimo', () => {
     expect(service.registerLoan).not.toHaveBeenCalled();
   });
 
-  it('só oferece exemplar didático livre de obra ativa e explica os demais', () => {
+  it('só habilita exemplar didático livre de obra ativa; a obra inativa é explicada', () => {
     expect(isLoanable(copy())).toBeTrue();
     expect(isLoanable(copy({ destination: 'COMMERCIAL' }))).toBeFalse();
     expect(isLoanable(copy({ free: false, status: 'BORROWED' }))).toBeFalse();
-    const { fixture, root } = setup((s) =>
-      s.lookupCopies.and.returnValue(of([
-        copy({ id: 1, barcode: 'C-1', destination: 'COMMERCIAL', free: true }),
-        copy({ id: 2, barcode: 'D-2', status: 'BORROWED', free: false }),
-        copy({ id: 3, barcode: 'D-3' , book: { id: 4, title: 'Inativa', author: 'x', isbn: null, is_active: false } }),
+    const { root } = setup((s) =>
+      s.listCopies.and.returnValue(of([
+        copy({ id: 3, barcode: 'D-3', book: { id: 4, title: 'Inativa', author: 'x', isbn: null, is_active: false } }),
         copy({ id: 4, barcode: 'D-4' }),
       ])));
-    type(fixture, root.querySelector('#loan-copy') as HTMLInputElement, 'x');
-    submit(fixture, root.querySelector('#loan-copy')!.closest('form') as HTMLFormElement);
     const items = Array.from(root.querySelectorAll('[aria-label="Exemplares encontrados"] li'));
-    expect(items.map((li) => li.querySelector('button')!.disabled)).toEqual([true, true, true, false]);
+    expect(items.map((li) => li.querySelector('button')!.disabled)).toEqual([true, false]);
     const text = items.map((li) => li.textContent?.replace(/\s+/g, ' '));
-    expect(text[0]).toContain('exemplar destinado à venda');
-    expect(text[1]).toContain('emprestado');
-    expect(text[2]).toContain('obra inativa');
-    expect(text[3]).toContain('Disponível · destinado a empréstimo');
+    expect(text[0]).toContain('obra inativa');
+    expect(text[1]).toContain('Disponível · destinado a empréstimo');
+  });
+
+  it('mostra vazio com o termo buscado e erro da busca, sem listar indisponíveis', () => {
+    const { fixture, root, service } = setup();
+    service.listCopies.and.returnValue(of([]));
+    type(fixture, root.querySelector('#loan-copy') as HTMLInputElement, 'X-1');
+    submit(fixture, root.querySelector('#loan-copy')!.closest('form') as HTMLFormElement);
+    expect(root.querySelector('.empty')?.textContent).toContain('Nenhum exemplar disponível para “X-1”');
+    service.listCopies.and.returnValue(throwError(() => ({ detail: 'Falha ao consultar.' })));
+    submit(fixture, root.querySelector('#loan-copy')!.closest('form') as HTMLFormElement);
+    expect(root.querySelector('app-alert')?.textContent).toContain('Falha ao consultar.');
+    expect(root.querySelector('.empty')).toBeNull();
   });
 
   it('mostra a revisão com os dados escolhidos, sem calcular prazo, e não chama o POST ao revisar', () => {
@@ -268,8 +271,8 @@ describe('Balcão: novo empréstimo', () => {
     expect(alert).toContain('Exemplar não está disponível para empréstimo.');
     expect(root.textContent).toContain('atualize a seleção antes de tentar novamente');
     click(fixture, button(root, 'Atualizar seleção'));
-    expect(service.lookupCopies).toHaveBeenCalledTimes(2);
-    expect(service.lookupCopies.calls.mostRecent().args).toEqual(['casmurro']);
+    expect(service.listCopies).toHaveBeenCalledTimes(3);
+    expect(service.listCopies.calls.mostRecent().args).toEqual([{ destination: 'DIDACTIC', available: true }, 'casmurro']);
     expect(button(root, 'Revisar empréstimo').disabled).toBeTrue();
   });
 

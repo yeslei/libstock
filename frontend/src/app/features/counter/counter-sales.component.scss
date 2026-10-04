@@ -36,11 +36,6 @@
   }
 }
 
-.card--muted {
-  background: #fff;
-  color: $staff-muted;
-}
-
 .result__ok {
   color: $staff-accent;
 }
@@ -53,14 +48,6 @@
   color: $staff-sidebar;
   font-size: 20px;
   font-weight: 600;
-}
-
-.result__block {
-  color: $error;
-}
-
-.card--muted .result__block {
-  color: $staff-muted;
 }
 
 .block {
