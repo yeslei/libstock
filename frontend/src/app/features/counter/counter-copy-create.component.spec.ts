@@ -90,6 +90,18 @@ describe('Balcão: novo exemplar', () => {
     expect(copies.create).not.toHaveBeenCalled();
   });
 
+  it('rejeita preço zero para venda, como a edição (Issue #175)', () => {
+    const { root, copies, type, choose, save } = setup(of(detail()));
+    type('#copy-barcode', '00105');
+    choose('COMMERCIAL');
+    type('#copy-price', '0');
+    save();
+    expect(root.textContent).toContain('O preço de venda deve ser maior que zero.');
+    type('#copy-price', '0,00');
+    expect(root.textContent).toContain('O preço de venda deve ser maior que zero.');
+    expect(copies.create).not.toHaveBeenCalled();
+  });
+
   it('envia exemplar de empréstimo sem preço e confirma só após 2xx, informando a nova quantidade', () => {
     const ctx = setup(of(detail()));
     const post = new Subject<CopyResponse>();

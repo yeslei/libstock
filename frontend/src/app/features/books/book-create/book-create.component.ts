@@ -47,7 +47,7 @@ const CONDITION_ERRORS = {
 };
 const PRICE_ERRORS = {
   required: 'Informe o preço do exemplar comercial.',
-  min: 'O preço não pode ser negativo.',
+  min: 'O preço de venda deve ser maior que zero.',
   server: 'Confira o preço informado.',
 };
 
@@ -79,7 +79,7 @@ export class BookCreateComponent {
     barcode: ['', [Validators.required, Validators.maxLength(100)]],
     destination: ['DIDACTIC' as 'DIDACTIC' | 'COMMERCIAL', [Validators.required]],
     condition: ['', [Validators.maxLength(30)]],
-    salePrice: this.fb.control<number | null>(null, [Validators.min(0)]),
+    salePrice: this.fb.control<number | null>(null, [Validators.min(0.01)]),
     acquiredAt: [''],
   });
   /** Categorias do catálogo escolhidas (Issue #174); vão em `genre_ids`. */

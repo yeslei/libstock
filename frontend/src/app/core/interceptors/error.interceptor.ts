@@ -68,13 +68,24 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   book_inactive: 'A obra deste exemplar está inativa e não aceita novas operações.',
   // Acervo administrado pelo vendedor (Issue #151).
   book_without_active_copy: 'A obra não pode ser reativada sem ao menos um exemplar ativo.',
-  copy_inactive: 'Este exemplar está inativo e não pode ser editado.',
+  copy_inactive: 'Este exemplar está inativo e não pode ser usado nesta operação.',
   copy_allocated: 'Este exemplar está destinado a uma reserva de compra e não pode ser editado.',
   copy_needed_for_requests: 'Este é o último exemplar didático livre da obra e há solicitação de retirada pendente. Atenda ou cancele a solicitação antes de converter para venda.',
   copy_in_operation: 'Este exemplar está em uma venda em andamento e não pode ser editado.',
   copy_sale_price_required: 'Exemplar destinado à venda exige preço de venda maior que zero.',
   copy_sale_price_not_allowed: 'Exemplar didático não pode ter preço de venda.',
   copy_update_persistence_error: 'Não foi possível atualizar o exemplar. Nada foi alterado; tente novamente.',
+  // Contrato de erros (Issue #175): venda, empréstimo, exemplar e validação com código estável.
+  validation_error: 'Confira os dados informados e tente novamente.',
+  duplicate_sale_item: 'O mesmo exemplar foi informado mais de uma vez na venda. Remova a repetição.',
+  copy_not_for_sale: 'Exemplares didáticos não podem ser vendidos. Escolha um exemplar comercial.',
+  sale_conflict: 'Não foi possível registrar a venda porque os exemplares mudaram. Atualize e tente novamente.',
+  sale_persistence_error: 'Não foi possível registrar a venda. Nada foi alterado; tente novamente.',
+  loan_conflict: 'Este exemplar já possui um empréstimo em aberto.',
+  loan_persistence_error: 'Não foi possível registrar o empréstimo. Nada foi alterado; tente novamente.',
+  loan_return_conflict: 'Não foi possível registrar a devolução porque o empréstimo mudou. Atualize a lista.',
+  loan_return_persistence_error: 'Não foi possível registrar a devolução. Nada foi alterado; tente novamente.',
+  copy_persistence_error: 'Não foi possível cadastrar o exemplar. Nada foi alterado; tente novamente.',
   book_has_active_operations: 'Esta obra possui operações em andamento e não pode ser inativada.',
 };
 

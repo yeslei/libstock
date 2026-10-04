@@ -74,7 +74,7 @@
           <div class="field">
             <label class="field__label" for="book-sale-price">Preço de venda <span aria-hidden="true">*</span></label>
             <div class="field__control" [class.field__control--invalid]="priceError() !== null">
-              <input class="field__input" id="book-sale-price" type="number" min="0" step="0.01" formControlName="salePrice" [attr.aria-invalid]="priceError() !== null" />
+              <input class="field__input" id="book-sale-price" type="number" min="0.01" step="0.01" formControlName="salePrice" [attr.aria-invalid]="priceError() !== null" />
             </div>
             @if (priceError(); as message) { <p class="field__error" aria-live="polite">{{ message }}</p> }
           </div>

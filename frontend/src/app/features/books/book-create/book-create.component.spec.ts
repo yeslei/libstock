@@ -378,6 +378,31 @@ describe('BookCreateComponent', () => {
     expect(service.create.calls.mostRecent().args[0].initial_copy.sale_price).toBe(49.9);
   });
 
+  it('rejeita preço zero do exemplar comercial na inclusão da obra (Issue #175)', () => {
+    input('book-isbn', '9788575225530');
+    input('book-barcode', 'COM-0');
+    const root = fixture.nativeElement as HTMLElement;
+    const destination = root.querySelector<HTMLSelectElement>('#book-destination')!;
+    destination.value = 'COMMERCIAL';
+    destination.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    input('book-sale-price', '0');
+    root.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+    expect(service.create).not.toHaveBeenCalled();
+    expect(root.textContent).toContain('O preço de venda deve ser maior que zero.');
+  });
+
+  it('mostra a mensagem do 422 de domínio de preço devolvido pelo backend', () => {
+    service.create.and.returnValue(fail({
+      status: 422, code: 'copy_sale_price_required',
+      detail: 'Exemplar destinado à venda exige preço de venda maior que zero.',
+    }));
+    input('book-isbn', '9788575225530');
+    submit();
+    expect(fixture.nativeElement.textContent).toContain('exige preço de venda maior que zero');
+  });
+
   it('orienta cadastro manual quando a integração retorna 503', () => {
     service.create.and.returnValue(fail({ status: 503, code: 'google_books_rate_limited', detail: 'Serviço indisponível.' }));
     input('book-isbn', '9788575225530');
