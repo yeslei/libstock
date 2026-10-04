@@ -35,7 +35,7 @@ interface BlockedState {
 interface OperationLink {
   readonly type: 'open_loan' | 'pending_loan_request' | 'purchase_reservation';
   readonly copy_barcode: string | null;
-  readonly client_name: string | null;
+  readonly client_name?: string | null;
 }
 
 interface BlockDetails {
@@ -143,6 +143,7 @@ export class CounterCatalogBookComponent {
 
   protected askSaveGenre(book: StaffCatalogBookDetail): void {
     if (!this.canEdit || this.genreTooLong() || !this.changed(book)) return;
+    this.blocked.set(null);
     const next = this.genre().trim() || null;
     this.flow.ask({
       title: 'Salvar alteração da obra?',
