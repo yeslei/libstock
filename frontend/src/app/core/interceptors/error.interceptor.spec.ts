@@ -35,6 +35,16 @@ describe('errorInterceptor', () => {
     expect(fail(500, { detail: 'x', code: 'copy_delete_persistence_error' }).detail).toContain('Nada foi alterado');
   });
 
+  it('mapeia os códigos estáveis de reativação de obra e edição de exemplar', () => {
+    expect(fail(409, { detail: 'x', code: 'book_without_active_copy' }).detail).toContain('sem ao menos um exemplar ativo');
+    expect(fail(409, { detail: 'x', code: 'copy_inactive' }).detail).toContain('inativo');
+    expect(fail(409, { detail: 'x', code: 'copy_allocated' }).detail).toContain('reserva de compra');
+    expect(fail(409, { detail: 'x', code: 'copy_in_operation' }).detail).toContain('venda em andamento');
+    expect(fail(422, { detail: 'x', code: 'copy_sale_price_required' }).detail).toContain('maior que zero');
+    expect(fail(422, { detail: 'x', code: 'copy_sale_price_not_allowed' }).detail).toContain('didático');
+    expect(fail(500, { detail: 'x', code: 'copy_update_persistence_error' }).detail).toContain('Nada foi alterado');
+  });
+
   it('mapeia exemplar comercial sem preço na venda direta', () => {
     expect(fail(409, { detail: 'x', code: 'copy_without_price' }).detail).toBe(
       'Este exemplar comercial não tem preço de venda cadastrado e não pode ser vendido.',

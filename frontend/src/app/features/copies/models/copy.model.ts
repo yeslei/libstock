@@ -9,6 +9,14 @@ export interface CopyCreateRequest {
   readonly acquiredAt: string | null;
 }
 
+/** Corpo de `PATCH /api/v1/copies/{id}`; o código do exemplar é imutável e não faz parte da edição. */
+export interface CopyUpdateRequest {
+  readonly destination?: DestinationType;
+  readonly condition?: string | null;
+  readonly salePrice?: number | null;
+  readonly acquiredAt?: string | null;
+}
+
 export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'SOLD' | 'RESERVED' | 'INACTIVE';
 
 export interface CopyResponse {

@@ -91,9 +91,12 @@ describe('Balcão: acervo', () => {
     expect(root.textContent).toContain('Mostrando as primeiras 50 obras');
   });
 
-  it('oferece "+ Nova obra" apenas ao administrador', () => {
+  it('oferece "+ Nova obra" a quem administra o acervo (vendedor e administrador), não a outros papéis', () => {
+    const user = setup((s) => s.listCatalogBooks.and.returnValue(of([])), ['USER']);
+    expect(user.root.textContent).not.toContain('+ Nova obra');
+    TestBed.resetTestingModule();
     const seller = setup((s) => s.listCatalogBooks.and.returnValue(of([])));
-    expect(seller.root.textContent).not.toContain('+ Nova obra');
+    expect(seller.root.textContent).toContain('+ Nova obra');
     TestBed.resetTestingModule();
     const admin = setup((s) => s.listCatalogBooks.and.returnValue(of([])), ['ADMINISTRATOR']);
     const link = Array.from(admin.root.querySelectorAll('a')).find((a) => a.textContent?.trim() === '+ Nova obra');

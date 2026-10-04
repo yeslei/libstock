@@ -182,10 +182,13 @@ describe('Balcão: novo exemplar', () => {
     expect((ctx.root.querySelector('#copy-barcode') as HTMLInputElement).value).toBe('');
   });
 
-  it('não oferece o formulário ao vendedor nem para obra inativa', () => {
+  it('oferece o formulário ao vendedor, mas não a papéis sem permissão nem para obra inativa', () => {
     const seller = setup(of(detail()), ['SELLER']);
-    expect(seller.root.textContent).toContain('Você não tem permissão para incluir exemplares.');
-    expect(seller.root.querySelector('form')).toBeNull();
+    expect(seller.root.querySelector('form')).not.toBeNull();
+    TestBed.resetTestingModule();
+    const user = setup(of(detail()), ['USER']);
+    expect(user.root.textContent).toContain('Você não tem permissão para incluir exemplares.');
+    expect(user.root.querySelector('form')).toBeNull();
     TestBed.resetTestingModule();
     const inactive = setup(of(detail({ is_active: false })));
     expect(inactive.root.textContent).toContain('A obra está inativa e não aceita novos exemplares.');
