@@ -1,9 +1,11 @@
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Book, Client, Copy, Sale, SaleItem, SaleStatus
+from app.models.domain import Book, Client, Copy, PurchaseReservation, ReservationStatus, Sale, SaleItem, SaleStatus
+from app.repositories.reservation_expiry import expire_due_reservations
 
 
 class SaleRepository:
@@ -26,6 +28,20 @@ class SaleRepository:
             .execution_options(populate_existing=True)
         ).all()
         return {book.id: book for book in books}
+
+    def expire_due_reservations(self, book_ids, now: datetime) -> None:
+        """Com os livros travados, efetiva a expiração das reservas vencidas (livro, depois reservas)."""
+        for book_id in sorted(book_ids):
+            expire_due_reservations(self.db, book_id, now)
+
+    def reserved_copy_ids(self, copy_ids: list[int]) -> set[int]:
+        """Exemplares ainda destinados a reserva NOTIFIED (as vencidas já foram expiradas)."""
+        return set(self.db.scalars(
+            select(PurchaseReservation.allocated_copy_id).where(
+                PurchaseReservation.allocated_copy_id.in_(copy_ids),
+                PurchaseReservation.status == ReservationStatus.NOTIFIED,
+            )
+        ))
 
     def find_copies_for_sale(self, copy_ids: list[int]) -> list[Copy]:
         statement = (

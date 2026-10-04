@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 
 import httpx
 from pydantic import ValidationError
@@ -7,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.business_dates import BUSINESS_ZONE
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
@@ -294,7 +296,7 @@ class BookService:
         """Bloqueia a inativação enquanto houver operação em andamento (Issue #135)."""
         # Com o livro e os exemplares travados, nenhuma retirada, empréstimo ou
         # destinação concorrente confirma entre a contagem e o commit.
-        self.repository.lock_book_for_inactivation(book_id)
+        self.repository.lock_book_for_inactivation(book_id, datetime.now(BUSINESS_ZONE))
         counts = self.repository.active_operation_counts(book_id)
         if any(counts.values()):
             raise BookHasActiveOperationsError(
