@@ -1,6 +1,7 @@
 import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { receiptGet, receiptStub } from '../receipts/receipt-testing.spec';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
@@ -24,7 +25,7 @@ function setup<T>(component: new () => T, configure: (service: jasmine.SpyObj<Co
   configure(service);
   TestBed.configureTestingModule({
     imports: [component],
-    providers: [provideRouter([]), { provide: CounterService, useValue: service }],
+    providers: [provideRouter([]), { provide: CounterService, useValue: service }, receiptStub()],
   });
   const fixture = TestBed.createComponent(component);
   fixture.detectChanges();
@@ -195,6 +196,8 @@ describe('Balcão: registrar devolução', () => {
     fixture.detectChanges();
     expect(dialog(root)).toBeNull();
     expect(snackbarMessage()).toContain('Devolução confirmada: exemplar D-001 de “Dom Casmurro”.');
+    expect(receiptGet()).toHaveBeenCalledOnceWith('return', 21);
+    expect(root.querySelector('app-receipt')).not.toBeNull();
     expect(service.listLoans).toHaveBeenCalledTimes(2);
     expect(root.querySelector('.empty')).not.toBeNull();
   });

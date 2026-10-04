@@ -5,6 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
+import { receiptGet, receiptStub } from '../receipts/receipt-testing.spec';
 import { CounterService, StaffClient, StaffLoan, StaffLoanRequest } from './counter.service';
 import { ClientsPanelComponent } from './clients-panel.component';
 import { businessToday } from './business-date';
@@ -38,7 +39,7 @@ function setup<T>(component: Type<T>, configure: (service: Spies) => void = () =
     'listPurchaseReservations', 'allocatePurchase', 'confirmSale',
   ]) as unknown as Spies;
   configure(service);
-  TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]), { provide: CounterService, useValue: service }, ...extra] });
+  TestBed.configureTestingModule({ imports: [component], providers: [provideRouter([]), { provide: CounterService, useValue: service }, receiptStub(), ...extra] });
   const fixture = TestBed.createComponent(component);
   fixture.detectChanges();
   return { fixture, service, root: fixture.nativeElement as HTMLElement };
@@ -120,6 +121,8 @@ describe('Balcão: retiradas', () => {
     fixture.detectChanges();
     expect(dialog(root)).toBeNull();
     expect(snackbarMessage()).toContain('Retirada confirmada. Empréstimo #77');
+    expect(receiptGet()).toHaveBeenCalledOnceWith('loan', 77);
+    expect(root.querySelector('app-receipt')).not.toBeNull();
     expect(service.listLoanRequests).toHaveBeenCalledTimes(2);
     expect(root.textContent).toContain('Nenhuma solicitação de empréstimo pendente.');
   });

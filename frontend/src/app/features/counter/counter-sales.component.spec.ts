@@ -1,6 +1,7 @@
 import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { receiptGet, receiptStub } from '../receipts/receipt-testing.spec';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
@@ -22,7 +23,7 @@ function setup(configure: (service: jasmine.SpyObj<CounterService>) => void) {
   configure(service);
   TestBed.configureTestingModule({
     imports: [CounterSalesComponent],
-    providers: [provideRouter([]), { provide: CounterService, useValue: service }],
+    providers: [provideRouter([]), { provide: CounterService, useValue: service }, receiptStub()],
   });
   const fixture = TestBed.createComponent(CounterSalesComponent);
   fixture.detectChanges();
@@ -166,6 +167,8 @@ describe('Balcão: registrar venda', () => {
     expect(feedback).toContain('C-007 vendido');
     expect(feedback).toContain('38,90');
     expect(feedback).toContain('venda nº 12');
+    expect(receiptGet()).toHaveBeenCalledOnceWith('sale', 12);
+    expect(root.querySelector('app-receipt')).not.toBeNull();
     expect(feedback).not.toMatch(/pendente/i);
     expect(service.lookupCopies).toHaveBeenCalledTimes(2);
     expect(root.querySelector('article button')).toBeNull();
