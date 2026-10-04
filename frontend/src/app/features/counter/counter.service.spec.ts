@@ -173,15 +173,6 @@ describe('CounterService', () => {
       expect(error?.code).toBe('book_not_found');
     });
 
-    it('localiza exemplares por código, ISBN ou título', () => {
-      service.lookupCopies(' 978-0 ').subscribe();
-      const request = http.expectOne((r) => r.url === '/api/v1/staff/copies');
-      expect(request.request.method).toBe('GET');
-      expect(request.request.params.get('q')).toBe('978-0');
-      expect(request.request.params.get('limit')).toBe('20');
-      request.flush([]);
-    });
-
     it('lista exemplares sem termo, filtrando por finalidade e disponibilidade', () => {
       service.listCopies({ destination: 'COMMERCIAL', available: true }).subscribe();
       const request = http.expectOne((r) => r.url === '/api/v1/staff/copies');
@@ -192,11 +183,21 @@ describe('CounterService', () => {
       request.flush([]);
     });
 
-    it('explica o termo ausente na busca de exemplares', () => {
-      let error: ApiError | undefined;
-      service.lookupCopies('x').subscribe({ error: (e) => (error = e) });
-      http.expectOne(() => true).flush({ code: 'search_term_required', detail: 'x' }, { status: 422, statusText: 'x' });
-      expect(error?.detail).toBe('Informe o código do exemplar, o ISBN ou o título.');
+    it('a busca filtra dentro da lista de disponíveis: envia q junto com destination e available', () => {
+      service.listCopies({ destination: 'DIDACTIC', available: true }, ' 978-0 ').subscribe();
+      const request = http.expectOne((r) => r.url === '/api/v1/staff/copies');
+      expect(request.request.params.get('q')).toBe('978-0');
+      expect(request.request.params.get('destination')).toBe('DIDACTIC');
+      expect(request.request.params.get('available')).toBe('true');
+      expect(request.request.params.get('limit')).toBe('20');
+      request.flush([]);
+    });
+
+    it('termo vazio ou só com espaços volta à lista padrão, sem q', () => {
+      service.listCopies({ destination: 'COMMERCIAL', available: true }, '  ').subscribe();
+      const request = http.expectOne((r) => r.url === '/api/v1/staff/copies');
+      expect(request.request.params.has('q')).toBeFalse();
+      request.flush([]);
     });
   });
 

@@ -23,9 +23,8 @@ const client = (over: Partial<StaffClient> = {}): StaffClient => ({
 const confirmed: SaleRegistration = { id: 12, client_id: 3, status: 'CONFIRMED', total_amount: '38.90' };
 
 function setup(configure: (service: jasmine.SpyObj<CounterService>) => void) {
-  const service = jasmine.createSpyObj<CounterService>('CounterService', ['lookupCopies', 'listCopies', 'searchClients', 'registerSale']);
+  const service = jasmine.createSpyObj<CounterService>('CounterService', ['listCopies', 'searchClients', 'registerSale']);
   service.listCopies.and.returnValue(of([copy()]));
-  service.lookupCopies.and.returnValue(of([copy()]));
   service.searchClients.and.returnValue(of([client()]));
   configure(service);
   TestBed.configureTestingModule({
@@ -69,20 +68,27 @@ describe('Balcão: registrar venda', () => {
     const { root, service } = setup(() => undefined);
     expect(root.querySelector('h1')?.textContent).toBe('Registrar venda');
     expect(root.querySelector('#sale-q')?.getAttribute('placeholder')).toBe('Filtrar por código, ISBN ou título');
-    expect(service.listCopies).toHaveBeenCalledOnceWith({ destination: 'COMMERCIAL', available: true });
+    expect(service.listCopies).toHaveBeenCalledOnceWith({ destination: 'COMMERCIAL', available: true }, '');
     expect(service.searchClients).toHaveBeenCalledOnceWith(undefined);
-    expect(service.lookupCopies).not.toHaveBeenCalled();
     expect(root.querySelector('article')?.textContent).toContain('Sapiens');
     expect(root.querySelector('app-client-picker')?.textContent).toContain('Maria Silva');
   });
 
-  it('a busca filtra a lista e o filtro vazio volta à lista padrão', () => {
+  it('a busca filtra a lista de comerciais disponíveis enviando q, destination e available', () => {
     const { fixture, root, service } = setup(() => undefined);
     submitSearch(fixture, root, ' Sapiens ');
-    expect(service.lookupCopies).toHaveBeenCalledOnceWith('Sapiens');
-    submitSearch(fixture, root, '  ');
-    expect(service.lookupCopies).toHaveBeenCalledTimes(1);
     expect(service.listCopies).toHaveBeenCalledTimes(2);
+    expect(service.listCopies.calls.mostRecent().args).toEqual([{ destination: 'COMMERCIAL', available: true }, 'Sapiens']);
+    submitSearch(fixture, root, '  ');
+    expect(service.listCopies.calls.mostRecent().args).toEqual([{ destination: 'COMMERCIAL', available: true }, '']);
+  });
+
+  it('a busca não exibe indisponíveis nem didáticos: só o que o backend devolve filtrado', () => {
+    const { fixture, root } = setup(() => undefined);
+    submitSearch(fixture, root, 'Sapiens');
+    expect(root.querySelectorAll('article').length).toBe(1);
+    expect(root.textContent).not.toContain('Indisponível para venda');
+    expect(root.textContent).not.toContain('Didático');
   });
 
   it('mostra destinação, disponibilidade, preço e estoque reais do exemplar comercial', () => {
@@ -131,30 +137,6 @@ describe('Balcão: registrar venda', () => {
     expect(button(root, 'Registrar venda').disabled).toBeFalse();
   });
 
-  it('bloqueia o exemplar didático sem oferecer venda e sem a nota de desenvolvimento', () => {
-    const { fixture, root } = setup((s) => s.lookupCopies.and.returnValue(of([
-      copy({ destination: 'DIDACTIC', sale_price: null, sellable: false, sale_block_reason: 'DIDACTIC' }),
-    ])));
-    submitSearch(fixture, root, 'C-007');
-    const card = root.querySelector('article')!;
-    expect(card.textContent).toContain('Didático');
-    expect(card.textContent).toContain('Venda não permitida. Exemplares didáticos não podem ser vendidos.');
-    expect(card.querySelector('button')).toBeNull();
-    expect(root.textContent).not.toContain('LEMBRETE');
-    expect(root.textContent).not.toContain('XXXXXX');
-  });
-
-  it('explica o exemplar indisponível sem botão de venda', () => {
-    const { fixture, root } = setup((s) => s.lookupCopies.and.returnValue(of([
-      copy({ status: 'BORROWED', free: false, sellable: false, sale_block_reason: 'NOT_AVAILABLE' }),
-      copy({ id: 8, barcode: 'C-008', status: 'AVAILABLE', free: false, sellable: false, sale_block_reason: 'NOT_AVAILABLE' }),
-    ])));
-    submitSearch(fixture, root, 'Sapiens');
-    const cards = root.querySelectorAll('article');
-    expect(cards[0].textContent).toContain('Indisponível para venda no momento: emprestado.');
-    expect(cards[1].textContent).toContain('venda em andamento ou reservado para um cliente');
-    expect(root.querySelector('article button')).toBeNull();
-  });
 
   it('não permite registrar sem preço cadastrado', () => {
     const { fixture, root, service } = setup((s) => s.listCopies.and.returnValue(of([copy({ sale_price: null })])));
@@ -171,10 +153,10 @@ describe('Balcão: registrar venda', () => {
     waiting.next([]);
     fixture.detectChanges();
     expect(root.querySelector('.empty')?.textContent).toContain('Nenhum exemplar comercial disponível para venda no momento.');
-    service.lookupCopies.and.returnValue(of([]));
+    service.listCopies.and.returnValue(of([]));
     submitSearch(fixture, root, 'X-1');
-    expect(root.querySelector('.empty')?.textContent).toContain('Nenhum exemplar encontrado para “X-1”');
-    service.lookupCopies.and.returnValue(throwError(() => ({ detail: 'Falha ao consultar.' })));
+    expect(root.querySelector('.empty')?.textContent).toContain('Nenhum exemplar disponível para “X-1”');
+    service.listCopies.and.returnValue(throwError(() => ({ detail: 'Falha ao consultar.' })));
     submitSearch(fixture, root, 'X-2');
     expect(root.querySelector('app-alert')?.textContent).toContain('Falha ao consultar.');
     expect(root.querySelector('.empty')).toBeNull();
@@ -210,7 +192,7 @@ describe('Balcão: registrar venda', () => {
     expect(service.registerSale).toHaveBeenCalledOnceWith(3, 7);
     expect(submit.disabled).toBeTrue();
     expect(snackbarMessage()).toBe('');
-    service.listCopies.and.returnValue(of([copy({ free: false, sellable: false, sale_block_reason: 'NOT_AVAILABLE', free_commercial_copies: 2 })]));
+    service.listCopies.and.returnValue(of([]));
     response.next(confirmed);
     response.complete();
     fixture.detectChanges();

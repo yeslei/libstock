@@ -8,20 +8,12 @@ import { SpinnerComponent } from '../../shared/components/spinner/spinner.compon
 import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { ClientPickerComponent } from './client-picker.component';
-import { COPY_LOOKUP_LIMIT, CopyListFilter, CopyStatus, CounterService, StaffClient, StaffCopyLookup } from './counter.service';
+import { COPY_LOOKUP_LIMIT, CopyListFilter, CounterService, StaffClient, StaffCopyLookup } from './counter.service';
 import { ActionFlow, formatPrice, toLoadState } from './desk-flow';
 import { ReceiptComponent } from '../receipts/receipt.component';
 
 /** Lista padrão da venda direta (Issue #172): exemplares comerciais disponíveis. */
 const SELLABLE_LIST: CopyListFilter = { destination: 'COMMERCIAL', available: true };
-
-const UNAVAILABLE_REASON: Readonly<Record<CopyStatus, string>> = {
-  AVAILABLE: 'venda em andamento ou reservado para um cliente',
-  BORROWED: 'emprestado',
-  RESERVED: 'reservado',
-  SOLD: 'vendido',
-  INACTIVE: 'inativo',
-};
 
 /**
  * Frame "Funcionário / Venda": lista os exemplares comerciais disponíveis ao abrir e filtra por código, ISBN ou título
@@ -65,7 +57,7 @@ export class CounterSalesComponent {
         switchMap(() => {
           const term = this.searched();
           return toLoadState(
-            term ? this.service.lookupCopies(term) : this.service.listCopies(SELLABLE_LIST),
+            this.service.listCopies(SELLABLE_LIST, term),
             'Não foi possível carregar os exemplares. Tente novamente.',
           );
         }),
@@ -90,9 +82,6 @@ export class CounterSalesComponent {
     this.searches.next();
   }
 
-  protected unavailableReason(copy: StaffCopyLookup): string {
-    return UNAVAILABLE_REASON[copy.status];
-  }
 
   /** Só há venda com o preço cadastrado; o backend recusa exemplar comercial sem preço (`copy_without_price`). */
   protected canRegister(copy: StaffCopyLookup): boolean {
