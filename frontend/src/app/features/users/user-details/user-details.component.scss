@@ -1,12 +1,30 @@
 @use 'variables' as *;
 
-.details-page { min-height: 100dvh; padding: $space-6 $space-4; background: $bg-page; }
-.details-card { display: grid; gap: $space-4; max-width: 600px; margin: 0 auto; padding: $space-8; border: 1px solid $border; border-radius: $radius-lg; background: $bg-surface; box-shadow: $shadow-md; }
-.eyebrow { color: $verde-medio; font-size: $font-size-xs; font-weight: 700; text-transform: uppercase; }
-h1 { color: $primary; }
+.details-page {
+  display: grid;
+  align-content: start;
+  gap: $space-5;
+  min-height: 100dvh;
+  padding: $space-6 $space-4;
+  background: $bg-page;
+}
+.details-page > * { width: 100%; max-width: 760px; margin-inline: auto; }
+.back { color: $verde-medio; font-size: $font-size-sm; font-weight: 600; text-decoration: none; }
+h1 { margin: 0; color: $primary; }
+h2 { margin: 0; color: $primary; font-size: 1.25rem; }
+.meta { margin: $space-1 0 0; color: $verde-medio; font-weight: 600; }
+.muted { margin: $space-2 0 0; color: $text-muted; font-size: $font-size-sm; }
+.details-card { display: grid; gap: $space-4; padding: $space-6; border: 1px solid $border; border-radius: $radius-lg; background: $bg-surface; }
 .state { display: flex; justify-content: center; gap: $space-2; padding: $space-8; color: $text-muted; }
 dl { display: grid; gap: $space-3; margin: 0; }
 dl div { padding-bottom: $space-3; border-bottom: 1px solid $border; }
 dt { color: $text-muted; font-size: $font-size-sm; }
 dd { margin: $space-1 0 0; font-weight: 600; }
-button { min-height: 44px; padding: 0 $space-4; border: 1px solid $primary; border-radius: $radius-md; background: $primary; color: #fff; font-weight: 600; cursor: pointer; }
+.actions { display: flex; flex-wrap: wrap; gap: $space-3; }
+.button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 $space-4; border: 1px solid $primary; border-radius: $radius-md;
+  background: $bg-surface; color: $primary; font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.button--primary { background: $primary; color: #fff; }
+@media (max-width: $bp-md) { .details-card { padding: $space-4; } }

@@ -384,8 +384,9 @@ Criação e edição reutilizam o mesmo template. Drawers, modais, confirmaçõe
 
 Na gestão de usuários, o botão “Cadastrar novo usuário” conduz à tela de
 cadastro já existente em `/gestao/funcionarios`. Não existe a rota
-`/gestao/usuarios/novo`. A exclusão definitiva permanece pendente e deve ser
-mostrada desabilitada; a inativação é a ação operacional disponível.
+`/gestao/usuarios/novo`. A exclusão definitiva permanece pendente e, seguindo a
+referência da Issue #131, não é mais exibida na listagem; a inativação é a ação
+operacional disponível e fica na tela de edição, com confirmação.
 
 ## 11. Navegação por papel
 
@@ -631,3 +632,18 @@ Referências: `png telas/paineis/02 — Cliente.png` (telas 4 a 7), `png telas/p
 Feedback: sucesso só após 2xx; envio bloqueado enquanto há requisição em curso; erros de domínio (duplicidade, indisponível, inelegível) usam a mensagem e o código do backend e não geram snackbar de sucesso; duplicidade oferece o link para Meus empréstimos / Minhas reservas.
 
 Divergências e lacunas (detalhes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21): (1) "Retire até <data>" aparece somente quando `expires_at` existe; não há prazo aprovado, e a data de 23/09 da imagem é ilustrativa; (2) "Situação do cliente: apto — conta ativa e sem pendências" (01-2) não é exibida, porque não há consulta de elegibilidade do cliente; a elegibilidade é decidida pelo backend no envio; (3) a pendência de penalidade cadastrada sem empréstimo em atraso não tem consulta de detalhes para o cliente (lacuna); (4) as etapas de confirmar, registrada e bloqueada são estados da própria rota `/livros/:id`, sem rotas novas; (5) "Consulta local" segue não configurada e só mostra texto informativo se um dia estiver configurada; (6) o tipo de "Outras formas de acesso" de 01-1 não foi criado, pois repete as modalidades já exibidas. Dados das imagens são ilustrativos e notas para desenvolvedores não são interface.
+
+### Gestão de usuários do administrador — Issue #131
+
+Referências: `png telas/paineis/04 — Administrador.png` (telas 1 e 2), `png telas/recortes/admin_01.png`, `admin_02.png` e `png telas/telas/administrador/Detalhe e edição de usuário.png`.
+
+| Frame | Rota | Endpoints | Situação |
+| --- | --- | --- | --- |
+| Gestão de usuários (admin_01) | `/gestao/usuarios` | `GET /api/v1/users?role=` | Colunas Usuário, E-mail, Perfil, Status e Ações (Ver / Editar; apenas Ver para inativos). Busca local por nome ou e-mail sobre a lista carregada; filtro por perfil mantido. Sem Inativar nem Excluir na lista |
+| Sidebar com "Usuários" (admin_01) | item do menu lateral do balcão | nenhum | Item "Usuários" visível somente para `ADMINISTRATOR`, apontando para `/gestao/usuarios`; as rotas mantêm `authGuard` e `roleGuard` (`ADMINISTRATOR`) |
+| Detalhe e edição de usuário (admin_02) | `/gestao/usuarios/:id/editar` | `GET /api/v1/users/{id}`, `PATCH /api/v1/users/{id}`, `PATCH /api/v1/users/{id}/inactivate`, `GET /api/v1/staff/clients/{id}/pendencies` | Nome, e-mail e Perfil editáveis; "Salvar alterações"; "Inativar usuário" abre o cartão "Inativar usuário?" (Cancelar / Confirmar inativação). Mudança de perfil também pede confirmação. Sucesso só após 2xx, botões bloqueados durante a requisição, erros de domínio no snackbar compartilhado |
+| Detalhe somente leitura | `/gestao/usuarios/:id` | `GET /api/v1/users/{id}`, `GET /api/v1/staff/clients/{id}/pendencies` | Mesmos dados e a seção Pendências, com "Editar usuário" apenas para ativos |
+
+Pendências (somente leitura): para usuários com perfil Cliente, usa a consulta V2 do balcão, que não sincroniza penalidade (o id do cliente coincide com o id do usuário): "Sem pendências ativas" ou, por empréstimo em atraso, obra, exemplar, vencimento e dias de atraso, mais o aviso de penalizado. Não usa a consulta V1 `/api/v1/clients/{id}/pendencies`, que grava penalidade. Para os demais perfis aparece "Pendências se aplicam somente a clientes."
+
+Divergências e lacunas (detalhes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21): (1) CPF não existe no modelo: o campo e o termo "CPF" da busca não são exibidos (limitação técnica); (2) a referência usa uma única tela para detalhe e edição; as duas rotas existentes foram mantidas; (3) a página de gestão de usuários fica fora do layout do balcão (rota `/gestao/usuarios` existente), portanto a sidebar leva até ela mas não é exibida nela; (4) rótulos de perfil reais (Cliente, Vendedor, Estoquista, Administrador) em vez de "Funcionário"; (5) a referência não tem ação de penalidade manual; embora `PATCH /api/v1/clients/{id}/penalty` esteja aprovado na seção 20, não foi exposto. Dados das imagens são ilustrativos e notas para desenvolvedores não são interface.

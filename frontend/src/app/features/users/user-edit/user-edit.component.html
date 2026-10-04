@@ -1,82 +1,125 @@
 <main class="edit-page">
-  <section class="edit-panel" aria-labelledby="edit-title">
-    <header>
-      <p class="eyebrow">Gestão de usuários</p>
-      <h1 id="edit-title">Editar usuário</h1>
+  <a class="back" routerLink="/gestao/usuarios">← Usuários</a>
+
+  @if (loading()) {
+    <div class="loading" role="status"><app-spinner /> Carregando usuário…</div>
+  } @else if (loadedUser(); as user) {
+    <header class="edit-header">
+      <h1 id="edit-title">{{ user.name }}</h1>
+      <p class="edit-header__meta">{{ summary() }}</p>
     </header>
 
+    <div class="edit-grid">
+      <section class="card" aria-labelledby="data-title">
+        <h2 id="data-title">Dados do usuário</h2>
+        <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+          <div class="field">
+            <label class="field__label" for="user-name">Nome</label>
+            <div class="field__control" [class.field__control--invalid]="nameError()">
+              <input
+                class="field__input"
+                id="user-name"
+                type="text"
+                formControlName="name"
+                [attr.aria-invalid]="nameError() ? true : null"
+                [attr.aria-describedby]="nameError() ? 'user-name-error' : null"
+              />
+            </div>
+            @if (nameError(); as message) {
+              <span class="field__error" id="user-name-error">{{ message }}</span>
+            }
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="user-email">E-mail</label>
+            <div class="field__control" [class.field__control--invalid]="emailError()">
+              <input
+                class="field__input"
+                id="user-email"
+                type="email"
+                formControlName="email"
+                [attr.aria-invalid]="emailError() ? true : null"
+                [attr.aria-describedby]="emailError() ? 'user-email-error' : null"
+              />
+            </div>
+            @if (emailError(); as message) {
+              <span class="field__error" id="user-email-error">{{ message }}</span>
+            }
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="user-role">Perfil</label>
+            <div class="field__control">
+              <select class="field__input" id="user-role" formControlName="roleCode">
+                @for (role of roles; track role.value) {
+                  <option [value]="role.value">{{ role.label }}</option>
+                }
+              </select>
+            </div>
+            <span class="field__hint">
+              @if (!user.is_active) {
+                Usuário inativo: somente consulta.
+              } @else if (form.controls.roleCode.disabled) {
+                Você não pode remover o próprio acesso administrativo.
+              } @else {
+                Alterar o perfil modifica as permissões do usuário.
+              }
+            </span>
+          </div>
+
+          @if (showsPendencies()) {
+            <app-user-pendencies [userId]="user.id" />
+          } @else {
+            <section aria-labelledby="no-pendencies-title">
+              <h2 id="no-pendencies-title">Pendências</h2>
+              <p class="muted">Pendências se aplicam somente a clientes.</p>
+            </section>
+          }
+
+          @if (user.is_active) {
+            <div class="form-actions">
+              <button class="button" type="submit" [disabled]="busy()" [attr.aria-busy]="saving()">
+                @if (saving()) { <app-spinner /> Salvando… } @else { Salvar alterações }
+              </button>
+              @if (!isSelf()) {
+                <button class="button button--danger" type="button" [disabled]="busy()" (click)="askInactivation()">
+                  Inativar usuário
+                </button>
+              }
+            </div>
+          }
+        </form>
+      </section>
+
+      @if (confirming(); as kind) {
+        <section class="card confirm-card" tabindex="-1" role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+          @if (kind === 'inactivate') {
+            <h2 id="confirm-title">Inativar usuário?</h2>
+            <p id="confirm-text">{{ user.name }} perderá acesso ao sistema.<br />O histórico permanecerá preservado.</p>
+            <div class="confirm-actions">
+              <button class="link" type="button" [disabled]="busy()" (click)="cancelConfirmation()">Cancelar</button>
+              <button class="button button--danger" type="button" [disabled]="busy()" [attr.aria-busy]="inactivating()" (click)="confirmInactivation()">
+                @if (inactivating()) { <app-spinner /> Inativando… } @else { Confirmar inativação }
+              </button>
+            </div>
+          } @else {
+            <h2 id="confirm-title">Alterar perfil?</h2>
+            <p id="confirm-text">{{ roleChangeText() }}</p>
+            <div class="confirm-actions">
+              <button class="link" type="button" [disabled]="busy()" (click)="cancelConfirmation()">Cancelar</button>
+              <button class="button" type="button" [disabled]="busy()" [attr.aria-busy]="saving()" (click)="confirmRoleChange()">
+                @if (saving()) { <app-spinner /> Salvando… } @else { Confirmar alteração }
+              </button>
+            </div>
+          }
+        </section>
+      }
+    </div>
+  } @else {
     @if (error(); as message) {
       <app-alert [message]="message" variant="error" />
     }
-    @if (success(); as message) {
-      <app-alert [message]="message" variant="success" />
-    }
-
-    @if (loading()) {
-      <div class="loading" role="status"><app-spinner /> Carregando usuário…</div>
-    } @else if (loadedUser()) {
-      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-        <div class="field">
-          <label class="field__label" for="user-name">Nome</label>
-          <div class="field__control" [class.field__control--invalid]="nameError()">
-            <input
-              class="field__input"
-              id="user-name"
-              type="text"
-              formControlName="name"
-              [attr.aria-invalid]="nameError() ? true : null"
-              [attr.aria-describedby]="nameError() ? 'user-name-error' : null"
-            />
-          </div>
-          @if (nameError(); as message) {
-            <span class="field__error" id="user-name-error">{{ message }}</span>
-          }
-        </div>
-
-        <div class="field">
-          <label class="field__label" for="user-email">E-mail</label>
-          <div class="field__control" [class.field__control--invalid]="emailError()">
-            <input
-              class="field__input"
-              id="user-email"
-              type="email"
-              formControlName="email"
-              [attr.aria-invalid]="emailError() ? true : null"
-              [attr.aria-describedby]="emailError() ? 'user-email-error' : null"
-            />
-          </div>
-          @if (emailError(); as message) {
-            <span class="field__error" id="user-email-error">{{ message }}</span>
-          }
-        </div>
-
-        <div class="field">
-          <label class="field__label" for="user-role">Cargo</label>
-          <div class="field__control">
-            <select class="field__input" id="user-role" formControlName="roleCode">
-              @for (role of roles; track role.value) {
-                <option [value]="role.value">{{ role.label }}</option>
-              }
-            </select>
-          </div>
-          <span class="field__hint">
-            @if (form.controls.roleCode.disabled) {
-              Você não pode remover o próprio acesso administrativo.
-            } @else {
-              Alterar o cargo modifica as permissões do usuário.
-            }
-          </span>
-        </div>
-
-        <div class="form-actions">
-          <button class="button button--secondary" type="button" (click)="back()">Voltar</button>
-          <button class="button" type="submit" [disabled]="saving()" [attr.aria-busy]="saving()">
-            @if (saving()) { <app-spinner /> Salvando… } @else { Salvar alterações }
-          </button>
-        </div>
-      </form>
-    } @else {
-      <button class="button button--secondary" type="button" (click)="back()">Voltar</button>
-    }
-  </section>
+    <button class="button button--secondary" type="button" (click)="back()">Voltar</button>
+  }
 </main>
+<app-snackbar />
