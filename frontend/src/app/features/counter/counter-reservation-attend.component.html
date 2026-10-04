@@ -10,8 +10,11 @@
       <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
       <div class="actions"><a class="btn" routerLink="/balcao/reservas">Voltar às reservas</a></div>
     } @else {
-      @if (error(); as message) {
-        <div class="feedback"><app-alert [message]="message" /></div>
+      @if (saveFailed()) {
+        <app-save-failure>
+          <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>
+          <button class="btn" type="button" (click)="saveFailed.set(false)">Voltar</button>
+        </app-save-failure>
       }
 
       @switch (screen()) {

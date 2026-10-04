@@ -1,3 +1,4 @@
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -154,13 +155,13 @@ describe('Balcão: registrar venda', () => {
     click(fixture, submit);
     expect(service.registerSale).toHaveBeenCalledOnceWith(7, '38.90');
     expect(submit.disabled).toBeTrue();
-    expect(root.querySelector('[data-feedback]')?.textContent?.trim()).toBe('');
+    expect(snackbarMessage()).toBe('');
     service.lookupCopies.and.returnValue(of([copy({ free: false, sellable: false, sale_block_reason: 'NOT_AVAILABLE', free_commercial_copies: 2 })]));
     response.next(pending);
     response.complete();
     fixture.detectChanges();
     expect(dialog(root)).toBeNull();
-    const feedback = root.querySelector('[data-feedback]')?.textContent ?? '';
+    const feedback = snackbarMessage() ?? '';
     expect(feedback).toContain('Venda registrada como pendente');
     expect(feedback).toContain('ainda não foi marcado como vendido');
     expect(feedback).not.toMatch(/venda concluída|vendido com sucesso/i);
@@ -176,10 +177,34 @@ describe('Balcão: registrar venda', () => {
     submitSearch(fixture, root, 'C-007');
     click(fixture, button(root, 'Registrar venda'));
     click(fixture, submitButton(root));
-    expect(root.querySelector('[data-feedback] [role="alert"]')?.textContent).toContain('não estão disponíveis para venda');
-    expect(root.querySelector('[data-feedback]')?.textContent).not.toContain('Venda registrada');
+    expect(snackbarMessage()).toContain('não estão disponíveis para venda');
+    expect(snackbarMessage()).not.toContain('Venda registrada');
     expect(service.lookupCopies).toHaveBeenCalledTimes(2);
   });
+
+  for (const status of [0, 503]) {
+    it(`falha de persistência/rede (${status}) mostra "Não foi possível salvar" sem snackbar nem reenvio`, () => {
+      const { fixture, root, service } = setup((s) => {
+        s.lookupCopies.and.returnValue(of([copy()]));
+        s.registerSale.and.returnValue(throwError(() => ({ status, detail: 'Tivemos um problema no servidor.' })));
+      });
+      submitSearch(fixture, root, 'C-007');
+      click(fixture, button(root, 'Registrar venda'));
+      click(fixture, submitButton(root));
+      const card = root.querySelector('app-save-failure')!;
+      expect(card.textContent).toContain('Não foi possível salvar');
+      expect(card.textContent).toContain('Atualize a consulta antes de repetir a operação para evitar registros duplicados.');
+      expect(snackbarMessage()).toBe('');
+      expect(root.textContent).not.toContain('Venda registrada');
+      expect(service.registerSale).toHaveBeenCalledTimes(1);
+      expect(service.lookupCopies).toHaveBeenCalledTimes(2);
+      click(fixture, button(root, 'Atualizar consulta'));
+      expect(service.lookupCopies).toHaveBeenCalledTimes(3);
+      expect(service.registerSale).toHaveBeenCalledTimes(1);
+      click(fixture, button(root, 'Voltar'));
+      expect(root.querySelector('app-save-failure')).toBeNull();
+    });
+  }
 
   it('exibe o erro de domínio de exemplar didático devolvido pelo backend', () => {
     const { fixture, root } = setup((s) => {
@@ -189,7 +214,8 @@ describe('Balcão: registrar venda', () => {
     submitSearch(fixture, root, 'C-007');
     click(fixture, button(root, 'Registrar venda'));
     click(fixture, submitButton(root));
-    expect(root.querySelector('[data-feedback] [role="alert"]')?.textContent).toContain('Exemplares didáticos não podem ser vendidos.');
+    expect(snackbarMessage()).toContain('Exemplares didáticos não podem ser vendidos.');
+    expect(snackbarVariant()).toBe('warning');
   });
 });
 

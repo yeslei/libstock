@@ -1,3 +1,4 @@
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -193,7 +194,7 @@ describe('Balcão: registrar devolução', () => {
     response.complete();
     fixture.detectChanges();
     expect(dialog(root)).toBeNull();
-    expect(root.querySelector('[data-feedback]')?.textContent).toContain('Devolução confirmada: exemplar D-001 de “Dom Casmurro”.');
+    expect(snackbarMessage()).toContain('Devolução confirmada: exemplar D-001 de “Dom Casmurro”.');
     expect(service.listLoans).toHaveBeenCalledTimes(2);
     expect(root.querySelector('.empty')).not.toBeNull();
   });
@@ -207,7 +208,7 @@ describe('Balcão: registrar devolução', () => {
     click(fixture, button(root, 'Confirmar devolução'));
     expect(dialog(root)?.textContent).toContain('Empréstimo dentro do prazo.');
     click(fixture, submitButton(root));
-    expect(root.querySelector('[data-feedback] [role="alert"]')?.textContent).toContain('Empréstimo já encerrado.');
+    expect(snackbarMessage()).toContain('Empréstimo já encerrado.');
     expect(root.textContent).not.toContain('Devolução confirmada:');
     expect(service.listLoans).toHaveBeenCalledTimes(2);
   });

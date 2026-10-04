@@ -7,11 +7,14 @@ import { ApiError } from '../../core/models/auth.model';
 import { LoadState } from '../../core/models/load-state.model';
 import { TokenStoreService } from '../../core/services/token-store.service';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
+import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { CopyResponse, DestinationType } from '../copies/models/copy.model';
 import { CopyService } from '../copies/services/copy.service';
 import { CounterService, StaffCatalogBookDetail } from './counter.service';
 import { destinationLabel, toLoadState } from './desk-flow';
+import { SaveFailureComponent } from './save-failure.component';
+import { failureVariant, isPersistenceFailure } from './save-failure';
 
 /** Papéis que o backend autoriza em `POST /api/v1/copies/`. No balcão, apenas ADMINISTRATOR chega à tela. */
 const CREATE_ROLES = ['STOCK_KEEPER', 'ADMINISTRATOR'];
@@ -32,7 +35,7 @@ interface Included {
 @Component({
   selector: 'app-counter-copy-create',
   standalone: true,
-  imports: [RouterLink, AlertComponent, SpinnerComponent],
+  imports: [RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-copy-create.component.html',
   styleUrl: './counter-catalog.component.scss',
@@ -41,6 +44,7 @@ export class CounterCopyCreateComponent {
   private readonly counter = inject(CounterService);
   private readonly copies = inject(CopyService);
   private readonly route = inject(ActivatedRoute);
+  private readonly snackbar = inject(SnackbarService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly reloads = new Subject<void>();
   private currentId = 0;
@@ -53,7 +57,7 @@ export class CounterCopyCreateComponent {
   protected readonly submitted = signal(false);
   protected readonly submitting = signal(false);
   protected readonly duplicateOf = signal<string | null>(null);
-  protected readonly failure = signal<string | null>(null);
+  protected readonly saveFailed = signal(false);
   protected readonly included = signal<Included | null>(null);
   protected readonly destinationLabel = destinationLabel;
 
@@ -114,7 +118,7 @@ export class CounterCopyCreateComponent {
   protected submit(book: StaffCatalogBookDetail): void {
     if (this.submitting() || !this.canCreate || !book.is_active) return;
     this.submitted.set(true);
-    this.failure.set(null);
+    this.saveFailed.set(false);
     const destination = this.destination();
     const code = this.barcode().trim();
     if (!destination || !code || this.barcodeError() || this.priceError()) return;
@@ -139,7 +143,8 @@ export class CounterCopyCreateComponent {
         error: (error: ApiError) => {
           this.submitting.set(false);
           if (error.status === 409) this.duplicateOf.set(code);
-          else this.failure.set(this.messageFor(error));
+          else if (isPersistenceFailure(error)) this.saveFailed.set(true);
+          else this.snackbar.show(this.messageFor(error), failureVariant(error));
         },
       });
   }
@@ -151,7 +156,7 @@ export class CounterCopyCreateComponent {
     this.price.set('');
     this.submitted.set(false);
     this.duplicateOf.set(null);
-    this.failure.set(null);
+    this.saveFailed.set(false);
   }
 
   private normalizedPrice(): string {

@@ -7,6 +7,7 @@ import { Subject, finalize, switchMap } from 'rxjs';
 import { ApiError } from '../../core/models/auth.model';
 import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
+import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { businessToday } from './business-date';
 import {
@@ -19,6 +20,8 @@ import {
 } from './counter.service';
 import { toLoadState } from './desk-flow';
 import { errorMessage, ineligibleReasons } from './desk-panel';
+import { SaveFailureComponent } from './save-failure.component';
+import { isPersistenceFailure, showFailure } from './save-failure';
 
 type Step = 'form' | 'review' | 'done' | 'blocked';
 type BlockKind = 'client' | 'copy';
@@ -65,7 +68,7 @@ function notLoanableReason(copy: StaffCopyLookup): string {
 @Component({
   selector: 'app-counter-loan-create',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-loan-create.component.html',
   styleUrl: './counter-loan-create.component.scss',
@@ -74,6 +77,7 @@ export class CounterLoanCreateComponent {
   private readonly service = inject(CounterService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly snackbar = inject(SnackbarService);
   private readonly clientSearches = new Subject<string>();
   private readonly copySearches = new Subject<string>();
 
@@ -97,7 +101,7 @@ export class CounterLoanCreateComponent {
   protected readonly copyState = signal<LoadState<readonly StaffCopyLookup[]> | null>(null);
   protected readonly copy = signal<StaffCopyLookup | null>(null);
   protected readonly submitting = signal(false);
-  protected readonly error = signal<string | null>(null);
+  protected readonly saveFailed = signal(false);
   protected readonly blocked = signal<Blocked | null>(null);
   protected readonly completed = signal<Completed | null>(null);
   /** Termo da última busca de exemplar, reutilizado ao atualizar a seleção. */
@@ -177,13 +181,13 @@ export class CounterLoanCreateComponent {
 
   protected review(): void {
     if (!this.canReview()) return;
-    this.error.set(null);
+    this.saveFailed.set(false);
     this.go('review');
   }
 
   protected back(): void {
     if (this.submitting()) return;
-    this.error.set(null);
+    this.saveFailed.set(false);
     this.go('form');
   }
 
@@ -192,7 +196,7 @@ export class CounterLoanCreateComponent {
     const copy = this.copy();
     if (this.submitting() || !client || !copy || !this.canReview()) return;
     this.submitting.set(true);
-    this.error.set(null);
+    this.saveFailed.set(false);
     this.service
       .registerLoan(client.id, copy.id)
       .pipe(
@@ -217,11 +221,12 @@ export class CounterLoanCreateComponent {
     } else if (status === 404 || status === 409) {
       this.block('copy', detail || 'O exemplar não está disponível para empréstimo.', client);
     } else {
-      this.error.set(
-        detail ||
-          'Não foi possível registrar o empréstimo. Confira em Empréstimos ativos se ele foi registrado antes de tentar novamente.',
-      );
-      this.focusHeading();
+      if (isPersistenceFailure(error)) {
+        this.saveFailed.set(true);
+        this.focusHeading();
+      } else {
+        showFailure(this.snackbar, error, 'Não foi possível registrar o empréstimo. Tente novamente.');
+      }
     }
   }
 
@@ -261,7 +266,7 @@ export class CounterLoanCreateComponent {
     this.lastCopyTerm = '';
     this.completed.set(null);
     this.blocked.set(null);
-    this.error.set(null);
+    this.saveFailed.set(false);
     this.go('form');
   }
 

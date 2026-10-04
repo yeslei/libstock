@@ -1,3 +1,4 @@
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -126,11 +127,11 @@ describe('Balcão: lista de reservas de compra', () => {
     press(fixture, confirmButton);
     press(fixture, confirmButton);
     expect(service.allocatePurchase).toHaveBeenCalledOnceWith(10);
-    expect(root.querySelector('[data-feedback]')?.textContent).not.toContain('Exemplar destinado');
+    expect(snackbarMessage()).not.toContain('Exemplar destinado');
     response.next({ id: 32 });
     response.complete();
     fixture.detectChanges();
-    expect(root.querySelector('[data-feedback]')?.textContent).toContain('Exemplar destinado a Ana Santos');
+    expect(snackbarMessage()).toContain('Exemplar destinado a Ana Santos');
     expect(service.listPurchaseReservations).toHaveBeenCalledTimes(2);
   });
 
@@ -141,8 +142,8 @@ describe('Balcão: lista de reservas de compra', () => {
     });
     press(fixture, button(root, 'Destinar exemplar a Ana Santos'));
     press(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
-    expect(root.querySelector('[data-feedback]')?.textContent).toContain('Não há exemplar comercial livre');
-    expect(root.querySelector('[data-feedback]')?.textContent).not.toContain('Exemplar destinado');
+    expect(snackbarMessage()).toContain('Não há exemplar comercial livre');
+    expect(snackbarMessage()).not.toContain('Exemplar destinado');
     expect(service.listPurchaseReservations).toHaveBeenCalledTimes(2);
   });
 
@@ -264,6 +265,22 @@ describe('Balcão: atender reserva', () => {
     expect(service.confirmSale).not.toHaveBeenCalled();
   });
 
+  it('falha 5xx ao confirmar a venda mostra "Não foi possível salvar" sem snackbar e sem reenvio', () => {
+    const { fixture, root, service } = create(CounterReservationAttendComponent, (s) => {
+      s.listPurchaseReservations.and.returnValue(of([notified()]));
+      s.confirmSale.and.returnValue(throwError(() => ({ status: 500, detail: 'Tivemos um problema no servidor.' })));
+    }, inputs);
+    typeInto(fixture, code(root), 'C-055');
+    press(fixture, button(root, 'Conferir venda'));
+    press(fixture, button(root, 'Confirmar venda'));
+    expect(root.querySelector('app-save-failure')?.textContent).toContain('Não foi possível salvar');
+    expect(snackbarMessage()).toBe('');
+    expect(root.textContent).not.toContain('Venda da reserva concluída');
+    expect(service.confirmSale).toHaveBeenCalledTimes(1);
+    press(fixture, button(root, 'Voltar'));
+    expect(root.querySelector('app-save-failure')).toBeNull();
+  });
+
   for (const [codeName, message] of [
     ['reservation_expired', 'O prazo de retirada desta reserva expirou.'],
     ['reservation_not_ready', 'Esta reserva ainda não tem exemplar destinado para retirada.'],
@@ -277,7 +294,8 @@ describe('Balcão: atender reserva', () => {
       typeInto(fixture, code(root), 'C-055');
       press(fixture, button(root, 'Conferir venda'));
       press(fixture, button(root, 'Confirmar venda'));
-      expect(root.querySelector('[role="alert"]')?.textContent).toContain(message);
+      expect(snackbarMessage()).toContain(message);
+      expect(snackbarVariant()).toBe('warning');
       expect(root.textContent).not.toContain('Venda registrada com sucesso');
       expect(service.listPurchaseReservations).toHaveBeenCalledTimes(2);
       expect(button(root, 'Confirmar venda').disabled).toBeFalse();

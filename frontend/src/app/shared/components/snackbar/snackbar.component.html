@@ -1,0 +1,26 @@
+<!-- Regiões vivas persistentes: leitores de tela só anunciam texto inserido em uma região já existente. -->
+<div class="snackbar-live" role="status" aria-live="polite" aria-atomic="true">
+  @if (feedback.notification(); as notification) {
+    @if (notification.variant !== 'error') {
+      <ng-container *ngTemplateOutlet="item; context: { $implicit: notification }" />
+    }
+  }
+</div>
+<div class="snackbar-live" role="alert" aria-live="assertive" aria-atomic="true">
+  @if (feedback.notification(); as notification) {
+    @if (notification.variant === 'error') {
+      <ng-container *ngTemplateOutlet="item; context: { $implicit: notification }" />
+    }
+  }
+</div>
+
+<ng-template #item let-notification>
+  <div class="snackbar" [class]="'snackbar snackbar--' + notification.variant" (keydown.escape)="feedback.dismiss(); $event.stopPropagation()">
+    <span class="snackbar__icon" aria-hidden="true">{{ notification.variant === 'success' ? '✓' : notification.variant === 'info' ? 'i' : '!' }}</span>
+    <span class="snackbar__message">{{ notification.message }}</span>
+    @if (notification.action; as action) {
+      <button type="button" (click)="feedback.act()">{{ action.label }}</button>
+    }
+    <button type="button" aria-label="Fechar mensagem" (click)="feedback.dismiss()">Fechar</button>
+  </div>
+</ng-template>

@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
+import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { businessToday } from './business-date';
 import { DeskPanel } from './desk-panel';
@@ -12,7 +13,7 @@ import { StaffLoanRequest } from './counter.service';
 @Component({
   selector: 'app-pickups-panel',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './pickups-panel.component.html',
   styleUrl: './pickups-panel.component.scss',

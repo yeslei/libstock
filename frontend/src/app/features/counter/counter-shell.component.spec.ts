@@ -3,6 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { Router, RouterOutlet, provideRouter } from '@angular/router';
 
 import { CounterShellComponent } from './counter-shell.component';
+import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
+import { By } from '@angular/platform-browser';
 
 @Component({ standalone: true, template: 'tela' })
 class StubComponent {}
@@ -78,5 +80,20 @@ describe('Layout do balcão (menu lateral)', () => {
     await router.navigateByUrl('/balcao/clientes');
     fixture.detectChanges();
     expect(root.querySelector('.shell__toggle')?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('hospeda feedback uma única vez e o descarta ao sair do balcão', async () => {
+    const { fixture, router, root } = await setup();
+    const service = fixture.debugElement.query(By.directive(CounterShellComponent)).injector.get(SnackbarService);
+    service.show('Operação confirmada.', 'success');
+    fixture.detectChanges();
+    expect(root.querySelectorAll('app-snackbar').length).toBe(1);
+    expect(root.querySelector('.snackbar')?.textContent).toContain('Operação confirmada.');
+    await router.navigateByUrl('/');
+    fixture.detectChanges();
+    expect(service.notification()).toBeNull();
+    await router.navigateByUrl('/balcao/painel');
+    fixture.detectChanges();
+    expect(root.querySelector('.snackbar')).toBeNull();
   });
 });

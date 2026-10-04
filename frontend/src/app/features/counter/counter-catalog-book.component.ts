@@ -10,6 +10,7 @@ import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { BookService } from '../books/services/book.service';
 import { CopyService } from '../copies/services/copy.service';
+import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { CounterService, StaffCatalogBookDetail, StaffCatalogCopy } from './counter.service';
 import { ActionFlow, copyStatusLabel, destinationLabel, toLoadState } from './desk-flow';
@@ -84,7 +85,7 @@ function positiveEntries(values: Readonly<Record<string, number>> | undefined, l
 @Component({
   selector: 'app-counter-catalog-book',
   standalone: true,
-  imports: [RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-catalog-book.component.html',
   styleUrl: './counter-catalog.component.scss',

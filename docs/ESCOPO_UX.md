@@ -590,4 +590,13 @@ Mapa frame → rota (estado atual):
 | Controle de pendências (referências: `png telas/telas/funcionario/Controle de pendências.png`, `04 — Administrador.png` tela 3; `png telas/referencias/05 — Estados & Modais.png`) | `/balcao/clientes` | Item "Clientes" da sidebar. Busca por nome ou e-mail (`GET /api/v1/staff/clients`) → cartão da situação (`GET /api/v1/staff/clients/{id}/pendencies`, somente leitura, regra V2): "Pendência ativa" com obra, exemplar, vencimento e dias de atraso, ou "Sem pendência"; atalhos Solicitações, Empréstimos ativos e Reservas filtrados pelo cliente. Estados de carregamento, vazio, erro com nova tentativa. Divergências: CPF não existe no modelo (limitação técnica, o placeholder diz só nome ou e-mail), lista de escolha para vários resultados, estado "Sem pendência" e avisos de penalizado/inativo não existem no desenho; notas para devs não são UI; decisões em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21 |
 | Controle de pendências (8:69), Novo empréstimo (39:519 a 39:609) | `/balcao/clientes` | Funcionam com a implementação anterior dentro do novo layout; aguardando leitura dos frames |
 
+#### Feedback e estados de recuperação do balcão — Issue #137
+
+Referências: `png telas/referencias/01 - UX - Snackbars & Feedback.png` e Complementos V2, seção 07 ("Não foi possível salvar").
+
+- Componente `app-snackbar` (variantes sucesso, erro, atenção e informação), hospedado no layout `/balcao`: sucesso e recusa de uma operação de escrita aparecem ali; bloqueios, decisões e telas de resultado (venda concluída, empréstimo registrado, exemplar incluído, reserva fora do prazo) continuam como estado/cartão, sem mensagem duplicada; confirmação destrutiva continua em diálogo.
+- Acessibilidade: regiões vivas persistentes (`status` educada e `alert` assertiva para erros), sem mover o foco, botão "Fechar" e Esc. Sucesso e informação somem em 8 s (a referência não indica tempo); erro, atenção e mensagens com ação permanecem até serem fechadas.
+- Falha de rede ou 5xx em escrita mostra "Não foi possível salvar" com "Atualizar consulta" e "Voltar"; não há reenvio automático nem botão que reenvie a escrita, porque o resultado pode ser incerto e o backend não é idempotente. A repetição é manual, após atualizar a consulta e confirmar de novo.
+- Divergências: textos prontos da referência não usados quando divergem do comportamento real (ex.: venda direta fica pendente); a variante informação ainda não é usada por nenhuma tela do balcão.
+
 Regras e decisões pendentes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21.

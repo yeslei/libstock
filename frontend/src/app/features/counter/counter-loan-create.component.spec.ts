@@ -1,3 +1,4 @@
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -248,7 +249,10 @@ describe('Balcão: novo empréstimo', () => {
     click(second.fixture, button(second.root, 'Confirmar empréstimo'));
     await flush(second.fixture);
     expect(second.root.querySelector('h1')?.textContent).toBe('Revisar empréstimo');
-    expect(second.root.querySelector('[role="alert"]')?.textContent).toContain('Não foi possível registrar o empréstimo.');
+    expect(second.root.querySelector('app-save-failure')?.textContent).toContain('Não foi possível salvar');
+    expect(second.root.querySelector('app-save-failure')?.textContent).toContain('Consultar empréstimos ativos');
+    expect(snackbarMessage()).toBe('');
+    expect(second.service.registerLoan).toHaveBeenCalledTimes(1);
     expect(button(second.root, 'Confirmar empréstimo').disabled).toBeFalse();
   });
 });
