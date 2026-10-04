@@ -166,9 +166,6 @@
 <ng-template #bookCard let-book let-featured="featured">
   <li>
     <app-catalog-book-card [book]="book">
-      @if (canRegisterCopy()) {
-        <a class="btn btn--outline card__manage" [routerLink]="['/obras', book.id, 'exemplares', 'novo']">Cadastrar exemplar</a>
-      }
       @if (featured && canManageCatalog()) {
         <button class="btn btn--outline card__manage" type="button" (click)="removeFromFeatured(book)">Remover destaque</button>
       }
