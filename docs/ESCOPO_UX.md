@@ -374,7 +374,7 @@ A interface deve impedir:
 | T06 | Painel por papel              | `/painel`                                         | Autenticados                    |
 | T07 | Perfil e sessões              | `/perfil`                                         | Autenticados                    |
 | T08 | Gestão de obras               | `/gestao/obras`                                   | `STOCK_KEEPER`, `ADMINISTRATOR` |
-| T09 | Cadastro/edição de obra       | `/gestao/obras/nova` e `/gestao/obras/:id/editar` | `STOCK_KEEPER`, `ADMINISTRATOR` |
+| T09 | Cadastro/edição de obra       | `/balcao/acervo/nova` e `/balcao/acervo/:id` (Issue #169) | `SELLER`, `STOCK_KEEPER`, `ADMINISTRATOR` |
 | T10 | Gestão de exemplares          | `/gestao/obras/:id/exemplares`                    | `STOCK_KEEPER`, `ADMINISTRATOR` |
 | T11 | Gestão de clientes            | `/gestao/clientes`                                | `SELLER`, `ADMINISTRATOR`       |
 | T12 | Gestão de usuários            | `/gestao/usuarios`                                | `ADMINISTRATOR`                 |
@@ -562,10 +562,12 @@ A V1 estará coerente com os papéis quando:
 | Todos | Início / Explorar livros | `/`, `/acervo`, `/explorar` | `/api/v1/catalog/*` | Funcional |
 | `USER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
 | `SELLER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
-| `SELLER`, `ADMINISTRATOR` | Balcão (V2) | `/balcao` | `/api/v1/staff/*` (consultas e confirmações V2), `/api/v1/staff/clients/{id}/pendencies` | Funcional |
-| `STOCK_KEEPER` | Cadastrar exemplar | `/gestao/acervo` | `/api/v1/books/*`, `/api/v1/copies/` | Funcional |
-| `SELLER` | Cadastrar obra e exemplar | `/obras/nova`, `/obras/:id/exemplares/novo` e Acervo do balcão | `/api/v1/books/*`, `/api/v1/copies/*` | Funcional (Issue #151) |
-| `ADMINISTRATOR` | Cadastrar exemplar / Gestão de usuários | `/gestao/acervo`, `/gestao/usuarios` | acervo e usuários | Funcional |
+| `SELLER`, `STOCK_KEEPER`, `ADMINISTRATOR` | Balcão (V2); o `STOCK_KEEPER` vê somente Acervo | `/balcao` | `/api/v1/staff/*` (consultas e confirmações V2), `/api/v1/staff/clients/{id}/pendencies` | Funcional |
+| `STOCK_KEEPER` | Acervo do balcão (consulta, nova obra, novo exemplar) | `/balcao/acervo`, `/balcao/acervo/nova`, `/balcao/acervo/:id/exemplares/novo` | `/api/v1/staff/books*` (leitura), `/api/v1/books/`, `/api/v1/copies/` | Funcional (Issue #169) |
+| `SELLER` | Cadastrar obra e exemplar | Acervo do balcão (`/balcao/acervo/nova`, `/balcao/acervo/:id/exemplares/novo`) | `/api/v1/books/*`, `/api/v1/copies/*` | Funcional (Issues #151 e #169) |
+| `ADMINISTRATOR` | Cadastrar obra e exemplar / Gestão de usuários | Acervo do balcão, `/gestao/usuarios` | acervo e usuários | Funcional |
+
+Telas antigas removidas (Issue #169): `/gestao/acervo` (gestão de exemplares), `/obras/nova`, `/obras/:id/exemplares/novo`, `/gestao/acervo/obras/:id/editar`, o item "Cadastrar exemplar" da navbar e o botão "Cadastrar exemplar" nos cards da vitrine. O cadastro de obra e de exemplar passou para o balcão; os endereços antigos redirecionam (`/obras/nova` → `/balcao/acervo/nova`, `/obras/:id/exemplares/novo` → `/balcao/acervo/:id/exemplares/novo`, `/gestao/acervo` → `/balcao/acervo`, edição → `/balcao/acervo/:id`). A navbar e o painel inicial oferecem o link "Balcão" também ao `STOCK_KEEPER`.
 
 Venda, empréstimo, devolução e reserva permanecem planejados. Como ainda não
 possuem controllers e services transacionais completos, não aparecem como
@@ -573,7 +575,7 @@ botões operacionais na navbar nem nos cards do catálogo.
 
 ### Balcão V2 (`/balcao`) — Issue #122
 
-Área operacional da V2, separada das operações transacionais antigas da V1 (que seguem como planejadas nesta matriz). Aparece na navbar e no painel apenas para `SELLER` e `ADMINISTRATOR`. A área segue os frames "Funcionário" do Figma (arquivo `gjM1ugpgfNOl5tjngzH65P`, página "LibStock — UX V2"): menu lateral de 250px (Painel, Acervo, Clientes, Empréstimos, Devoluções, Vendas, Reservas) que vira menu recolhível em telas menores. Cada alteração abre diálogo de confirmação, bloqueia envio duplicado e recarrega a lista após a resposta do backend. A destinação vai para a primeira reserva elegível da fila: cliente inelegível mantém a posição e a interface explica o bloqueio (Issue #150).
+Área operacional da V2, separada das operações transacionais antigas da V1 (que seguem como planejadas nesta matriz). Aparece na navbar e no painel para `SELLER`, `STOCK_KEEPER` e `ADMINISTRATOR`; o `STOCK_KEEPER` (Issue #169) vê na sidebar somente "Acervo", entra direto em `/balcao/acervo`, só tem consulta, "+ Nova obra" e "Novo exemplar" (sem editar, inativar, reativar, converter nem excluir) e as demais telas do balcão o redirecionam ao acervo. A área segue os frames "Funcionário" do Figma (arquivo `gjM1ugpgfNOl5tjngzH65P`, página "LibStock — UX V2"): menu lateral de 250px (Painel, Acervo, Clientes, Empréstimos, Devoluções, Vendas, Reservas) que vira menu recolhível em telas menores. Cada alteração abre diálogo de confirmação, bloqueia envio duplicado e recarrega a lista após a resposta do backend. A destinação vai para a primeira reserva elegível da fila: cliente inelegível mantém a posição e a interface explica o bloqueio (Issue #150).
 
 Mapa frame → rota (estado atual):
 
@@ -582,7 +584,7 @@ Mapa frame → rota (estado atual):
 | Funcionário / Painel (3:133) | `/balcao/painel` | Conforme o frame; indicadores de `GET /api/v1/staff/dashboard` |
 | Funcionário / Empréstimos / Início (20:2) | `/balcao/emprestimos` | Conforme o frame |
 | Funcionário / Empréstimos / Solicitações de retirada (19:2) | `/balcao/emprestimos/solicitacoes` | Conforme o frame; "Fila desta obra" omitida (sem dado de fila de empréstimo no backend); notas "DEvs" do frame não são UI |
-| Funcionário / Acervo (14:2) | `/balcao/acervo` | Conforme o frame: busca por título, autor ou ISBN, tabela e "Ver obra"; "+ Nova obra" (`/obras/nova`) só para quem o backend autoriza; nota "DEV" do frame não é UI |
+| Funcionário / Acervo (14:2) | `/balcao/acervo` | Conforme o frame: busca por título, autor ou ISBN, tabela e "Ver obra"; "+ Nova obra" (`/balcao/acervo/nova`, formulário de cadastro de obra com exemplar inicial dentro do layout do balcão; após cadastrar, abre `/balcao/acervo/:id`) para `SELLER`, `STOCK_KEEPER` e `ADMINISTRATOR`; nota "DEV" do frame não é UI |
 | Funcionário / Acervo / Detalhes da obra (8:81) e Exemplares | `/balcao/acervo/:id` | Dados da obra, categoria e exemplares com finalidade/status reais; "Editar obra", "Salvar alteração", "Inativar obra" e, em obra inativa, "Reativar obra" para SELLER/STOCK_KEEPER/MANAGER/ADMINISTRATOR, com confirmação; por exemplar, "Editar" (painel "Editando exemplar": finalidade, preço de venda, condição; código imutável) e "Excluir exemplar" para SELLER/STOCK_KEEPER/ADMINISTRATOR (decisões delegadas de 2026-10-03, Issues #135, #147 e #151). Divergências: sem rádio Didático/Comercial da obra (destinação é por exemplar); o painel fica abaixo da lista, sem o campo Status; ver BUSINESS_RULES, seção 21 |
 | Funcionário / Empréstimos / Ativos (19:35) | `/balcao/emprestimos/ativos` | Conforme o frame: busca por cliente, e-mail, obra ou exemplar, contador "x ativos • x atrasados", tabela somente leitura (Cliente, Obra / exemplar, Retirada, Devolução, Status) e rodapé sobre pendência. Dados de `GET /api/v1/staff/loans`; atraso decidido pelo backend (regra V2). Os contadores refletem os itens listados (busca, filtro de cliente e limite de 50). Acrescenta o e-mail sob o nome e "há N dia(s)" no atrasado. |
 | Funcionário / Devolução (3:219) | `/balcao/devolucoes` | Conforme o frame: "Registrar devolução", campo "Código do exemplar ou ISBN" (sem busca vazia), cartão com obra, exemplar, cliente e devolução prevista, "Confirmar devolução" com diálogo, bloqueio de envio duplicado e sucesso somente após 2xx (`POST /api/v1/staff/loans/{id}/confirm-return`); estados vazio, erro de consulta e erro de domínio (ex.: empréstimo já encerrado). Divergências: botão "Buscar" explícito; a trilha "← Devoluções" é texto, sem destino próprio; comprovante de devolução exibido após o 2xx, com "Imprimir comprovante" (Issue #152); o ISBN pode listar vários exemplares emprestados da mesma obra, cada um com seu botão |
