@@ -104,6 +104,9 @@
   color: $text-primary;
   font-size: $font-size-xs;
   text-decoration: none;
+  background: white;
+  cursor: pointer;
+  font-family: inherit;
 
   &:hover {
     border-color: $primary;

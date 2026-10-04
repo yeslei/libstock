@@ -100,12 +100,12 @@ describe('AppNavbarComponent', () => {
     expect(focus).toHaveBeenCalled();
   });
 
-  it('leva "Explorar acervo" às categorias da home sem marcá-lo como página atual', () => {
+  it('leva "Explorar acervo" à listagem completa do acervo sem marcá-lo como página atual', () => {
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('a[href="/explorar"]')).toBeNull();
     const link = Array.from(root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Explorar acervo')!;
-    expect(link.getAttribute('href')).toBe('/#categorias');
+    expect(link.getAttribute('href')).toBe('/acervo');
     expect(link.hasAttribute('aria-current')).toBeFalse();
   });
 

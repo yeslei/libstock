@@ -89,6 +89,12 @@ export const routes: Routes = [
     pathMatch: 'full',
   },
   {
+    path: 'acervo',
+    title: 'Acervo completo · LibStock',
+    loadComponent: () =>
+      import('./features/catalog/all-books/all-books.component').then((m) => m.AllBooksComponent),
+  },
+  {
     path: 'livros/:id',
     title: 'Detalhes do livro · LibStock',
     loadComponent: () =>

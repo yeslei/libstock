@@ -16,7 +16,7 @@ interface NavItem {
 
 const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Início', route: '/' },
-  { label: 'Explorar acervo', route: '/', fragment: 'categorias' },
+  { label: 'Explorar acervo', route: '/acervo' },
   { label: 'Meus empréstimos', route: '/meus-emprestimos', roles: ['USER'] },
   { label: 'Minhas reservas', route: '/minhas-reservas', roles: ['USER'] },
   { label: 'Balcão', route: '/balcao', roles: ['SELLER', 'ADMINISTRATOR'] },
