@@ -69,6 +69,7 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
           # Always capture integracao, regardless of the branch used for dispatch.
           SOURCE_SHA=$(git rev-parse HEAD)
@@ -78,8 +79,19 @@ jobs:
             exit 1
           fi
           printf '<!-- libstock-release -->\n\nPromove integracao para main pelo merge do PR.\n\nRelease-source: %s\n' "$SOURCE_SHA" > "$RUNNER_TEMP/release-pr.md"
-          url=$(gh pr create --base main --head integracao --title "Release $RELEASE_TAG" --body-file "$RUNNER_TEMP/release-pr.md")
-          number=$(gh pr view "$url" --json number --jq '.number')
+          echo "GitHub App: $APP_SLUG"
+          # REST em vez de GraphQL: em caso de recusa, o cabeçalho
+          # X-Accepted-GitHub-Permissions informa a permissão que falta.
+          if ! gh api -i --method POST "repos/$GH_REPO/pulls" \
+               -f base=main -f head=integracao -f title="Release $RELEASE_TAG" \
+               -F body=@"$RUNNER_TEMP/release-pr.md" > "$RUNNER_TEMP/pr-response.txt"; then
+            echo 'Falha ao abrir o PR de release. Resposta da API:' >&2
+            grep -iE '^(HTTP|x-accepted-github-permissions|x-github-request-id)' "$RUNNER_TEMP/pr-response.txt" >&2 || true
+            sed -n '/^\r\{0,1\}$/,$p' "$RUNNER_TEMP/pr-response.txt" >&2
+            exit 1
+          fi
+          number=$(sed -n '/^\r\{0,1\}$/,$p' "$RUNNER_TEMP/pr-response.txt" | jq -r '.number')
+          url=$(sed -n '/^\r\{0,1\}$/,$p' "$RUNNER_TEMP/pr-response.txt" | jq -r '.html_url')
           printf 'number=%s\nsource=%s\n' "$number" "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           printf 'PR de promocao: %s\n' "$url" >> "$GITHUB_STEP_SUMMARY"
 
