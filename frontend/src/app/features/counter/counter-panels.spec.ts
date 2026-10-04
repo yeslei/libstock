@@ -1,3 +1,4 @@
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { Provider, Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
@@ -118,9 +119,28 @@ describe('Balcão: retiradas', () => {
     response.next({ id: 77 }); response.complete();
     fixture.detectChanges();
     expect(dialog(root)).toBeNull();
-    expect(root.querySelector('[data-feedback]')?.textContent).toContain('Retirada confirmada. Empréstimo #77');
+    expect(snackbarMessage()).toContain('Retirada confirmada. Empréstimo #77');
     expect(service.listLoanRequests).toHaveBeenCalledTimes(2);
     expect(root.textContent).toContain('Nenhuma solicitação de empréstimo pendente.');
+  });
+
+  it('falha 5xx na retirada mostra "Não foi possível salvar", sem snackbar, e só consulta de novo ao atualizar', () => {
+    const { fixture, root, service } = setup(PickupsPanelComponent, (s) => {
+      s.listLoanRequests.and.returnValue(of([loanRequest()]));
+      s.confirmPickup.and.returnValue(throwError(() => ({ status: 500, detail: 'Tivemos um problema no servidor.' })));
+    });
+    const select = root.querySelector('select') as HTMLSelectElement;
+    select.value = '91'; select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    click(fixture, button(root, 'Confirmar retirada'));
+    click(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
+    expect(root.querySelector('app-save-failure')?.textContent).toContain('Não foi possível salvar');
+    expect(snackbarMessage()).toBe('');
+    expect(service.confirmPickup).toHaveBeenCalledTimes(1);
+    expect(service.listLoanRequests).toHaveBeenCalledTimes(2);
+    click(fixture, button(root, 'Atualizar consulta'));
+    expect(service.listLoanRequests).toHaveBeenCalledTimes(3);
+    expect(service.confirmPickup).toHaveBeenCalledTimes(1);
   });
 
   it('mostra o erro de domínio, não mostra sucesso e recarrega', () => {
@@ -133,9 +153,9 @@ describe('Balcão: retiradas', () => {
     fixture.detectChanges();
     click(fixture, button(root, 'Confirmar retirada'));
     click(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
-    const feedback = root.querySelector('[data-feedback]')!;
-    expect(feedback.querySelector('[role="alert"]')?.textContent).toContain('já foi confirmada');
-    expect(feedback.textContent).not.toContain('Retirada confirmada.');
+    expect(snackbarMessage()).toContain('já foi confirmada');
+    expect(snackbarVariant()).toBe('warning');
+    expect(snackbarMessage()).not.toContain('Retirada confirmada.');
     expect(service.listLoanRequests).toHaveBeenCalledTimes(2);
   });
 

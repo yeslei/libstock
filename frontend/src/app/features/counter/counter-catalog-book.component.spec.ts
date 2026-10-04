@@ -1,3 +1,4 @@
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
@@ -159,14 +160,14 @@ describe('Balcão: detalhes da obra', () => {
       ctx.fixture.detectChanges();
       expect(ctx.books.update).toHaveBeenCalledTimes(1);
       expect(ctx.books.update).toHaveBeenCalledWith(7, { genre: 'Ficção' });
-      expect(ctx.root.textContent).not.toContain('atualizada');
+      expect(snackbarMessage()).not.toContain('atualizada');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(1);
 
       ctx.counter.getCatalogBook.and.returnValue(of(detail({ genre: 'Ficção' })));
       patch.next({});
       patch.complete();
       ctx.fixture.detectChanges();
-      expect(ctx.root.textContent).toContain('Categoria de “Dom Casmurro” atualizada.');
+      expect(snackbarMessage()).toContain('Categoria de “Dom Casmurro” atualizada.');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
       expect(ctx.root.textContent).toContain('Categoria literária: Ficção');
     });
@@ -206,8 +207,9 @@ describe('Balcão: detalhes da obra', () => {
       ctx.button('Salvar alteração')!.click();
       ctx.fixture.detectChanges();
       confirmDialog(ctx);
-      expect(ctx.root.querySelector('[role="alert"]')?.textContent).toContain('Obra não pode ser alterada.');
-      expect(ctx.root.textContent).not.toContain('atualizada');
+      expect(snackbarMessage()).toContain('Obra não pode ser alterada.');
+      expect(snackbarVariant()).toBe('warning');
+      expect(snackbarMessage()).not.toContain('atualizada');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
     });
 
@@ -222,7 +224,7 @@ describe('Balcão: detalhes da obra', () => {
       ctx.counter.getCatalogBook.and.returnValue(of(detail({ is_active: false })));
       confirmDialog(ctx);
       expect(ctx.books.update).toHaveBeenCalledOnceWith(7, { is_active: false });
-      expect(ctx.root.textContent).toContain('Dom Casmurro foi inativada. O histórico foi preservado.');
+      expect(snackbarMessage()).toContain('Dom Casmurro foi inativada. O histórico foi preservado.');
       expect(ctx.root.textContent).toContain('Situação da obra');
       expect(ctx.root.textContent).toContain('Disponibilidade operacional: indisponível');
       expect(ctx.root.querySelector('a[href="/balcao/acervo"].btn')?.textContent).toContain('Voltar ao acervo');
@@ -268,8 +270,8 @@ describe('Balcão: detalhes da obra', () => {
       ctx.button('Inativar obra')!.click();
       ctx.fixture.detectChanges();
       confirmDialog(ctx);
-      expect(ctx.root.querySelector('[role="alert"]')?.textContent).toContain('Obra não pode ser inativada.');
-      expect(ctx.root.textContent).not.toContain('foi inativada');
+      expect(snackbarMessage()).toContain('Obra não pode ser inativada.');
+      expect(snackbarMessage()).not.toContain('foi inativada');
       expect(ctx.root.textContent).not.toContain('Vínculos encontrados');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
     });
@@ -325,7 +327,7 @@ describe('Balcão: detalhes da obra', () => {
       expect(blocked.querySelector('a[href="/balcao/emprestimos/ativos"]')?.textContent).toContain('Consultar empréstimos');
       expect(blocked.querySelector('a[href="/balcao/reservas"]')?.textContent).toContain('Consultar reservas');
       expect(ctx.root.querySelector('app-alert')).toBeNull();
-      expect(ctx.root.textContent).not.toContain('foi inativada');
+      expect(snackbarMessage()).not.toContain('foi inativada');
       expect(ctx.root.textContent).toContain('Status da obra: Ativa');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
     });
@@ -397,12 +399,12 @@ describe('Balcão: detalhes da obra', () => {
       submit.click();
       ctx.fixture.detectChanges();
       expect(ctx.copies.delete).toHaveBeenCalledOnceWith(1);
-      expect(ctx.root.textContent).not.toContain('Exemplar #00101 excluído');
+      expect(snackbarMessage()).not.toContain('Exemplar #00101 excluído');
       ctx.counter.getCatalogBook.and.returnValue(of(detail({ total_copies: 3, copies: detail().copies.slice(1) })));
       request.next({ id: 1, bookId: 7, barcode: '00101' });
       request.complete();
       ctx.fixture.detectChanges();
-      expect(ctx.root.textContent).toContain('Exemplar #00101 excluído. A quantidade de Dom Casmurro foi atualizada de 4 para 3 exemplares.');
+      expect(snackbarMessage()).toContain('Exemplar #00101 excluído. A quantidade de Dom Casmurro foi atualizada de 4 para 3 exemplares.');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
       expect(ctx.root.textContent).toContain('Quantidade total: 3 exemplares');
       expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
@@ -430,7 +432,7 @@ describe('Balcão: detalhes da obra', () => {
         'Empréstimos: 2',
         'Reservas de compra: 1',
       ]);
-      expect(ctx.root.textContent).not.toContain('Exemplar #00101 excluído');
+      expect(snackbarMessage()).not.toContain('Exemplar #00101 excluído');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
       ctx.button('Voltar aos exemplares')!.click();
       ctx.fixture.detectChanges();
@@ -473,8 +475,11 @@ describe('Balcão: detalhes da obra', () => {
       openDelete(ctx);
       confirmDialog(ctx);
       expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
-      expect(ctx.root.querySelector('[role="alert"]')?.textContent).toContain('Nada foi alterado');
-      expect(ctx.root.textContent).not.toContain('Exemplar #00101 excluído');
+      expect(ctx.root.querySelector('app-save-failure')?.textContent).toContain('Não foi possível salvar');
+      expect(ctx.root.querySelector('app-save-failure')?.textContent).toContain('Atualize a consulta antes de repetir');
+      expect(snackbarMessage()).toBe('');
+      expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
+      expect(snackbarMessage()).not.toContain('Exemplar #00101 excluído');
     });
 
     it('depois de excluir, a tela de bloqueio anterior some', () => {
@@ -489,7 +494,7 @@ describe('Balcão: detalhes da obra', () => {
       openDelete(ctx);
       expect(ctx.root.querySelector('[data-blocked]')).toBeNull();
       confirmDialog(ctx);
-      expect(ctx.root.textContent).toContain('Exemplar #00101 excluído.');
+      expect(snackbarMessage()).toContain('Exemplar #00101 excluído.');
     });
   });
 });

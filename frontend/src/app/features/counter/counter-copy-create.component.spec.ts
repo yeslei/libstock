@@ -1,3 +1,4 @@
+import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
@@ -155,14 +156,17 @@ describe('Balcão: novo exemplar', () => {
     expect((ctx.root.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBeFalse();
   });
 
-  it('mostra o erro de domínio de outras falhas sem anunciar sucesso', () => {
+  it('mostra "Não foi possível salvar" em falha 5xx, mantém os dados e não reenvia sozinho', () => {
     const ctx = setup(of(detail()));
     ctx.copies.create.and.returnValue(throwError(() => ({ status: 500, detail: 'Não foi possível cadastrar o exemplar.' })));
     ctx.type('#copy-barcode', '00105');
     ctx.choose('DIDACTIC');
     ctx.save();
-    expect(ctx.root.querySelector('[role="alert"]')?.textContent).toContain('Não foi possível cadastrar o exemplar.');
+    expect(ctx.root.querySelector('app-save-failure')?.textContent).toContain('Não foi possível salvar');
+    expect(snackbarMessage()).toBe('');
     expect(ctx.root.querySelector('h1')?.textContent).toBe('Novo exemplar');
+    expect((ctx.root.querySelector('#copy-barcode') as HTMLInputElement).value).toBe('00105');
+    expect(ctx.copies.create).toHaveBeenCalledTimes(1);
   });
 
   it('"Adicionar outro" volta ao formulário vazio', () => {

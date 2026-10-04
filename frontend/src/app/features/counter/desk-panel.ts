@@ -4,12 +4,9 @@ import { Observable, Subject, catchError, finalize, map, of, startWith, switchMa
 
 import { ApiError } from '../../core/models/auth.model';
 import { LoadState } from '../../core/models/load-state.model';
+import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 import { CirculationResult, CounterService, LIST_LIMIT, StaffClient } from './counter.service';
-
-export interface Feedback {
-  readonly kind: 'success' | 'error';
-  readonly message: string;
-}
+import { isPersistenceFailure, showFailure } from './save-failure';
 
 /** Operação aguardando confirmação explícita do funcionário antes do POST. */
 export interface Confirmation {
@@ -46,10 +43,11 @@ export abstract class DeskPanel<T> implements OnInit, OnChanges {
   protected readonly service = inject(CounterService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly snackbar = inject(SnackbarService);
 
   protected readonly state = signal<LoadState<readonly T[]>>({ status: 'loading' });
   protected readonly term = signal('');
-  protected readonly feedback = signal<Feedback | null>(null);
+  protected readonly saveFailed = signal(false);
   protected readonly confirming = signal<Confirmation | null>(null);
   protected readonly submitting = signal(false);
   protected readonly ineligibleReasons = ineligibleReasons;
@@ -104,7 +102,7 @@ export abstract class DeskPanel<T> implements OnInit, OnChanges {
   protected ask(confirmation: Confirmation): void {
     if (this.submitting()) return;
     this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    this.feedback.set(null);
+    this.saveFailed.set(false);
     this.confirming.set(confirmation);
   }
 
@@ -118,6 +116,7 @@ export abstract class DeskPanel<T> implements OnInit, OnChanges {
     const confirmation = this.confirming();
     if (!confirmation || this.submitting()) return;
     this.submitting.set(true);
+    this.saveFailed.set(false);
     confirmation
       .run()
       .pipe(
@@ -125,18 +124,20 @@ export abstract class DeskPanel<T> implements OnInit, OnChanges {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: (result) => this.finish({ kind: 'success', message: confirmation.success(result) }),
-        error: (error) =>
-          this.finish({
-            kind: 'error',
-            message: errorMessage(error, 'Não foi possível concluir a operação. Tente novamente.'),
-          }),
+        next: (result) => {
+          this.snackbar.show(confirmation.success(result), 'success');
+          this.finish();
+        },
+        error: (error) => {
+          if (isPersistenceFailure(error)) this.saveFailed.set(true);
+          else showFailure(this.snackbar, error, 'Não foi possível concluir a operação. Tente novamente.');
+          this.finish();
+        },
       });
   }
 
-  private finish(feedback: Feedback): void {
+  private finish(): void {
     this.confirming.set(null);
-    this.feedback.set(feedback);
     this.reload();
     queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('[data-feedback]')?.focus());
   }

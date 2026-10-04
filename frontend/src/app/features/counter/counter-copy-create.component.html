@@ -38,9 +38,12 @@
           } @else if (!s.data.is_active) {
             <app-alert message="A obra está inativa e não aceita novos exemplares." />
           } @else {
-            <div data-feedback tabindex="-1">
-              @if (failure(); as message) { <app-alert [message]="message" /> }
-            </div>
+            @if (saveFailed()) {
+              <app-save-failure>
+                <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>
+                <button class="btn" type="button" (click)="saveFailed.set(false)">Voltar</button>
+              </app-save-failure>
+            }
             <form class="stack" novalidate (submit)="$event.preventDefault(); submit(s.data)">
               <article class="card" aria-labelledby="obra-selecionada-titulo">
                 <h2 id="obra-selecionada-titulo">Obra selecionada</h2>

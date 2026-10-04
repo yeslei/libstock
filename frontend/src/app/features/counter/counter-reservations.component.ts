@@ -7,6 +7,7 @@ import { Subject, switchMap } from 'rxjs';
 import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
+import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { CounterContext } from './counter-context.service';
 import { CounterService, LIST_LIMIT, StaffPurchaseReservation } from './counter.service';
@@ -21,7 +22,7 @@ import { BLOCK_TEXT, groupByBook } from './reservation-queue';
 @Component({
   selector: 'app-counter-reservations',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-reservations.component.html',
   styleUrl: './counter-reservations.component.scss',
@@ -69,7 +70,7 @@ export class CounterReservationsComponent {
 
   protected search(event: Event): void {
     event.preventDefault();
-    this.flow.feedback.set(null);
+    this.flow.saveFailed.set(false);
     this.searched.set(this.term().trim());
     this.reload();
   }

@@ -5,6 +5,7 @@ import { Subject, switchMap } from 'rxjs';
 import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
+import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { COPY_LOOKUP_LIMIT, CopyStatus, CounterService, StaffCopyLookup } from './counter.service';
 import { ActionFlow, formatPrice, toLoadState } from './desk-flow';
@@ -25,7 +26,7 @@ const UNAVAILABLE_REASON: Readonly<Record<CopyStatus, string>> = {
 @Component({
   selector: 'app-counter-sales',
   standalone: true,
-  imports: [AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-sales.component.html',
   styleUrl: './counter-sales.component.scss',
@@ -72,7 +73,7 @@ export class CounterSalesComponent {
       this.missingTerm.set(true);
       return;
     }
-    this.flow.feedback.set(null);
+    this.flow.saveFailed.set(false);
     this.searched.set(term);
     this.reload();
   }

@@ -6,6 +6,7 @@ import { Subject, switchMap } from 'rxjs';
 import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
+import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { CounterService, StaffLoan } from './counter.service';
 import { ActionFlow, toLoadState } from './desk-flow';
@@ -17,7 +18,7 @@ import { ActionFlow, toLoadState } from './desk-flow';
 @Component({
   selector: 'app-counter-returns',
   standalone: true,
-  imports: [DatePipe, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, DatePipe, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-returns.component.html',
   styleUrl: './counter-returns.component.scss',
@@ -65,7 +66,7 @@ export class CounterReturnsComponent {
       this.missingTerm.set(true);
       return;
     }
-    this.flow.feedback.set(null);
+    this.flow.saveFailed.set(false);
     this.searched.set(term);
     this.reload();
   }

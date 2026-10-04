@@ -152,8 +152,11 @@
     @case ('review') {
       <p class="page__crumb">LibStock / Revisar empréstimo</p>
       <h1 id="novo-emprestimo-titulo" tabindex="-1">Revisar empréstimo</h1>
-      @if (error(); as message) {
-        <div class="feedback"><app-alert [message]="message" /></div>
+      @if (saveFailed()) {
+        <app-save-failure>
+          <a class="btn btn--primary" routerLink="/balcao/emprestimos/ativos">Consultar empréstimos ativos</a>
+          <button class="btn" type="button" (click)="back()">Voltar</button>
+        </app-save-failure>
       }
       @if (client(); as c) {
         @if (copy(); as e) {

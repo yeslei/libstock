@@ -6,9 +6,12 @@ import { Subject, catchError, finalize, of, switchMap } from 'rxjs';
 
 import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
+import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { CounterService, StaffPurchaseReservation } from './counter.service';
-import { errorMessage, ineligibleReasons } from './desk-panel';
+import { ineligibleReasons } from './desk-panel';
+import { SaveFailureComponent } from './save-failure.component';
+import { isPersistenceFailure, showFailure } from './save-failure';
 import { toLoadState } from './desk-flow';
 import { canSellReservation } from './reservation-queue';
 
@@ -31,7 +34,7 @@ interface Completed {
 @Component({
   selector: 'app-counter-reservation-attend',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-reservation-attend.component.html',
   styleUrl: './counter-reservation-attend.component.scss',
@@ -40,6 +43,7 @@ export class CounterReservationAttendComponent {
   private readonly service = inject(CounterService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly snackbar = inject(SnackbarService);
   private readonly loads = new Subject<void>();
 
   /** Parâmetros da rota (`withComponentInputBinding`) ou informados diretamente nos testes. */
@@ -52,7 +56,7 @@ export class CounterReservationAttendComponent {
   protected readonly code = signal('');
   protected readonly codeError = signal<string | null>(null);
   protected readonly submitting = signal(false);
-  protected readonly error = signal<string | null>(null);
+  protected readonly saveFailed = signal(false);
   protected readonly completed = signal<Completed | null>(null);
 
   protected readonly screen = computed<Screen | null>(() => {
@@ -116,7 +120,7 @@ export class CounterReservationAttendComponent {
       this.codeError.set('O código informado não corresponde ao exemplar destinado a esta reserva. Confira o exemplar entregue.');
       return;
     }
-    this.error.set(null);
+    this.saveFailed.set(false);
     this.step.set('confirm');
     this.focusHeading();
   }
@@ -130,7 +134,7 @@ export class CounterReservationAttendComponent {
   protected confirm(reservation: StaffPurchaseReservation): void {
     if (this.submitting() || !this.canSell(reservation)) return;
     this.submitting.set(true);
-    this.error.set(null);
+    this.saveFailed.set(false);
     this.service
       .confirmSale(reservation.id)
       .pipe(
@@ -144,7 +148,8 @@ export class CounterReservationAttendComponent {
           this.focusHeading();
         },
         error: (error) => {
-          this.error.set(errorMessage(error, 'Não foi possível concluir a venda. Tente novamente.'));
+          if (isPersistenceFailure(error)) this.saveFailed.set(true);
+          else showFailure(this.snackbar, error, 'Não foi possível concluir a venda. Tente novamente.');
           this.reload();
           this.focusHeading();
         },

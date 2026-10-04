@@ -15,9 +15,12 @@
 
   <hr class="page__rule" />
 
-  <div data-feedback tabindex="-1">
-    @if (feedback(); as f) { <app-alert [message]="f.message" [variant]="f.kind" /> }
-  </div>
+  @if (saveFailed()) {
+    <app-save-failure>
+      <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>
+      <button class="btn" type="button" (click)="saveFailed.set(false)">Voltar</button>
+    </app-save-failure>
+  }
 
   @if (state(); as s) {
     @switch (s.status) {
