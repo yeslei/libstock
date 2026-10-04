@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
+    ApplicationError,
+    PermissionDeniedError,
     DuplicateEmailError,
     InactiveUserError,
     LastActiveAdministratorError,
@@ -13,10 +15,11 @@ from app.core.exceptions import (
     UserSelfRoleRemovalError,
 )
 from sqlalchemy.exc import IntegrityError
+from app.core.security import hash_password
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.repositories.user_session_repository import UserSessionRepository
-from app.schemas.user_schema import UserUpdate
+from app.schemas.user_schema import UserPasswordReset, UserPasswordResetResponse, UserUpdate
 
 
 class UserService:
@@ -29,6 +32,27 @@ class UserService:
         self.db = db
         self.user_repository = user_repository
         self.session_repository = session_repository
+
+    def reset_password(self, target_id: int, data: UserPasswordReset, *, actor_id: int) -> UserPasswordResetResponse:
+        try:
+            if not self.user_repository.is_active_administrator_employee(actor_id):
+                raise PermissionDeniedError()
+            user = self.user_repository.find_by_id_for_update(target_id)
+            if user is None:
+                raise UserNotFoundError()
+            now = datetime.now(timezone.utc)
+            self.user_repository.reset_password(user, hash_password(data.new_password.get_secret_value()), now)
+            self.session_repository.revoke_all_for_user(target_id, now)
+            self.user_repository.audit_password_reset(target_id, actor_id)
+            self.db.commit()
+            return UserPasswordResetResponse(user_id=target_id, message="Senha redefinida com sucesso.")
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except Exception as exc:
+            self.db.rollback()
+            raise ApplicationError("Não foi possível redefinir a senha. Tente novamente.",
+                                   "password_reset_persistence_error", 500) from exc
 
     def get_by_id(self, user_id: int) -> User:
         user = self.user_repository.find_by_id(user_id)

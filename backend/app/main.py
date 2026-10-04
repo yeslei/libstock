@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 
 from app.controllers.admin_catalog_controller import router as admin_catalog_router
 from app.controllers.auth_controller import router as auth_router
@@ -48,6 +50,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def password_reset_validation_handler(request: Request, exception: RequestValidationError):
+    if getattr(request.scope.get("route"), "name", None) == "reset_user_password":
+        # FastAPI's default includes raw input. Never reflect credentials in 422 responses.
+        errors = [{key: error[key] for key in ("loc", "msg", "type") if key in error}
+                  for error in exception.errors()]
+        for error in errors:
+            if error.get("type") == "extra_forbidden":
+                error["loc"] = ["body", "campo_desconhecido"]
+        return JSONResponse(status_code=422, content={"detail": errors})
+    return await request_validation_exception_handler(request, exception)
 
 
 @app.exception_handler(ApplicationError)
