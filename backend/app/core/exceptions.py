@@ -317,3 +317,51 @@ class BookHasActiveOperationsError(ApplicationError):
 class CopyNotForLoanError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Somente exemplares didáticos podem ser emprestados.", "copy_not_for_loan", 409)
+
+
+class BookWithoutActiveCopyError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "A obra não pode ser reativada sem ao menos um exemplar ativo.",
+            "book_without_active_copy",
+            409,
+        )
+
+
+class CopyUpdateBlockedError(ApplicationError):
+    """Edição/conversão de exemplar bloqueada. O código é o do primeiro motivo.
+
+    Os motivos possíveis são `copy_inactive`, `copy_not_available`,
+    `copy_allocated` e `copy_in_operation`; todos seguem em `details["reasons"]`.
+    """
+
+    def __init__(self, reasons: list[dict]) -> None:
+        message = "Edição bloqueada: " + " ".join(reason["message"] for reason in reasons)
+        super().__init__(message, reasons[0]["code"], 409, {"reasons": reasons})
+
+
+class CopySalePriceRequiredError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Exemplar destinado à venda exige preço de venda maior que zero.",
+            "copy_sale_price_required",
+            422,
+        )
+
+
+class CopySalePriceNotAllowedError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Exemplar didático não pode ter preço de venda.",
+            "copy_sale_price_not_allowed",
+            422,
+        )
+
+
+class CopyUpdatePersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível atualizar o exemplar. Nada foi alterado.",
+            "copy_update_persistence_error",
+            500,
+        )

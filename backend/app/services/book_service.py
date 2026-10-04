@@ -21,6 +21,7 @@ from app.core.exceptions import (
     GoogleBooksRateLimitError,
     GoogleBooksUnavailableError,
     BookNotFoundError,
+    BookWithoutActiveCopyError,
 )
 from app.models.domain import Book
 from app.repositories.book_repository import BookRepository
@@ -39,6 +40,7 @@ from app.schemas.book_schema import (
 GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
 GOOGLE_BOOKS_TIMEOUT_SECONDS = 5.0
 logger = logging.getLogger(__name__)
+LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
 
 UNIQUE_CONSTRAINT_ERRORS = {
     "books_isbn_key": DuplicateIsbnError,
@@ -274,6 +276,8 @@ class BookService:
             )
             if changes.is_active is False and book.is_active:
                 self._ensure_no_active_operations(book_id, can_view_clients)
+            elif changes.is_active is True and not book.is_active:
+                self._ensure_has_active_copy(book_id)
             updated = self.repository.update_book(book, changes)
             response = BookDetailResponse.model_validate(updated)
             self.db.commit()
@@ -288,7 +292,18 @@ class BookService:
             raise
         except SQLAlchemyError as exc:
             self.db.rollback()
+            # O gatilho adiado trg_active_book_has_copy é a última barreira da reativação.
+            if LAST_ACTIVE_COPY_MESSAGE in str(getattr(exc, "orig", None) or exc):
+                raise BookWithoutActiveCopyError() from exc
             raise BookUpdatePersistenceError() from exc
+
+    def _ensure_has_active_copy(self, book_id: int) -> None:
+        """Reativação exige ao menos um exemplar ativo (decisão 7 de #147, Issue #151)."""
+        # Com o livro e os exemplares travados, nenhum exemplar é excluído ou
+        # inativado entre a conferência e o commit.
+        self.repository.lock_book_for_inactivation(book_id)
+        if not self.repository.has_active_copy(book_id):
+            raise BookWithoutActiveCopyError()
 
     def _ensure_no_active_operations(self, book_id: int, can_view_clients: bool) -> None:
         """Bloqueia a inativação enquanto houver operação em andamento (Issue #135)."""

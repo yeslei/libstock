@@ -7,7 +7,10 @@ from app.models.domain import (
     Loan,
     Profile,
     PurchaseReservation,
+    ReservationStatus,
+    Sale,
     SaleItem,
+    SaleStatus,
 )
 from app.models.loan_request import LoanRequest
 from app.models.purchase_request import PurchaseRequest
@@ -19,7 +22,8 @@ class CopyRepository:
         self.db = db
 
     def is_employee(self, user_id: int) -> bool:
-        return self.db.scalar(select(Employee.id).where(Employee.id == user_id)) is not None
+        # Funcionário ativo (perfil e usuário), como nos demais fluxos de balcão (Issue #151).
+        return self.is_active_employee(user_id)
 
     def set_audit_actor(self, employee_id: int) -> None:
         self.db.execute(
@@ -135,3 +139,27 @@ class CopyRepository:
     def delete_copy(self, copy: Copy) -> None:
         self.db.delete(copy)
         self.db.flush()
+
+    def is_allocated_to_reservation(self, copy_id: int) -> bool:
+        return self.db.scalar(
+            select(PurchaseReservation.id)
+            .where(
+                PurchaseReservation.allocated_copy_id == copy_id,
+                PurchaseReservation.status == ReservationStatus.NOTIFIED,
+            )
+            .limit(1)
+        ) is not None
+
+    def has_open_sale(self, copy_id: int) -> bool:
+        return self.db.scalar(
+            select(SaleItem.id)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(SaleItem.copy_id == copy_id, Sale.status == SaleStatus.PENDING)
+            .limit(1)
+        ) is not None
+
+    def apply_copy_changes(self, copy: Copy, changes: dict) -> Copy:
+        for field, value in changes.items():
+            setattr(copy, field, value)
+        self.db.flush()
+        return copy

@@ -8,6 +8,7 @@ from app.models.domain import (
     Employee,
     Loan,
     LoanStatus,
+    Profile,
     PurchaseReservation,
     ReservationStatus,
 )
@@ -22,8 +23,18 @@ class BookRepository:
 
     def employee_exists(self, employee_id: int) -> bool:
         # Employee.id -> Profile.id -> User.id; as PKs/FKs compartilhadas, o ID
-        # do usuário autenticado precisa existir exatamente em employees.
-        return self.db.get(Employee, employee_id) is not None
+        # do usuário autenticado precisa existir exatamente em employees e o
+        # funcionário (perfil e usuário) precisa estar ativo (Issue #151).
+        return self.db.scalar(
+            select(Employee.id)
+            .join(Profile, Profile.id == Employee.id)
+            .join(User, User.id == Employee.id)
+            .where(
+                Employee.id == employee_id,
+                Profile.is_active.is_(True),
+                User.is_active.is_(True),
+            )
+        ) is not None
 
     def find_by_id(self, book_id: int) -> Book | None:
         return self.db.get(Book, book_id)
@@ -33,6 +44,11 @@ class BookRepository:
 
     def find_by_isbn_except(self, isbn: str, book_id: int) -> Book | None:
         return self.db.scalar(select(Book).where(Book.isbn == isbn, Book.id != book_id))
+
+    def has_active_copy(self, book_id: int) -> bool:
+        return self.db.scalar(
+            select(Copy.id).where(Copy.book_id == book_id, Copy.is_active.is_(True)).limit(1)
+        ) is not None
 
     def get_with_copies(self, book_id: int) -> Book | None:
         return self.db.scalar(
