@@ -90,6 +90,8 @@ export class BookCreateComponent {
   protected readonly imageFailed = signal(false);
   protected readonly metadataState = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   protected readonly metadataMessage = signal<string | null>(null);
+  /** Campos e valores preenchidos pela sugestão do Google Books (Issue #176). */
+  private suggested: Partial<Record<'title' | 'author' | 'coverUrl', string>> = {};
 
   constructor() {
     this.form.controls.isbn.valueChanges
@@ -222,14 +224,17 @@ export class BookCreateComponent {
     const filled: string[] = [];
     if (!title.value.trim()) {
       title.setValue(metadata.title);
+      this.suggested['title'] = metadata.title;
       filled.push('título');
     }
     if (!author.value.trim()) {
       author.setValue(metadata.author);
+      this.suggested['author'] = metadata.author;
       filled.push('autor');
     }
     if (!coverUrl.value.trim() && metadata.cover_url) {
       coverUrl.setValue(metadata.cover_url);
+      this.suggested['coverUrl'] = metadata.cover_url;
       filled.push('capa');
     }
     this.metadataState.set('loaded');
@@ -240,7 +245,18 @@ export class BookCreateComponent {
     );
   }
 
+  /**
+   * Ao trocar o ISBN, o que veio da sugestão anterior e não foi editado é descartado (a nova
+   * sugestão, se houver, preenche de novo); campos editados pelo funcionário prevalecem.
+   */
   private unlockMetadata(): void {
+    for (const field of ['title', 'author', 'coverUrl'] as const) {
+      const control = this.form.controls[field];
+      if (this.suggested[field] !== undefined && control.value === this.suggested[field]) {
+        control.setValue('', { emitEvent: false });
+      }
+    }
+    this.suggested = {};
     this.metadataState.set('idle');
     this.metadataMessage.set(null);
   }

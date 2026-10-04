@@ -138,6 +138,59 @@ describe('BookCreateComponent', () => {
     expect(root.textContent).toContain('dados informados foram mantidos');
   }));
 
+  it('trocar o ISBN descarta a sugestão não editada e aplica a nova (Issue #176)', fakeAsync(() => {
+    service.lookupMetadata.and.returnValues(
+      of({ isbn: 'a', title: 'Título A', author: 'Autor A', genre: null, cover_url: 'https://x/a.jpg' }),
+      of({ isbn: 'b', title: 'Título B', author: 'Autor B', genre: null }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    const value = (id: string) => root.querySelector<HTMLInputElement>(`#${id}`)!.value;
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    expect(value('book-title')).toBe('Título A');
+    expect(value('book-coverUrl')).toBe('https://x/a.jpg');
+    input('book-isbn', '9780306406157');
+    tick(451);
+    fixture.detectChanges();
+    expect(value('book-title')).toBe('Título B');
+    expect(value('book-author')).toBe('Autor B');
+    expect(value('book-coverUrl')).toBe('');
+  }));
+
+  it('trocar o ISBN com falha na consulta não deixa os dados da sugestão anterior', fakeAsync(() => {
+    service.lookupMetadata.and.returnValues(
+      of({ isbn: 'a', title: 'Título A', author: 'Autor A', genre: null }),
+      throwError(() => ({ status: 404, detail: 'x' })),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    input('book-isbn', '9780306406157');
+    tick(451);
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#book-title')!.value).toBe('');
+    expect(root.querySelector<HTMLInputElement>('#book-author')!.value).toBe('');
+  }));
+
+  it('trocar o ISBN preserva o campo editado pelo funcionário', fakeAsync(() => {
+    service.lookupMetadata.and.returnValues(
+      of({ isbn: 'a', title: 'Título A', author: 'Autor A', genre: null }),
+      of({ isbn: 'b', title: 'Título B', author: 'Autor B', genre: null }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    input('book-title', 'Título do funcionário');
+    input('book-isbn', '9780306406157');
+    tick(451);
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#book-title')!.value).toBe('Título do funcionário');
+    expect(root.querySelector<HTMLInputElement>('#book-author')!.value).toBe('Autor B');
+  }));
+
   it('não usa a categoria do Google Books como categoria da obra (Issue #176)', fakeAsync(() => {
     spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
     service.create.and.returnValue(of(response));
