@@ -60,7 +60,8 @@ class FakeCatalogService:
     def list_featured_genres(self):
         return [SimpleNamespace(id=1, name="Ficção", slug="ficcao")]
 
-    def list_books_by_genre(self, *, slug, page, page_size):
+    def list_books_by_genre(self, *, slug, page, page_size, q=None):
+        self.last_genre_query = q
         if slug != "ficcao":
             raise GenreNotFoundError()
         return PagedBooksResponse(
@@ -225,6 +226,27 @@ class TestCatalogRepositorySearch:
         assert self.repository.search_by_barcode("BC") == []
         assert self.repository.search_by_barcode("BC-3") == []
 
+    def test_genre_search_matches_title_or_author_with_literal_wildcards(self):
+        self.db.add(Genre(id=1, name="Romance", slug="romance"))
+        self.db.flush()
+        self.db.add_all([BookGenre(book_id=1, genre_id=1), BookGenre(book_id=2, genre_id=1)])
+        self.db.add(Book(id=4, isbn="978-85-4", title="100% Jane", author="Outra Pessoa", is_active=True))
+        self.db.flush()
+        self.db.add(Copy(id=4, book_id=4, barcode="BC-4", destination=DestinationType.DIDACTIC, is_active=True))
+        self.db.add(BookGenre(book_id=4, genre_id=1))
+        self.db.commit()
+
+        def ids(q):
+            items, total = self.repository.find_books_by_genre(genre_id=1, page=1, page_size=12, q=q)
+            assert total == len(items)
+            return [book.id for book in items]
+
+        assert ids(None) == [4, 1]
+        assert ids("isbn") == [1]
+        assert ids("AUTOR") == [1]
+        assert ids("%") == [4]
+        assert ids("inexistente") == []
+
     def test_catalog_visibility_excludes_inactive_or_copyless_books(self):
         assert self.repository.search_by_isbn("978-85-2") == []
         assert self.repository.search_by_isbn("978-85-3") == []
@@ -247,6 +269,37 @@ def test_genero_inexistente_retorna_404():
 
     assert response.status_code == 404
     assert response.json()["code"] == "genre_not_found"
+
+
+def test_busca_dentro_do_genero_repassa_o_termo_sem_autenticacao():
+    fake = _use_fake_service()
+
+    response = client.get("/api/v1/catalog/genres/ficcao/books?q=jane")
+
+    assert response.status_code == 200
+    assert fake.last_genre_query == "jane"
+
+
+def test_busca_dentro_do_genero_rejeita_termo_longo_demais():
+    _use_fake_service()
+
+    response = client.get(f"/api/v1/catalog/genres/ficcao/books?q={'a' * 101}")
+
+    assert response.status_code == 422
+
+
+def test_service_normaliza_termo_em_branco_da_busca_no_genero():
+    genres = Mock()
+    genres.find_by_slug.return_value = SimpleNamespace(id=1, name="Ficção", slug="ficcao")
+    repository = Mock(spec=CatalogRepository)
+    repository.find_books_by_genre.return_value = ([], 0)
+    service = CatalogService(db=Mock(), catalog_repository=repository, genre_repository=genres)
+
+    service.list_books_by_genre(slug="ficcao", page=1, page_size=12, q="   ")
+    service.list_books_by_genre(slug="ficcao", page=1, page_size=12, q=" Jane ")
+
+    queries = [call.kwargs["q"] for call in repository.find_books_by_genre.call_args_list]
+    assert queries == [None, "Jane"]
 
 
 def test_paginacao_rejeita_page_size_acima_do_teto():

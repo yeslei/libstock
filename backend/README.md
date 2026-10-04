@@ -69,6 +69,7 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | Método | Endpoint | Autenticação | Descrição |
 |---|---|---|---|
 | `GET` | `/api/v1/catalog/books/{id}` | Pública | Capa, dados bibliográficos e disponibilidade por modalidade |
+| `GET` | `/api/v1/catalog/genres/{slug}/books` | Pública | Livros da categoria, paginados (`page`, `page_size` até 48); `q` (até 100 caracteres) filtra por título ou autor dentro da categoria |
 | `POST` | `/api/v1/loan-requests` | Bearer (`USER`) | Solicitação pendente de empréstimo |
 | `POST` | `/api/v1/purchase-requests` | Bearer (`USER`) | Solicitação pendente de compra com retirada no balcão |
 

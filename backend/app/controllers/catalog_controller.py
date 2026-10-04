@@ -75,10 +75,12 @@ def list_books_by_genre(
     slug: str,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=12, ge=1, le=48),
+    q: str | None = Query(default=None, max_length=100),
     catalog_service: CatalogService = Depends(get_catalog_service),
 ) -> PagedBooksResponse:
     return catalog_service.list_books_by_genre(
         slug=slug,
         page=page,
         page_size=page_size,
+        q=q,
     )
