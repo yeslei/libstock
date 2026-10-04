@@ -20,6 +20,10 @@
     <p class="field__error" id="sale-q-error" role="alert">Informe o código do exemplar, o ISBN ou o título.</p>
   }
 
+  @if (soldId(); as saleId) {
+    <app-receipt kind="sale" [id]="saleId" [closable]="true" [focusOnLoad]="true" (closed)="soldId.set(null)" />
+  }
+
   @if (flow.saveFailed()) {
     <app-save-failure>
       <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>

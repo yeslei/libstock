@@ -9,6 +9,7 @@ import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { COPY_LOOKUP_LIMIT, CopyStatus, CounterService, StaffCopyLookup } from './counter.service';
 import { ActionFlow, formatPrice, toLoadState } from './desk-flow';
+import { ReceiptComponent } from '../receipts/receipt.component';
 
 const UNAVAILABLE_REASON: Readonly<Record<CopyStatus, string>> = {
   AVAILABLE: 'venda em andamento ou reservado para um cliente',
@@ -26,7 +27,7 @@ const UNAVAILABLE_REASON: Readonly<Record<CopyStatus, string>> = {
 @Component({
   selector: 'app-counter-sales',
   standalone: true,
-  imports: [SaveFailureComponent, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, AlertComponent, SpinnerComponent, ConfirmDialogComponent, ReceiptComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-sales.component.html',
   styleUrl: './counter-sales.component.scss',
@@ -42,6 +43,8 @@ export class CounterSalesComponent {
   /** Termo da última busca enviada; é ele que a recarga reutiliza. */
   protected readonly searched = signal('');
   protected readonly missingTerm = signal(false);
+  /** Venda recém-registrada; abre o comprovante de venda. */
+  protected readonly soldId = signal<number | null>(null);
   /** `null` até a primeira busca. */
   protected readonly state = signal<LoadState<readonly StaffCopyLookup[]> | null>(null);
 
@@ -105,6 +108,7 @@ export class CounterSalesComponent {
       run: () => this.service.registerSale(copy.id),
       success: (sale) =>
         `Venda registrada: “${copy.book.title}”, exemplar ${copy.barcode} vendido. Total ${formatPrice(sale.total_amount)} (venda nº ${sale.id}).`,
+      done: (sale) => this.soldId.set(sale.id),
     });
   }
 }
