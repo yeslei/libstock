@@ -247,7 +247,8 @@ def test_sold_copy_cannot_be_edited(acervo):
     copy_id = add_copy(acervo, DestinationType.COMMERCIAL, 20)
     with Session(acervo.engine) as db:
         SaleService(SaleRepository(db), db).create_sale(
-            SaleCreate(items=[{'copy_id': copy_id, 'unit_price': '20.00'}]), employee_id=acervo.seller_id)
+            SaleCreate(client_id=acervo.client_id, items=[{'copy_id': copy_id, 'unit_price': '20.00'}]),
+            employee_id=acervo.seller_id)
     assert load(acervo, copy_id).status == CopyStatus.SOLD
     response = patch_copy(acervo, copy_id, {'destination': 'DIDACTIC'})
     assert (response.status_code, response.json()['code']) == (409, 'copy_not_available')

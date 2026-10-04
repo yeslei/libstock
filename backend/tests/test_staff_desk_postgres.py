@@ -13,7 +13,7 @@ from app.controllers.staff_desk_controller import get_staff_desk_service
 from app.dependencies.authentication import get_current_user
 from app.main import app
 from app.models.domain import (
-    Client, Copy, CopyStatus, DestinationType, Employee, Loan, LoanStatus, Profile, PurchaseReservation,
+    Book, Client, Copy, CopyStatus, DestinationType, Employee, Loan, LoanStatus, Profile, PurchaseReservation,
     ReservationStatus, Role, UserRole,
 )
 from app.models.user import User
@@ -133,8 +133,73 @@ def test_client_search_matches_name_and_email_and_escapes_wildcards(desk):
     assert http.get(f'{BASE}/clients', params={'q': '%%'}).json() == []  # curinga é literal
     assert http.get(f'{BASE}/clients', params={'q': needle, 'limit': 1}).json()[0]['id'] == other
     assert seller_id not in [c['id'] for c in http.get(f'{BASE}/clients', params={'q': 'Balcão Teste'}).json()]  # só clientes
-    http.get(f'{BASE}/clients')  # sem termo é 422
-    assert http.get(f'{BASE}/clients').status_code == 422
+    assert http.get(f'{BASE}/clients', params={'q': 'a'}).status_code == 422  # termo curto continua recusado
+    assert http.get(f'{BASE}/clients', params={'q': ''}).status_code == 422
+
+
+def test_client_listing_without_term_lists_only_active_clients_ordered_by_name_with_limit(desk):
+    http, engine, _, client_id, seller_id = desk
+    tag = uuid4().hex[:8]
+    with Session(engine) as db:
+        first = new_user(db, 'USER', f'0000 {tag} Alfa')
+        second = new_user(db, 'USER', f'0000 {tag} Beta')
+        inactive_profile = new_user(db, 'USER', f'0000 {tag} Aaa Perfil')
+        inactive_user = new_user(db, 'USER', f'0000 {tag} Aaa Usuario')
+        db.get(Profile, inactive_profile).is_active = False
+        db.get(User, inactive_user).is_active = False
+        db.commit()
+    listing = http.get(f'{BASE}/clients', params={'limit': 100})
+    assert listing.status_code == 200
+    rows = listing.json()
+    ids = [c['id'] for c in rows]
+    assert inactive_profile not in ids and inactive_user not in ids and seller_id not in ids
+    assert all(c['is_active'] for c in rows)
+    assert [c['id'] for c in rows if c['name'].startswith(f'0000 {tag}')] == [first, second]
+    assert [c['name'] for c in rows] == sorted(c['name'] for c in rows)  # ordenação determinística por nome
+    assert len(http.get(f'{BASE}/clients', params={'limit': 1}).json()) == 1
+    assert http.get(f'{BASE}/clients', params={'limit': 101}).status_code == 422
+    # Com termo, a busca atual continua enxergando clientes inativos (o balcão os mostra como não aptos).
+    found = http.get(f'{BASE}/clients', params={'q': f'{tag} Aaa Usuario'}).json()
+    assert [(c['id'], c['is_active']) for c in found] == [(inactive_user, False)]
+
+
+def test_copy_listing_without_term_filters_destination_and_availability_in_order(desk):
+    http, engine, book_id, client_id, seller_id = desk
+    tag = uuid4().hex[:8]
+    title = f'0000 {tag} Listagem'
+    with Session(engine) as db:
+        db.execute(text("SELECT set_config('libstock.employee_id', :id, true)"), {'id': str(seller_id)})
+        book = Book(title=title, author='Autor Lista')
+        db.add(book); db.flush()
+        free_commercial = Copy(book_id=book.id, barcode=f'L172-{tag}-C1', destination=DestinationType.COMMERCIAL, sale_price=9)
+        taken_commercial = Copy(book_id=book.id, barcode=f'L172-{tag}-C2', destination=DestinationType.COMMERCIAL,
+                                sale_price=9)
+        free_didactic = Copy(book_id=book.id, barcode=f'L172-{tag}-D1', destination=DestinationType.DIDACTIC)
+        db.add_all([free_commercial, taken_commercial, free_didactic]); db.flush()
+        now = datetime.now(timezone.utc)
+        db.add(Loan(client_id=client_id, copy_id=taken_commercial.id, employee_id=seller_id, loan_date=now,
+                    due_date=now + timedelta(days=30), status=LoanStatus.OPEN))
+        db.flush()
+        ids = {'c1': free_commercial.id, 'c2': taken_commercial.id, 'd1': free_didactic.id}
+        db.commit()
+
+    def listing(**params):
+        response = http.get(f'{BASE}/copies', params={'limit': 100, **params})
+        assert response.status_code == 200
+        return [c for c in response.json() if c['book']['title'] == title]
+
+    assert [c['id'] for c in listing()] == sorted(ids.values())  # título e depois id
+    assert [(c['id'], c['sellable']) for c in listing(destination='COMMERCIAL', available='true')] == [(ids['c1'], True)]
+    assert [c['id'] for c in listing(destination='DIDACTIC', available='true')] == [ids['d1']]
+    assert [c['id'] for c in listing(destination='COMMERCIAL')] == [ids['c1'], ids['c2']]
+    assert [c['id'] for c in listing(available='false')] == [ids['c2']]
+    all_rows = http.get(f'{BASE}/copies', params={'limit': 100}).json()
+    assert [(c['book']['title'], c['id']) for c in all_rows] == sorted((c['book']['title'], c['id']) for c in all_rows)
+    assert len(http.get(f'{BASE}/copies', params={'limit': 2}).json()) == 2
+    assert http.get(f'{BASE}/copies', params={'limit': 101}).status_code == 422
+    assert http.get(f'{BASE}/copies', params={'q': ''}).status_code == 422
+    assert http.get(f'{BASE}/copies', params={'q': f'{tag}-D1', 'destination': 'COMMERCIAL'}).json() == []  # q + filtros
+    assert [c['id'] for c in http.get(f'{BASE}/copies', params={'q': f'{tag}-D1'}).json()] == [ids['d1']]
 
 
 def test_inactive_employee_cannot_read_desk(desk):

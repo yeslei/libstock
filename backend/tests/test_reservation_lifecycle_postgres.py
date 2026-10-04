@@ -441,7 +441,7 @@ def test_direct_sale_of_copy_allocated_in_time_is_a_stable_conflict(desk):  # no
     http.post(f'{BASE}/books/{book_id}/allocate-purchase')
     sessions = []
     app.dependency_overrides[get_sale_service] = sale_service(engine, sessions)
-    response = http.post('/api/v1/sales/', json={'items': [{'copy_id': copy_id}]})
+    response = http.post('/api/v1/sales/', json={'client_id': client_id, 'items': [{'copy_id': copy_id}]})
     assert (response.status_code, response.json()['code']) == (409, 'copy_reserved')  # nunca 500 do gatilho
     assert state(engine, reservation_id)[:2] == ('NOTIFIED', copy_id)
     with Session(engine) as db:
@@ -458,7 +458,7 @@ def test_direct_sale_of_copy_with_overdue_reservation_expires_it_and_sells(desk)
     force_expired(engine, reservation_id)
     sessions = []
     app.dependency_overrides[get_sale_service] = sale_service(engine, sessions)
-    response = http.post('/api/v1/sales/', json={'items': [{'copy_id': copy_id}]})
+    response = http.post('/api/v1/sales/', json={'client_id': client_id, 'items': [{'copy_id': copy_id}]})
     assert (response.status_code, response.json()['status']) == (201, 'CONFIRMED')
     assert state(engine, reservation_id)[0] == 'EXPIRED'
     with Session(engine) as db:
@@ -539,7 +539,7 @@ def test_direct_sale_of_overdue_reserved_copy_versus_expire_endpoint(desk, sale_
     http.post(f'{BASE}/books/{book_id}/allocate-purchase')
     force_expired(engine, reservation_id)
     sell = lambda db: SaleService(SaleRepository(db), db).create_sale(  # noqa: E731
-        SaleCreate(items=[{'copy_id': copy_id}]), employee_id=seller_id)
+        SaleCreate(client_id=client_id, items=[{'copy_id': copy_id}]), employee_id=seller_id)
     expire = lambda db: circulation(db).expire_due_reservations(seller_id)  # noqa: E731
     assert run_in_order_db(engine, book_id, *((sell, expire) if sale_first else (expire, sell))) == ('ok', 'ok')
     assert state(engine, reservation_id)[0] == 'EXPIRED'

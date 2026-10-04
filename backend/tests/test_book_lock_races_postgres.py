@@ -107,7 +107,8 @@ def sale_op(api, copy_id):
         with Session(api.engine) as db:
             service = SaleService(SaleRepository(db), db)
             return outcome(lambda: service.create_sale(
-                SaleCreate(items=[{'copy_id': copy_id, 'unit_price': '20.00'}]), employee_id=api.admin_id))
+                SaleCreate(client_id=api.client_id, items=[{'copy_id': copy_id, 'unit_price': '20.00'}]),
+                employee_id=api.admin_id))
     return run
 
 
