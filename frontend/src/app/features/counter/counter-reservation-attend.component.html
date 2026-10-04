@@ -58,7 +58,7 @@
             <div class="card">
               <h2>Reserva localizada</h2>
               <p class="line">{{ reservation.client.name }} · {{ reservation.book.title }} · Exemplar {{ reservation.allocated_copy_barcode }}</p>
-              <p class="line">Prazo de retirada encerrado@if (reservation.expires_at) { em {{ reservation.expires_at | date: 'dd/MM/yyyy' }} }</p>
+              <p class="line">Prazo de retirada encerrado@if (reservation.expires_at) { em {{ reservation.expires_at | date: 'dd/MM/yyyy':'-0300' }} }</p>
               <p class="line">Status: consultar situação atualizada da reserva</p>
             </div>
             <div class="callout callout--danger" role="alert">
@@ -91,7 +91,7 @@
               <p class="line">{{ reservation.book.title }} · disponível para retirada</p>
               <p class="line">Exemplar {{ reservation.allocated_copy_barcode }} · Comercial · destinado à venda</p>
               @if (reservation.expires_at) {
-                <p class="line">Prazo de retirada: {{ reservation.expires_at | date: 'dd/MM/yyyy' }}</p>
+                <p class="line">Retirar até {{ reservation.expires_at | date: 'dd/MM/yyyy':'-0300' }}</p>
               }
             </div>
 

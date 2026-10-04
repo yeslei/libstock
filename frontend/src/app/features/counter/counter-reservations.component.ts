@@ -44,6 +44,11 @@ export class CounterReservationsComponent {
     return s.status === 'loaded' ? groupByBook(s.data) : [];
   });
 
+  protected readonly hasExpired = computed(() => {
+    const s = this.state();
+    return s.status === 'loaded' && s.data.some((reservation) => reservation.expired);
+  });
+
   protected readonly flow = new ActionFlow(inject(DestroyRef), () => {
     this.reload();
     queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('[data-feedback]')?.focus());
@@ -106,13 +111,41 @@ export class CounterReservationsComponent {
       title: 'Destinar exemplar?',
       details: [
         `Obra: ${reservation.book.title}`,
-        `Primeiro da fila: ${reservation.client.name} (${reservation.client.email})`,
+        `Primeira reserva elegível da fila: ${reservation.client.name} (${reservation.client.email})`,
         `Exemplares comerciais livres: ${reservation.free_commercial_copies}`,
-        'Um exemplar comercial livre ficará destinado a este cliente e indisponível para outros.',
+        'Um exemplar comercial livre ficará destinado a este cliente e indisponível para outros, com cinco dias corridos para a retirada.',
       ],
       confirmLabel: 'Destinar exemplar',
       run: () => this.service.allocatePurchase(reservation.book.id),
       success: () => `Exemplar destinado a ${reservation.client.name} para “${reservation.book.title}”.`,
+    });
+  }
+
+  protected cancel(reservation: StaffPurchaseReservation): void {
+    const destined = reservation.status === 'NOTIFIED';
+    this.flow.ask({
+      title: 'Cancelar reserva?',
+      details: [
+        `Obra: ${reservation.book.title}`,
+        `Cliente: ${reservation.client.name} (${reservation.client.email})`,
+        destined
+          ? 'O exemplar destinado será liberado e a reserva ficará cancelada.'
+          : 'A reserva sairá da fila e ficará cancelada.',
+      ],
+      confirmLabel: 'Cancelar reserva',
+      run: () => this.service.cancelReservation(reservation.id),
+      success: () => `Reserva de ${reservation.client.name} para “${reservation.book.title}” cancelada.`,
+    });
+  }
+
+  protected releaseExpired(): void {
+    this.flow.ask({
+      title: 'Liberar exemplares vencidos?',
+      details: ['As reservas com prazo de retirada vencido passarão a expiradas e seus exemplares voltarão à fila.'],
+      confirmLabel: 'Liberar exemplares',
+      run: () => this.service.expireDueReservations(),
+      success: (result) =>
+        result.expired === 1 ? '1 reserva vencida foi encerrada.' : `${result.expired} reservas vencidas foram encerradas.`,
     });
   }
 }

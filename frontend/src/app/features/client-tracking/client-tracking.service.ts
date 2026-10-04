@@ -15,6 +15,7 @@ export interface TrackingItem {
   queue_position: number | null;
   available_since: string | null;
   expires_at: string | null;
+  expired?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -22,4 +23,5 @@ export class ClientTrackingService {
   private readonly http = inject(HttpClient);
   getLoans() { return this.http.get<TrackingItem[]>('/api/v1/loans/me'); }
   getReservations() { return this.http.get<TrackingItem[]>('/api/v1/purchase-reservations/me'); }
+  cancelReservation(id: number) { return this.http.post<{ id: number }>(`/api/v1/purchase-reservations/${id}/cancel`, {}); }
 }

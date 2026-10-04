@@ -48,6 +48,8 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   reservation_not_found: 'Reserva não encontrada ou sem fila aguardando. Atualize a lista.',
   reservation_not_ready: 'Esta reserva ainda não tem exemplar destinado para retirada.',
   reservation_expired: 'O prazo de retirada desta reserva expirou.',
+  reservation_not_cancellable: 'Esta reserva já foi encerrada e não pode ser cancelada. Atualize a lista.',
+  no_eligible_reservation: 'Nenhuma reserva da fila tem cliente elegível no momento. Nada foi destinado.',
   purchase_unavailable: 'Não há exemplar comercial livre para esta operação.',
   circulation_persistence_error: 'Não foi possível concluir a operação. Nada foi alterado; tente novamente.',
   search_term_too_short: 'Informe ao menos 2 caracteres para buscar.',
