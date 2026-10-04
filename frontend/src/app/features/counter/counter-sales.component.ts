@@ -20,8 +20,8 @@ const UNAVAILABLE_REASON: Readonly<Record<CopyStatus, string>> = {
 
 /**
  * Frame "Funcionário / Venda": localiza o exemplar por código, ISBN ou título (`GET /staff/copies`) e registra
- * a venda direta por `POST /api/v1/sales/`. O backend cria a venda como PENDENTE e não há endpoint que a
- * confirme: a tela nunca afirma que o exemplar foi vendido. O preço enviado é o do exemplar e não é editável.
+ * a venda direta por `POST /api/v1/sales/`. A venda é confirmada no ato (pagamento no balcão) e o exemplar
+ * passa a Vendido na mesma transação; o preço é sempre o cadastrado no exemplar (a tela não o envia nem edita).
  */
 @Component({
   selector: 'app-counter-sales',
@@ -86,7 +86,7 @@ export class CounterSalesComponent {
     return UNAVAILABLE_REASON[copy.status];
   }
 
-  /** Só há venda com o preço cadastrado: o valor enviado é sempre o do exemplar. */
+  /** Só há venda com o preço cadastrado; o backend recusa exemplar comercial sem preço (`copy_without_price`). */
   protected canRegister(copy: StaffCopyLookup): boolean {
     return copy.sellable && copy.sale_price !== null && copy.sale_price !== '';
   }
@@ -99,12 +99,12 @@ export class CounterSalesComponent {
         `Obra: ${copy.book.title}`,
         `Exemplar: ${copy.barcode}`,
         `Preço: ${formatPrice(copy.sale_price)}`,
-        'A venda será registrada como pendente. O exemplar não será marcado como vendido: ainda não há confirmação de venda direta.',
+        'A venda será confirmada no ato e o exemplar ficará vendido.',
       ],
       confirmLabel: 'Registrar venda',
-      run: () => this.service.registerSale(copy.id, copy.sale_price!),
-      success: () =>
-        `Venda registrada como pendente: “${copy.book.title}”, exemplar ${copy.barcode}, ${formatPrice(copy.sale_price)}. O exemplar ainda não foi marcado como vendido.`,
+      run: () => this.service.registerSale(copy.id),
+      success: (sale) =>
+        `Venda registrada: “${copy.book.title}”, exemplar ${copy.barcode} vendido. Total ${formatPrice(sale.total_amount)} (venda nº ${sale.id}).`,
     });
   }
 }

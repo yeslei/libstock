@@ -167,26 +167,26 @@ describe('CounterService', () => {
   });
 
   describe('venda direta', () => {
-    it('registra a venda em POST /api/v1/sales/ com o preço do exemplar em texto e sem cliente', () => {
+    it('registra a venda em POST /api/v1/sales/ sem enviar preço e sem cliente', () => {
       let result: unknown;
-      service.registerSale(7, '38.90').subscribe((value) => (result = value));
+      service.registerSale(7).subscribe((value) => (result = value));
       const request = http.expectOne('/api/v1/sales/');
       expect(request.request.method).toBe('POST');
-      expect(request.request.body).toEqual({ items: [{ copy_id: 7, unit_price: '38.90' }] });
-      request.flush({ id: 5, client_id: null, status: 'PENDING', total_amount: '38.90' }, { status: 201, statusText: 'Created' });
-      expect(result).toEqual(jasmine.objectContaining({ id: 5, status: 'PENDING' }));
+      expect(request.request.body).toEqual({ items: [{ copy_id: 7 }] });
+      request.flush({ id: 5, client_id: null, status: 'CONFIRMED', total_amount: '38.90' }, { status: 201, statusText: 'Created' });
+      expect(result).toEqual(jasmine.objectContaining({ id: 5, status: 'CONFIRMED' }));
     });
 
-    it('converte preço numérico em texto', () => {
-      service.registerSale(7, 38.9).subscribe();
-      const request = http.expectOne('/api/v1/sales/');
-      expect(request.request.body.items[0].unit_price).toBe('38.9');
-      request.flush({}, { status: 201, statusText: 'Created' });
+    it('propaga o erro de exemplar sem preço cadastrado', () => {
+      let error: ApiError | undefined;
+      service.registerSale(7).subscribe({ error: (e) => (error = e) });
+      http.expectOne('/api/v1/sales/').flush({ detail: 'x', code: 'copy_without_price' }, { status: 409, statusText: 'Conflict' });
+      expect(error?.code).toBe('copy_without_price');
     });
 
     it('propaga o erro de domínio do exemplar didático', () => {
       let error: ApiError | undefined;
-      service.registerSale(7, '10.00').subscribe({ error: (e) => (error = e) });
+      service.registerSale(7).subscribe({ error: (e) => (error = e) });
       http.expectOne('/api/v1/sales/').flush({ detail: 'Exemplares didáticos não podem ser vendidos.' }, { status: 409, statusText: 'Conflict' });
       expect(error?.status).toBe(409);
       expect(error?.detail).toBe('Exemplares didáticos não podem ser vendidos.');

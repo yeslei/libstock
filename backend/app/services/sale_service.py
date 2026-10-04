@@ -4,8 +4,8 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ApplicationError, BookInactiveError
-from app.models.domain import CopyStatus, DestinationType, SaleStatus
+from app.core.exceptions import ApplicationError, BookInactiveError, CopyWithoutPriceError
+from app.models.domain import CopyStatus, DestinationType
 from app.repositories.sale_repository import SaleRepository
 from app.schemas.sale_schema import SaleCreate, SaleItemResponse, SaleResponse
 
@@ -71,8 +71,16 @@ class SaleService:
                         detail="Exemplares didáticos não podem ser vendidos.",
                     )
 
+            # O preço é sempre o cadastrado no exemplar (banco); o valor enviado é ignorado.
+            priced_items = []
+            for item in sale_data.items:
+                price = copies_by_id[item.copy_id].sale_price
+                if price is None:
+                    raise CopyWithoutPriceError()
+                priced_items.append((item.copy_id, price))
+
             total_amount = sum(
-                (item.unit_price for item in sale_data.items),
+                (price for _, price in priced_items),
                 Decimal("0.00"),
             )
 
@@ -84,8 +92,13 @@ class SaleService:
 
             sale_items = self.repository.create_sale_items(
                 sale_id=sale.id,
-                items=sale_data.items,
+                items=priced_items,
             )
+
+            # Venda direta é paga no balcão: confirma no ato. O gatilho do banco
+            # (mesmo mecanismo do confirm-sale V2) marca o exemplar como SOLD,
+            # recalcula o total e registra o funcionário na auditoria.
+            self.repository.confirm_sale(sale)
 
             self.db.commit()
             self.db.refresh(sale)

@@ -59,6 +59,7 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   copy_has_history: 'Este exemplar possui histórico (empréstimo, venda, reserva ou solicitação) e não pode ser excluído.',
   last_active_copy: 'Este é o último exemplar ativo de uma obra ativa e não pode ser excluído.',
   copy_delete_persistence_error: 'Não foi possível excluir o exemplar. Nada foi alterado; tente novamente.',
+  copy_without_price: 'Este exemplar comercial não tem preço de venda cadastrado e não pode ser vendido.',
   book_inactive: 'A obra deste exemplar está inativa e não aceita novas operações.',
   book_has_active_operations: 'Esta obra possui operações em andamento e não pode ser inativada.',
 };

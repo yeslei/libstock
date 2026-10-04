@@ -3,7 +3,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Book, Client, Copy, Sale, SaleItem
+from app.models.domain import Book, Client, Copy, Sale, SaleItem, SaleStatus
 
 
 class SaleRepository:
@@ -58,18 +58,23 @@ class SaleRepository:
         self,
         *,
         sale_id: int,
-        items,
+        items: list[tuple[int, Decimal]],
     ) -> list[SaleItem]:
         sale_items = [
             SaleItem(
                 sale_id=sale_id,
-                copy_id=item.copy_id,
-                unit_price=item.unit_price,
+                copy_id=copy_id,
+                unit_price=unit_price,
             )
-            for item in items
+            for copy_id, unit_price in items
         ]
 
         self.db.add_all(sale_items)
         self.db.flush()
 
         return sale_items
+
+    def confirm_sale(self, sale: Sale) -> None:
+        """PENDING -> CONFIRMED; os gatilhos do banco aplicam SOLD aos exemplares."""
+        sale.status = SaleStatus.CONFIRMED
+        self.db.flush()

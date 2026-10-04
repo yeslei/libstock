@@ -15,7 +15,7 @@ const copy = (over: Partial<StaffCopyLookup> = {}): StaffCopyLookup => ({
   free: true, free_commercial_copies: 3, sellable: true, sale_block_reason: null, ...over,
 });
 
-const pending: SaleRegistration = { id: 12, client_id: null, status: 'PENDING', total_amount: '38.90' };
+const confirmed: SaleRegistration = { id: 12, client_id: null, status: 'CONFIRMED', total_amount: '38.90' };
 
 function setup(configure: (service: jasmine.SpyObj<CounterService>) => void) {
   const service = jasmine.createSpyObj<CounterService>('CounterService', ['lookupCopies', 'registerSale']);
@@ -130,19 +130,19 @@ describe('Balcão: registrar venda', () => {
     expect(root.querySelector('.note')?.textContent).toContain('Mostrando os primeiros 20');
   });
 
-  it('pede confirmação antes do POST, informa que a venda ficará pendente e cancelar não envia', () => {
+  it('pede confirmação antes do POST, informa que a venda será confirmada no ato e cancelar não envia', () => {
     const { fixture, root, service } = setup((s) => s.lookupCopies.and.returnValue(of([copy()])));
     submitSearch(fixture, root, 'C-007');
     click(fixture, button(root, 'Registrar venda'));
     expect(dialog(root)?.textContent).toContain('Registrar venda?');
-    expect(dialog(root)?.textContent).toContain('A venda será registrada como pendente');
-    expect(dialog(root)?.textContent).toContain('não será marcado como vendido');
+    expect(dialog(root)?.textContent).toContain('A venda será confirmada no ato e o exemplar ficará vendido.');
+    expect(dialog(root)?.textContent).not.toContain('pendente');
     click(fixture, button(root, 'Cancelar'));
     expect(dialog(root)).toBeNull();
     expect(service.registerSale).not.toHaveBeenCalled();
   });
 
-  it('envia o preço do exemplar, bloqueia duplo envio e só anuncia sucesso após o 2xx, como pendente', () => {
+  it('não envia preço, bloqueia duplo envio e só anuncia a venda registrada após o 2xx', () => {
     const response = new Subject<SaleRegistration>();
     const { fixture, root, service } = setup((s) => {
       s.lookupCopies.and.returnValue(of([copy()]));
@@ -153,18 +153,20 @@ describe('Balcão: registrar venda', () => {
     const submit = submitButton(root);
     click(fixture, submit);
     click(fixture, submit);
-    expect(service.registerSale).toHaveBeenCalledOnceWith(7, '38.90');
+    expect(service.registerSale).toHaveBeenCalledOnceWith(7);
     expect(submit.disabled).toBeTrue();
     expect(snackbarMessage()).toBe('');
     service.lookupCopies.and.returnValue(of([copy({ free: false, sellable: false, sale_block_reason: 'NOT_AVAILABLE', free_commercial_copies: 2 })]));
-    response.next(pending);
+    response.next(confirmed);
     response.complete();
     fixture.detectChanges();
     expect(dialog(root)).toBeNull();
     const feedback = snackbarMessage() ?? '';
-    expect(feedback).toContain('Venda registrada como pendente');
-    expect(feedback).toContain('ainda não foi marcado como vendido');
-    expect(feedback).not.toMatch(/venda concluída|vendido com sucesso/i);
+    expect(feedback).toContain('Venda registrada');
+    expect(feedback).toContain('C-007 vendido');
+    expect(feedback).toContain('38,90');
+    expect(feedback).toContain('venda nº 12');
+    expect(feedback).not.toMatch(/pendente/i);
     expect(service.lookupCopies).toHaveBeenCalledTimes(2);
     expect(root.querySelector('article button')).toBeNull();
   });
@@ -205,6 +207,18 @@ describe('Balcão: registrar venda', () => {
       expect(root.querySelector('app-save-failure')).toBeNull();
     });
   }
+
+  it('exibe o erro de exemplar sem preço devolvido pelo backend, sem sucesso', () => {
+    const { fixture, root } = setup((s) => {
+      s.lookupCopies.and.returnValue(of([copy()]));
+      s.registerSale.and.returnValue(throwError(() => ({ detail: 'Este exemplar comercial não tem preço de venda cadastrado e não pode ser vendido.', code: 'copy_without_price', status: 409 })));
+    });
+    submitSearch(fixture, root, 'C-007');
+    click(fixture, button(root, 'Registrar venda'));
+    click(fixture, submitButton(root));
+    expect(snackbarMessage()).toContain('não tem preço de venda cadastrado');
+    expect(snackbarMessage()).not.toContain('Venda registrada');
+  });
 
   it('exibe o erro de domínio de exemplar didático devolvido pelo backend', () => {
     const { fixture, root } = setup((s) => {
