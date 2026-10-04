@@ -65,7 +65,7 @@ As migrations 0011/0012 já aplicadas foram preservadas. A 0013 é incremental e
 3. **P1 — Comprovante digital:** definir conteúdo, persistir após retirada e restringir acesso. A solicitação pendente não gera comprovante de empréstimo ativo.
 4. **P1 — Gestão de acervo:** finalizar inativação, quantidades e conversão com transações, permissões e impedimentos por operação em andamento.
 5. **P1 — Pendências:** aprovar responsáveis e regra de regularização; implementar auditoria e telas. Não apagar automaticamente `is_penalized` ao devolver, pois o motivo da penalidade não está modelado.
-6. **Resolvido (Issue #150) — Ciclo completo da fila:** prazo de retirada de 5 dias corridos, expiração preguiçosa, cancelamento (cliente e balcão) e destinação à primeira reserva elegível foram aprovados e implementados (BUSINESS_RULES, seção 19). Pendente: prazo para reservas criadas por solicitação de compra com exemplar disponível, notificação e expiração agendada.
+6. **Resolvido (Issue #150) — Ciclo completo da fila:** prazo de retirada de 5 dias corridos, expiração preguiçosa, cancelamento (cliente e balcão) e destinação à primeira reserva elegível foram aprovados e implementados (BUSINESS_RULES, seção 19). Pendente: notificação e expiração agendada (as reservas criadas por solicitação de compra com exemplar disponível também recebem o prazo).
 7. **P2 — Homologação/escala:** testes completos no navegador, paginação de consultas/listas, posições da fila em lote (hoje há uma consulta de posição por reserva WAITING) e revisão de acessibilidade/responsividade das telas operacionais.
 
 Não entram neste repasse: histórico do cliente, notificações V3, pagamentos online ou prioridade complexa de fila. Consulta local continua explicitamente não configurada.

@@ -389,3 +389,29 @@ def test_rollback_keeps_reservation_when_cancel_audit_fails(desk, monkeypatch): 
     response = http.post(f'{BASE}/purchase-reservations/{reservation_id}/cancel')
     assert (response.status_code, response.json()['code']) == (500, 'circulation_persistence_error')
     assert state(engine, reservation_id)[0] == 'WAITING'
+
+
+def test_purchase_request_with_free_copy_is_an_allocation_with_the_same_deadline_and_expires(desk):  # noqa: F811
+    from app.repositories.purchase_request_repository import PurchaseRequestRepository
+    from app.schemas.purchase_request_schema import PurchaseRequestCreate
+    from app.services.purchase_request_service import PurchaseRequestService
+    http, engine, book_id, client_id, seller_id = desk
+    with Session(engine) as db:
+        PurchaseRequestService(db, PurchaseRequestRepository(db)).create(
+            PurchaseRequestCreate(book_id=book_id, pickup_date=business_today()), client_id=client_id)
+        reservation = db.scalar(select(PurchaseReservation).where(
+            PurchaseReservation.client_id == client_id, PurchaseReservation.book_id == book_id,
+            PurchaseReservation.status == ReservationStatus.NOTIFIED))
+        reservation_id, copy_id = reservation.id, reservation.allocated_copy_id
+        assert reservation.expires_at == reservation_pickup_deadline(reservation.notified_at)
+        local = reservation.expires_at.astimezone(BUSINESS_ZONE)
+        assert (local.date(), local.hour, local.minute, local.microsecond) == (
+            business_today() + timedelta(days=5), 23, 59, 999000)
+    force_expired(engine, reservation_id)
+    # expira pelas mesmas regras: a venda é recusada e o exemplar é liberado
+    response = http.post(f'{BASE}/purchase-reservations/{reservation_id}/confirm-sale')
+    assert (response.status_code, response.json()['code']) == (409, 'reservation_expired')
+    assert state(engine, reservation_id)[0] == 'EXPIRED'
+    with Session(engine) as db:
+        assert db.get(Copy, copy_id).status == CopyStatus.AVAILABLE
+        assert CirculationRepository(db).lock_free_copy(book_id, commercial_copy(db, book_id).destination) is not None

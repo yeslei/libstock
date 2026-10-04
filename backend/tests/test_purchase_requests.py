@@ -74,3 +74,14 @@ def test_purchase_api_contract_and_access(purchase):
         assert client.post('/api/v1/purchase-requests', json=payload).status_code == 201
     finally:
         app.dependency_overrides.clear()
+
+
+def test_repository_create_sets_pickup_deadline_for_new_notified_reservation():
+    from unittest.mock import Mock
+    from app.core.business_dates import reservation_pickup_deadline
+    from app.repositories.purchase_request_repository import PurchaseRequestRepository
+    db = Mock()
+    PurchaseRequestRepository(db).create(1, 2, __import__('datetime').date(2026, 10, 4), 9)
+    reservation = db.add.call_args_list[0].args[0]
+    assert reservation.status.value == 'NOTIFIED'
+    assert reservation.expires_at == reservation_pickup_deadline(reservation.notified_at)

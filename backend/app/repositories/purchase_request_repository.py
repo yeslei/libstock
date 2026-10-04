@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from app.models.domain import Copy, DestinationType, PurchaseReservation, ReservationStatus
 from datetime import datetime, timezone
+from app.core.business_dates import reservation_pickup_deadline
 from app.models.purchase_request import PurchaseRequest
 from app.repositories.client_request_repository import ClientRequestRepository
 from app.repositories.inventory_availability import free_copies_statement
@@ -23,8 +24,10 @@ class PurchaseRequestRepository(ClientRequestRepository):
         ).limit(1)) is not None
 
     def create(self, client_id, book_id, pickup_date, copy_id):
+        notified_at = datetime.now(timezone.utc)
         reservation = PurchaseReservation(book_id=book_id, client_id=client_id, status=ReservationStatus.NOTIFIED,
-            allocated_copy_id=copy_id, notified_at=datetime.now(timezone.utc))
+            allocated_copy_id=copy_id, notified_at=notified_at,
+            expires_at=reservation_pickup_deadline(notified_at))
         self.db.add(reservation); self.db.flush(); self.db.refresh(reservation)
         request = PurchaseRequest(client_id=client_id, book_id=book_id, pickup_date=pickup_date,
                                   status='PENDING', reservation_id=reservation.id)
