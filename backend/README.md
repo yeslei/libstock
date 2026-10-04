@@ -71,7 +71,7 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `GET` | `/api/v1/catalog/books/{id}` | Pública | Capa, dados bibliográficos e disponibilidade por modalidade |
 | `GET` | `/api/v1/catalog/genres/{slug}/books` | Pública | Livros da categoria, paginados (`page`, `page_size` até 48); `q` (até 100 caracteres) filtra por título ou autor dentro da categoria |
 | `POST` | `/api/v1/loan-requests` | Bearer (`USER`) | Solicitação pendente de empréstimo |
-| `POST` | `/api/v1/purchase-requests` | Bearer (`USER`) | Solicitação pendente de compra com retirada no balcão |
+| `POST` | `/api/v1/purchase-requests` | Bearer (`USER`) | Solicitação pendente de compra com retirada no balcão; `pickup_date` limitada ao prazo (422 `pickup_date_after_deadline`); com fila `WAITING` entra no fim da fila (`reservation_status`) |
 
 Os dois POSTs recebem `{ "book_id": 42, "pickup_date": "2026-10-31" }`.
 Retornam HTTP 201 com `id`, `book_id`, `pickup_date`, `status` e `created_at`;
