@@ -67,3 +67,42 @@ def test_response_lists_genres_alphabetically_from_orm_links():
     links = [NS(genre=genre(2, 'romance')), NS(genre=genre(1, 'Fantasia'))]
     book = NS(id=1, title='T', author='A', is_active=True, isbn=None, genre=None, genres=links)
     assert [g.name for g in BookResponse.model_validate(book).genres] == ['Fantasia', 'romance']
+
+
+def test_genre_text_with_genre_ids_is_rejected_with_stable_code_on_update():
+    from app.core.exceptions import GenreTextWithGenreIdsError
+    svc, repository = service()
+    repository.employee_exists.return_value = True
+    repository.get_with_copies.return_value = NS(id=1, is_active=True)
+    with pytest.raises(GenreTextWithGenreIdsError) as error:
+        svc.update_book(1, BookUpdate(genre='Texto', genre_ids=[1]), employee_id=9)
+    assert (error.value.status_code, error.value.code) == (422, 'genre_text_with_genre_ids')
+    repository.update_book.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_genre_text_with_genre_ids_is_rejected_on_create_before_any_lookup():
+    from app.core.exceptions import GenreTextWithGenreIdsError
+    svc, repository = service()
+    repository.employee_exists.return_value = True
+    with pytest.raises(GenreTextWithGenreIdsError):
+        await svc.create_book(BookCreate(isbn='9788575225530', genre='x', genre_ids=[1], initial_copy=COPY), employee_id=9)
+    repository.create_book.assert_not_called()
+
+
+@pytest.fixture
+def anyio_backend():
+    return 'asyncio'
+
+
+def test_foreign_key_violation_on_genre_is_404_not_500():
+    from sqlalchemy.exc import IntegrityError
+    from app.core.exceptions import GenreNotFoundError
+    svc, repository = service([genre(1, 'Romance')])
+    repository.employee_exists.return_value = True
+    repository.get_with_copies.return_value = NS(id=1, is_active=True)
+    orig = Exception('insert or update on table "book_genres" violates foreign key constraint "book_genres_genre_id_fkey"')
+    repository.update_book.side_effect = IntegrityError('x', {}, orig)
+    with pytest.raises(GenreNotFoundError) as error:
+        svc.update_book(1, BookUpdate(genre_ids=[1]), employee_id=9)
+    assert (error.value.status_code, error.value.code) == (404, 'genre_not_found')

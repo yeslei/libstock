@@ -160,6 +160,16 @@ class DuplicateGenreError(ApplicationError):
         super().__init__("Gênero já cadastrado.", "duplicate_genre", 409)
 
 
+class GenreTextWithGenreIdsError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O texto `genre` é legado e não alimenta o catálogo: envie só `genre_ids` "
+            "(o texto passa a espelhar os nomes escolhidos).",
+            "genre_text_with_genre_ids",
+            422,
+        )
+
+
 class GenreNotFoundError(ApplicationError):
     def __init__(self, missing_ids: list[int] | None = None) -> None:
         # Na associação de categorias à obra (Issue #174), `details.missing_ids` lista os ids inexistentes.

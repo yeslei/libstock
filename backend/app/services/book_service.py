@@ -19,6 +19,7 @@ from app.core.exceptions import (
     DuplicateIsbnError,
     EmployeeRecordRequiredError,
     GenreNotFoundError,
+    GenreTextWithGenreIdsError,
     GoogleBooksInvalidResponseError,
     GoogleBooksNotFoundError,
     GoogleBooksRateLimitError,
@@ -46,6 +47,13 @@ GOOGLE_BOOKS_TIMEOUT_SECONDS = 5.0
 logger = logging.getLogger(__name__)
 LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
 GENRE_TEXT_MAX_LENGTH = 100
+GENRE_FK_CONSTRAINT = "book_genres_genre_id_fkey"
+
+
+def _is_genre_fk_violation(exc: IntegrityError) -> bool:
+    """Categoria removida entre a leitura e o commit: vira 404 `genre_not_found`, nunca 500."""
+    constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+    return constraint == GENRE_FK_CONSTRAINT or GENRE_FK_CONSTRAINT in str(exc.orig)
 
 UNIQUE_CONSTRAINT_ERRORS = {
     "books_isbn_key": DuplicateIsbnError,
@@ -255,6 +263,8 @@ class BookService:
             require_commercial_price(
                 book_data.initial_copy.destination, book_data.initial_copy.sale_price
             )
+            if book_data.genre_ids is not None and book_data.genre is not None:
+                raise GenreTextWithGenreIdsError()
             if self.repository.find_by_isbn(book_data.isbn) is not None:
                 raise DuplicateIsbnError()
             if self.repository.find_copy_by_barcode(book_data.initial_copy.barcode) is not None:
@@ -303,6 +313,8 @@ class BookService:
             constraint = _unique_constraint_name(exc)
             if constraint is not None:
                 raise UNIQUE_CONSTRAINT_ERRORS[constraint]() from exc
+            if _is_genre_fk_violation(exc):
+                raise GenreNotFoundError() from exc
             logger.exception("Falha de integridade inesperada ao cadastrar obra e exemplar")
             raise BookPersistenceError() from exc
         except ApplicationError:
@@ -358,11 +370,8 @@ class BookService:
                 changes.isbn, book_id
             ) is not None:
                 raise DuplicateIsbnError()
-            genres = (
-                self._resolve_genres(changes.genre_ids)
-                if "genre_ids" in changes.model_fields_set
-                else None
-            )
+            if "genre_ids" in changes.model_fields_set and "genre" in changes.model_fields_set:
+                raise GenreTextWithGenreIdsError()
             self.db.execute(
                 text("SELECT set_config('libstock.employee_id', :employee_id, true)"),
                 {"employee_id": str(employee_id)},
@@ -375,8 +384,12 @@ class BookService:
                     self._ensure_no_active_operations(book_id, can_view_clients)
                 elif changes.is_active is True and not book.is_active:
                     self._ensure_has_active_copy(book_id)
-            if genres is not None:
+            genres = None
+            if "genre_ids" in changes.model_fields_set:
+                # Ordem: obra (e exemplares) primeiro, depois as categorias com FOR SHARE, que impede
+                # a remoção concorrente de uma categoria até o commit desta transação.
                 self.repository.lock_book_row(book_id)
+                genres = self._resolve_genres(changes.genre_ids)
             genre_args = (
                 {"genres": genres, "genre_text": self.genre_text(genres)}
                 if genres is not None
@@ -390,6 +403,8 @@ class BookService:
             self.db.rollback()
             if _unique_constraint_name(exc) == "books_isbn_key":
                 raise DuplicateIsbnError() from exc
+            if _is_genre_fk_violation(exc):
+                raise GenreNotFoundError() from exc
             raise BookUpdatePersistenceError() from exc
         except ApplicationError:
             self.db.rollback()
