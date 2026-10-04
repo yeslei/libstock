@@ -78,7 +78,7 @@ def test_counter_roles_can_read_lists(api, role):
 
 @pytest.mark.parametrize('path', [
     '/api/v1/staff/books?limit=0', '/api/v1/staff/books?limit=101', '/api/v1/staff/books?q=' + 'x' * 101,
-    '/api/v1/staff/books/0', '/api/v1/staff/books/abc', '/api/v1/staff/copies?q=', '/api/v1/staff/copies?destination=OTHER',
+    '/api/v1/staff/books/0', '/api/v1/staff/books/abc', '/api/v1/staff/copies?destination=OTHER',
     '/api/v1/staff/copies?available=maybe', '/api/v1/staff/copies?limit=101',
     '/api/v1/staff/copies?q=' + 'x' * 101,
 ])

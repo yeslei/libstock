@@ -31,7 +31,7 @@ def dashboard(user: User = Depends(staff_only), service=Depends(get_staff_desk_s
 
 
 @router.get('/clients', response_model=list[StaffClient])
-def search_clients(q: Annotated[str | None, Query(min_length=2, max_length=100)] = None, limit: Limit = 20,
+def search_clients(q: Term = None, limit: Limit = 20,
                    user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
     return service.search_clients(q, user.id, limit)
 
@@ -74,7 +74,7 @@ def get_catalog_book(book_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
 
 
 @router.get('/copies', response_model=list[StaffCopyLookup])
-def lookup_copies(q: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
+def lookup_copies(q: Term = None,
                   destination: DestinationType | None = None, available: bool | None = None, limit: Limit = 20,
                   user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
     return service.copy_lookup(user.id, q, limit, destination=destination, available=available)

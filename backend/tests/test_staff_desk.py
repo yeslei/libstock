@@ -53,7 +53,7 @@ def test_counter_roles_can_read(api, path, role):
 
 
 @pytest.mark.parametrize('path', [
-    '/api/v1/staff/clients?q=a', '/api/v1/staff/clients?q=', '/api/v1/staff/clients?q=' + 'x' * 101,
+    '/api/v1/staff/clients?q=' + 'x' * 101,
     '/api/v1/staff/clients?q=ana&limit=0', '/api/v1/staff/loans?limit=101', '/api/v1/staff/loans?client_id=0',
     '/api/v1/staff/loans?client_id=abc', '/api/v1/staff/loan-requests?client_id=2147483648',
     '/api/v1/staff/purchase-reservations?status=FULFILLED', '/api/v1/staff/loans?q=' + 'x' * 101,
