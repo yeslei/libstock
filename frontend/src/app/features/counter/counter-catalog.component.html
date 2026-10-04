@@ -45,7 +45,7 @@
                       <span class="row__sub">{{ book.is_active ? 'Obra cadastrada' : 'Obra inativa' }}</span>
                     </td>
                     <td>{{ book.author }}</td>
-                    <td>@if (book.genre) { <span class="badge">{{ book.genre }}</span> } @else { — }</td>
+                    <td>@if (genreLabel(book); as label) { <span class="badge">{{ label }}</span> } @else { — }</td>
                     <td><span class="pill">{{ copiesLabel(book) }}</span></td>
                     <td><a class="link-btn" [routerLink]="['/balcao/acervo', book.id]" [attr.aria-label]="'Ver obra ' + book.title">Ver obra →</a></td>
                   </tr>

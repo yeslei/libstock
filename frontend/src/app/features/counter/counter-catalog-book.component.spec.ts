@@ -7,6 +7,8 @@ import { RoleCode } from '../../core/models/user.model';
 import { TokenStoreService } from '../../core/services/token-store.service';
 import { BookService } from '../books/services/book.service';
 import { CopyService } from '../copies/services/copy.service';
+import { Genre } from '../catalog/models/catalog.model';
+import { CatalogService } from '../catalog/services/catalog.service';
 import { CounterCatalogBookComponent } from './counter-catalog-book.component';
 import { CounterService, StaffCatalogBookDetail, StaffCatalogCopy } from './counter.service';
 
@@ -16,7 +18,7 @@ const copy = (over: Partial<StaffCatalogCopy> = {}): StaffCatalogCopy => ({
 });
 
 const detail = (over: Partial<StaffCatalogBookDetail> = {}): StaffCatalogBookDetail => ({
-  id: 7, title: 'Dom Casmurro', author: 'Machado de Assis', isbn: '9780000000002', genre: 'Romance', is_active: true,
+  id: 7, title: 'Dom Casmurro', author: 'Machado de Assis', isbn: '9780000000002', genre: 'Romance', genres: [{ id: 7, name: 'Romance', slug: 'romance' }], is_active: true,
   total_copies: 4, didactic_copies: 2, commercial_copies: 2,
   copies: [
     copy(),
@@ -27,11 +29,19 @@ const detail = (over: Partial<StaffCatalogBookDetail> = {}): StaffCatalogBookDet
   ...over,
 });
 
+const CATALOG_GENRES: Genre[] = [
+  { id: 1, name: 'Ficção', slug: 'ficcao' },
+  { id: 4, name: 'Fantasia', slug: 'fantasia' },
+  { id: 7, name: 'Romance', slug: 'romance' },
+];
+
 function setup(book$: Observable<StaffCatalogBookDetail>, roles: RoleCode[] = ['SELLER']) {
   const counter = jasmine.createSpyObj<CounterService>('CounterService', ['getCatalogBook']);
   counter.getCatalogBook.and.returnValue(book$);
   const books = jasmine.createSpyObj<BookService>('BookService', ['update']);
   const copies = jasmine.createSpyObj<CopyService>('CopyService', ['delete', 'update']);
+  const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['getAllGenres']);
+  catalog.getAllGenres.and.returnValue(of(CATALOG_GENRES));
   TestBed.configureTestingModule({
     imports: [CounterCatalogBookComponent],
     providers: [
@@ -39,6 +49,7 @@ function setup(book$: Observable<StaffCatalogBookDetail>, roles: RoleCode[] = ['
       { provide: CounterService, useValue: counter },
       { provide: BookService, useValue: books },
       { provide: CopyService, useValue: copies },
+      { provide: CatalogService, useValue: catalog },
       { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '7' })) } },
     ],
   });
@@ -48,18 +59,20 @@ function setup(book$: Observable<StaffCatalogBookDetail>, roles: RoleCode[] = ['
   const root = fixture.nativeElement as HTMLElement;
   const button = (label: string) =>
     Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.trim() === label) as HTMLButtonElement | undefined;
-  return { fixture, counter, books, copies, root, button };
+  return { fixture, counter, books, copies, catalog, root, button };
 }
 
 type Ctx = ReturnType<typeof setup>;
 
-function edit(ctx: Ctx, value: string) {
+/** Abre "Editar obra" e deixa marcadas exatamente as categorias com os nomes dados. */
+function edit(ctx: Ctx, names: string[]) {
   ctx.button('Editar obra')!.click();
   ctx.fixture.detectChanges();
-  const input = ctx.root.querySelector('#book-genre') as HTMLInputElement;
-  input.value = value;
-  input.dispatchEvent(new Event('input'));
-  ctx.fixture.detectChanges();
+  for (const genre of CATALOG_GENRES) {
+    const box = ctx.root.querySelector(`#book-genre-${genre.id}`) as HTMLInputElement;
+    if (box.checked !== names.includes(genre.name)) box.click();
+    ctx.fixture.detectChanges();
+  }
 }
 
 function confirmDialog(ctx: Ctx) {
@@ -140,7 +153,7 @@ describe('Balcão: detalhes da obra', () => {
   });
 
   it('informa obra sem exemplares e o singular de um exemplar', () => {
-    const { root } = setup(of(detail({ copies: [], total_copies: 1, genre: null })));
+    const { root } = setup(of(detail({ copies: [], total_copies: 1, genre: null, genres: [] })));
     expect(root.textContent).toContain('Nenhum exemplar cadastrado');
     expect(root.textContent).toContain('Quantidade total: 1 exemplar');
     expect(root.textContent).toContain('Categoria literária: —');
@@ -161,7 +174,10 @@ describe('Balcão: detalhes da obra', () => {
       expect(root.querySelector('input')).toBeNull();
       button('Editar obra')!.click();
       fixture.detectChanges();
-      expect((root.querySelector('#book-genre') as HTMLInputElement).value).toBe('Romance');
+      const boxes = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+      expect(boxes.map((box) => [box.id, box.checked])).toEqual([
+        ['book-genre-1', false], ['book-genre-4', false], ['book-genre-7', true],
+      ]);
       expect(button('Salvar alteração')!.disabled).toBeTrue();
       expect(root.textContent).toContain('A destinação é definida em cada exemplar');
     });
@@ -170,7 +186,7 @@ describe('Balcão: detalhes da obra', () => {
       const ctx = setup(of(detail()), admin);
       const patch = new Subject<unknown>();
       ctx.books.update.and.returnValue(patch as never);
-      edit(ctx, ' Ficção ');
+      edit(ctx, ['Ficção']);
       ctx.button('Salvar alteração')!.click();
       ctx.fixture.detectChanges();
       expect(ctx.books.update).not.toHaveBeenCalled();
@@ -181,22 +197,22 @@ describe('Balcão: detalhes da obra', () => {
       submit.click();
       ctx.fixture.detectChanges();
       expect(ctx.books.update).toHaveBeenCalledTimes(1);
-      expect(ctx.books.update).toHaveBeenCalledWith(7, { genre: 'Ficção' });
-      expect(snackbarMessage()).not.toContain('atualizada');
+      expect(ctx.books.update).toHaveBeenCalledWith(7, { genre_ids: [1] });
+      expect(snackbarMessage()).not.toContain('atualizadas');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(1);
 
-      ctx.counter.getCatalogBook.and.returnValue(of(detail({ genre: 'Ficção' })));
+      ctx.counter.getCatalogBook.and.returnValue(of(detail({ genre: 'Ficção', genres: [{ id: 1, name: 'Ficção', slug: 'ficcao' }] })));
       patch.next({});
       patch.complete();
       ctx.fixture.detectChanges();
-      expect(snackbarMessage()).toContain('Categoria de “Dom Casmurro” atualizada.');
+      expect(snackbarMessage()).toContain('Categorias de “Dom Casmurro” atualizadas.');
       expect(ctx.counter.getCatalogBook).toHaveBeenCalledTimes(2);
       expect(ctx.root.textContent).toContain('Categoria literária: Ficção');
     });
 
     it('cancelar não altera nada', () => {
       const ctx = setup(of(detail()), admin);
-      edit(ctx, 'Ficção');
+      edit(ctx, ['Ficção']);
       ctx.button('Salvar alteração')!.click();
       ctx.fixture.detectChanges();
       ctx.button('Cancelar')!.click();
@@ -205,27 +221,50 @@ describe('Balcão: detalhes da obra', () => {
       expect(ctx.root.querySelector('dialog')).toBeNull();
     });
 
-    it('envia categoria vazia como nula', () => {
+    it('remover todas as categorias envia lista vazia', () => {
       const ctx = setup(of(detail()), admin);
       ctx.books.update.and.returnValue(of({}) as never);
-      edit(ctx, '   ');
+      edit(ctx, []);
+      ctx.button('Salvar alteração')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.querySelector('dialog')?.textContent).toContain('Romance → sem categoria');
+      confirmDialog(ctx);
+      expect(ctx.books.update).toHaveBeenCalledWith(7, { genre_ids: [] });
+    });
+
+    it('permite escolher várias categorias do catálogo (seleção múltipla)', () => {
+      const ctx = setup(of(detail()), admin);
+      ctx.books.update.and.returnValue(of({}) as never);
+      edit(ctx, ['Romance', 'Fantasia']);
       ctx.button('Salvar alteração')!.click();
       ctx.fixture.detectChanges();
       confirmDialog(ctx);
-      expect(ctx.books.update).toHaveBeenCalledWith(7, { genre: null });
+      expect(ctx.books.update).toHaveBeenCalledWith(7, { genre_ids: [7, 4] });
     });
 
-    it('bloqueia categoria acima de 100 caracteres', () => {
+    it('sem mudança de seleção o botão fica desabilitado', () => {
       const ctx = setup(of(detail()), admin);
-      edit(ctx, 'x'.repeat(101));
-      expect(ctx.root.textContent).toContain('A categoria aceita até 100 caracteres.');
+      edit(ctx, ['Romance']);
       expect(ctx.button('Salvar alteração')!.disabled).toBeTrue();
+    });
+
+    it('obra só com texto legado avisa e permite associar às categorias do catálogo', () => {
+      const ctx = setup(of(detail({ genre: 'Culinária', genres: [] })), admin);
+      expect(ctx.root.textContent).toContain('Categoria literária: Culinária');
+      ctx.button('Editar obra')!.click();
+      ctx.fixture.detectChanges();
+      expect(ctx.root.textContent).toContain('Texto de categoria anterior: “Culinária”');
+    });
+
+    it('mostra as categorias do catálogo no detalhe (não só o texto legado)', () => {
+      const { root } = setup(of(detail({ genre: 'texto antigo', genres: [{ id: 1, name: 'Ficção', slug: 'ficcao' }, { id: 7, name: 'Romance', slug: 'romance' }] })));
+      expect(root.textContent).toContain('Categoria literária: Ficção, Romance');
     });
 
     it('mostra erro de domínio sem anunciar sucesso e recarrega', () => {
       const ctx = setup(of(detail()), admin);
       ctx.books.update.and.returnValue(throwError(() => ({ status: 409, detail: 'Obra não pode ser alterada.' })));
-      edit(ctx, 'Ficção');
+      edit(ctx, ['Ficção']);
       ctx.button('Salvar alteração')!.click();
       ctx.fixture.detectChanges();
       confirmDialog(ctx);
@@ -315,7 +354,7 @@ describe('Balcão: detalhes da obra', () => {
     it('oculta a edição da obra do STOCK_KEEPER, que só cadastra (Issue #169)', () => {
       const keeper = setup(of(detail()), ['STOCK_KEEPER']);
       expect(keeper.button('Editar obra')).toBeUndefined();
-      expect(keeper.root.querySelector('#book-genre')).toBeNull();
+      expect(keeper.root.querySelector('app-genre-picker')).toBeNull();
     });
 
     it('mostra a inativação bloqueada com os vínculos devolvidos pelo 409 e não anuncia sucesso', () => {
@@ -489,7 +528,7 @@ describe('Balcão: detalhes da obra', () => {
       ctx.fixture.detectChanges();
       confirmDialog(ctx);
       expect(ctx.root.querySelector('[data-blocked]')).not.toBeNull();
-      edit(ctx, 'Ficção');
+      edit(ctx, ['Ficção']);
       ctx.button('Salvar alteração')!.click();
       ctx.fixture.detectChanges();
       expect(ctx.root.querySelector('[data-blocked]')).toBeNull();

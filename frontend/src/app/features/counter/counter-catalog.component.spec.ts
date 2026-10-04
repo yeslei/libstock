@@ -9,6 +9,7 @@ import { CounterService, StaffCatalogBook } from './counter.service';
 
 const book = (over: Partial<StaffCatalogBook> = {}): StaffCatalogBook => ({
   id: 7, title: 'Dom Casmurro', author: 'Machado de Assis', isbn: '9780000000002', genre: 'Romance',
+  genres: [{ id: 7, name: 'Romance', slug: 'romance' }],
   is_active: true, total_copies: 4, didactic_copies: 3, commercial_copies: 1, ...over,
 });
 
@@ -50,8 +51,17 @@ describe('Balcão: acervo', () => {
     expect(row.querySelector('a')?.getAttribute('href')).toBe('/balcao/acervo/7');
   });
 
+  it('exibe as categorias do catálogo (Issue #174) e cai no texto legado só quando não há associação', () => {
+    const { root } = setup((s) => s.listCatalogBooks.and.returnValue(of([
+      book({ genre: 'texto antigo', genres: [{ id: 4, name: 'Fantasia', slug: 'fantasia' }, { id: 7, name: 'Romance', slug: 'romance' }] }),
+      book({ id: 8, genre: 'Texto legado', genres: [] }),
+    ])));
+    const badges = Array.from(root.querySelectorAll('tbody tr')).map((row) => row.querySelector('.badge')?.textContent);
+    expect(badges).toEqual(['Fantasia, Romance', 'Texto legado']);
+  });
+
   it('usa singular para uma cópia e sinaliza obra inativa sem categoria', () => {
-    const { root } = setup((s) => s.listCatalogBooks.and.returnValue(of([book({ total_copies: 1, is_active: false, genre: null })])));
+    const { root } = setup((s) => s.listCatalogBooks.and.returnValue(of([book({ total_copies: 1, is_active: false, genre: null, genres: [] })])));
     const row = root.querySelector('tbody tr')!;
     expect(row.querySelector('.pill')?.textContent).toBe('1 cópia');
     expect(row.textContent).toContain('Obra inativa');

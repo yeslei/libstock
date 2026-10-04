@@ -3,7 +3,6 @@ from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -31,7 +30,7 @@ def test_copy_creation_persists_and_duplicate_barcode_returns_409_without_new_ro
             CopyCreate(book_id=book_id, barcode=code, destination=DestinationType.DIDACTIC), actor_id=seller_id)
         assert (created.barcode, created.status.value, created.is_active) == (code, 'AVAILABLE', True)
     with Session(engine) as db:
-        with pytest.raises(HTTPException) as duplicate:
+        with pytest.raises(ApplicationError) as duplicate:
             copy_service(db).create_new_copy(
                 CopyCreate(book_id=book_id, barcode=code, destination=DestinationType.DIDACTIC), actor_id=seller_id)
         assert duplicate.value.status_code == 409
@@ -40,8 +39,14 @@ def test_copy_creation_persists_and_duplicate_barcode_returns_409_without_new_ro
 
 def test_copy_creation_rejects_inactive_book_and_price_rules_are_validated(desk):  # noqa: F811
     _, engine, book_id, _, seller_id = desk
-    with pytest.raises(ValueError):
-        CopyCreate(book_id=book_id, barcode='X', destination=DestinationType.COMMERCIAL)
+    for price in (None, 0):  # Issue #175: preço ausente ou zero é 422 de domínio, como na edição
+        with Session(engine) as db:
+            with pytest.raises(ApplicationError) as invalid:
+                copy_service(db).create_new_copy(
+                    CopyCreate(book_id=book_id, barcode='NEW-175-P', destination=DestinationType.COMMERCIAL,
+                               sale_price=price), actor_id=seller_id)
+            assert (invalid.value.status_code, invalid.value.code) == (422, 'copy_sale_price_required')
+            assert db.query(Copy).filter(Copy.barcode == 'NEW-175-P').count() == 0
     with pytest.raises(ValueError):
         CopyCreate(book_id=book_id, barcode='X', destination=DestinationType.DIDACTIC, sale_price=10)
     with Session(engine) as db:
@@ -49,7 +54,7 @@ def test_copy_creation_rejects_inactive_book_and_price_rules_are_validated(desk)
         db.get(Book, book_id).is_active = False
         db.commit()
     with Session(engine) as db:
-        with pytest.raises(HTTPException) as inactive:
+        with pytest.raises(ApplicationError) as inactive:
             copy_service(db).create_new_copy(
                 CopyCreate(book_id=book_id, barcode='NEW-135-B', destination=DestinationType.DIDACTIC), actor_id=seller_id)
         assert inactive.value.status_code == 404

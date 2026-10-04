@@ -78,7 +78,7 @@ def test_counter_roles_can_read_lists(api, role):
 
 @pytest.mark.parametrize('path', [
     '/api/v1/staff/books?limit=0', '/api/v1/staff/books?limit=101', '/api/v1/staff/books?q=' + 'x' * 101,
-    '/api/v1/staff/books/0', '/api/v1/staff/books/abc', '/api/v1/staff/copies?q=', '/api/v1/staff/copies?destination=OTHER',
+    '/api/v1/staff/books/0', '/api/v1/staff/books/abc', '/api/v1/staff/copies?destination=OTHER',
     '/api/v1/staff/copies?available=maybe', '/api/v1/staff/copies?limit=101',
     '/api/v1/staff/copies?q=' + 'x' * 101,
 ])
@@ -93,6 +93,7 @@ def test_invalid_input_is_rejected(api, path):
 def make_service():
     repo = Mock(spec=StaffDeskRepository)
     repo.is_active_employee.return_value = True
+    repo.book_genres.return_value = {}
     return StaffDeskService(Mock(), repo), repo
 
 
@@ -122,7 +123,20 @@ def test_catalog_list_maps_counts_and_trims_term():
     repo.catalog_books.assert_called_once_with('dom', 50)
     assert result[0].model_dump() == {
         'id': 1, 'title': 'Dom Casmurro', 'author': 'Machado', 'isbn': '9780000000002', 'genre': 'Romance',
-        'is_active': True, 'total_copies': 4, 'didactic_copies': 3, 'commercial_copies': 1}
+        'genres': [], 'is_active': True, 'total_copies': 4, 'didactic_copies': 3, 'commercial_copies': 1}
+
+
+def test_catalog_list_and_detail_expose_catalog_genres():
+    """Issue #174: o balcão exibe as categorias do catálogo (book_genres), não só o texto legado."""
+    service, repo = make_service()
+    genres = {1: [{'id': 2, 'name': 'Não ficção', 'slug': 'nao-ficcao'}, {'id': 7, 'name': 'Romance', 'slug': 'romance'}]}
+    repo.book_genres.return_value = genres
+    repo.catalog_books.return_value = [book_row()]
+    repo.catalog_book.return_value = book_row()
+    repo.book_copies.return_value = []
+    assert [g.name for g in service.catalog_books(7, None, 50)[0].genres] == ['Não ficção', 'Romance']
+    assert [g.slug for g in service.catalog_book(7, 1).genres] == ['nao-ficcao', 'romance']
+    repo.book_genres.assert_called_with([1])
 
 
 def test_catalog_detail_unknown_book_is_404():

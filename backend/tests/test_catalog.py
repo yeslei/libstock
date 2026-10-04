@@ -98,6 +98,12 @@ class FakeCatalogService:
             cover_url=None, genres=[],
         )
 
+    def to_catalog_response(self, book):
+        return CatalogBookResponse(
+            id=book.id, title=book.title, author=book.author, cover_url=None, genres=["Ficção"],
+            offers=[BookOffer(destination=DestinationType.COMMERCIAL, available=True, price=Decimal("39.90"))],
+        )
+
 
 @pytest.fixture(autouse=True)
 def _reset_overrides():
@@ -568,3 +574,7 @@ def test_rota_de_destaque_repassa_o_usuario_autenticado():
     assert response.status_code == 200
     _, _, actor_id = fake.book_featured_set[0]
     assert actor_id == 1  # id do usuário autenticado no dublê
+    # Issue #175: a resposta traz as ofertas reais da obra, não uma lista vazia.
+    assert response.json()["offers"] == [
+        {"destination": "COMMERCIAL", "available": True, "price": "39.90", "can_reserve": False}
+    ]

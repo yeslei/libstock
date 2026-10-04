@@ -26,6 +26,34 @@ describe('errorInterceptor', () => {
     return received!;
   }
 
+  it('mapeia os códigos estáveis de venda, empréstimo e exemplar (Issue #175)', () => {
+    expect(fail(422, { detail: 'x', code: 'duplicate_sale_item' }).detail).toContain('mais de uma vez');
+    expect(fail(409, { detail: 'x', code: 'copy_not_for_sale' }).detail).toContain('didáticos');
+    expect(fail(409, { detail: 'x', code: 'sale_conflict' }).detail).toContain('venda');
+    expect(fail(500, { detail: 'x', code: 'sale_persistence_error' }).detail).toContain('Nada foi alterado');
+    expect(fail(409, { detail: 'x', code: 'loan_conflict' }).detail).toContain('empréstimo em aberto');
+    expect(fail(500, { detail: 'x', code: 'loan_persistence_error' }).detail).toContain('Nada foi alterado');
+    expect(fail(409, { detail: 'x', code: 'loan_return_conflict' }).detail).toContain('devolução');
+    expect(fail(500, { detail: 'x', code: 'loan_return_persistence_error' }).detail).toContain('Nada foi alterado');
+    expect(fail(500, { detail: 'x', code: 'copy_persistence_error' }).detail).toContain('cadastrar o exemplar');
+  });
+
+  it('mantém os erros de campo do 422 de validação sem depender de eco da entrada', () => {
+    const error = fail(422, {
+      code: 'validation_error',
+      detail: [{ loc: ['body', 'initial_copy', 'barcode'], msg: 'Field required', type: 'missing' }],
+    });
+    expect(error.code).toBe('validation_error');
+    expect(error.detail).toBe('Confira os dados informados e tente novamente.');
+    expect(error.validationErrors).toEqual([{ field: 'barcode', message: 'Field required' }]);
+  });
+
+  it('mapeia categoria inexistente no cadastro e na edição de obra (Issue #174)', () => {
+    const error = fail(404, { detail: 'Gênero não encontrado.', code: 'genre_not_found', details: { missing_ids: [9] } });
+    expect(error.detail).toContain('categorias escolhidas não existe mais');
+    expect(error.details).toEqual({ missing_ids: [9] });
+  });
+
   it('mapeia o código estável da exclusão de exemplar para mensagem de UI', () => {
     expect(fail(404, { detail: 'x', code: 'copy_not_found' }).detail).toBe('O exemplar não foi encontrado. Atualize a obra.');
     expect(fail(409, { detail: 'x', code: 'copy_not_available' }).detail).toContain('não está disponível');

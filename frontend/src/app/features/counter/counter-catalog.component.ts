@@ -8,7 +8,7 @@ import { TokenStoreService } from '../../core/services/token-store.service';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
 import { CounterService, LIST_LIMIT, StaffCatalogBook } from './counter.service';
-import { toLoadState } from './desk-flow';
+import { genreLabel, toLoadState } from './desk-flow';
 
 /** Papéis que o backend autoriza em `POST /api/v1/books/` (Issue #151: o vendedor administra o acervo). */
 const CREATE_BOOK_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
@@ -57,6 +57,8 @@ export class CounterCatalogComponent implements OnInit {
     event.preventDefault();
     this.reload();
   }
+
+  protected readonly genreLabel = genreLabel;
 
   protected copiesLabel(book: StaffCatalogBook): string {
     return book.total_copies === 1 ? '1 cópia' : `${book.total_copies} cópias`;

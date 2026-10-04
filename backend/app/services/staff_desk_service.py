@@ -147,17 +147,18 @@ class StaffDeskService:
         return result
 
     @staticmethod
-    def _catalog_book(row):
+    def _catalog_book(row, genres=None):
         book = row['Book']
         return dict(id=book.id, title=book.title, author=book.author, isbn=book.isbn, genre=book.genre,
-                    is_active=book.is_active, total_copies=row['total_copies'],
+                    genres=(genres or {}).get(book.id, []), is_active=book.is_active, total_copies=row['total_copies'],
                     didactic_copies=row['didactic_copies'], commercial_copies=row['commercial_copies'])
 
     def catalog_books(self, actor_id, term, limit):
         """Acervo somente leitura para o balcão (obras e contagem de exemplares)."""
         self._guard(actor_id)
         rows = self._read(lambda: self.repository.catalog_books(self._term(term), limit))
-        return [StaffCatalogBook(**self._catalog_book(row)) for row in rows]
+        genres = self._read(lambda: self.repository.book_genres([row['Book'].id for row in rows]))
+        return [StaffCatalogBook(**self._catalog_book(row, genres)) for row in rows]
 
     def catalog_book(self, actor_id, book_id):
         self._guard(actor_id)
@@ -165,7 +166,8 @@ class StaffDeskService:
         if row is None:
             raise ApplicationError('Obra não encontrada.', 'book_not_found', 404)
         copies = self._read(lambda: self.repository.book_copies(book_id))
-        return StaffCatalogBookDetail(**self._catalog_book(row), copies=[
+        genres = self._read(lambda: self.repository.book_genres([book_id]))
+        return StaffCatalogBookDetail(**self._catalog_book(row, genres), copies=[
             StaffCatalogCopy(id=item['Copy'].id, barcode=item['Copy'].barcode, destination=item['Copy'].destination,
                              status=item['Copy'].status, condition=item['Copy'].condition,
                              sale_price=item['Copy'].sale_price, is_active=item['Copy'].is_active,
