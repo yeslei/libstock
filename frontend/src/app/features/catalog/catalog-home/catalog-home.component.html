@@ -3,9 +3,9 @@
     <section class="hero" aria-labelledby="home-heading">
       <div class="hero__content">
         <h1 id="home-heading">Encontre livros,<br />acompanhe suas reservas<br />e fortaleça a leitura.</h1>
-        <p>Consulte o acervo e encontre sua próxima leitura no LibStock.</p>
+        <p>Consulte o acervo, solicite empréstimos ou compras e acompanhe tudo pelo LibStock.</p>
         <div class="hero__actions">
-          <button class="btn btn--primary" type="button" (click)="homeSearch.open = true; catalogSearch.focus()">Buscar livros</button>
+          <a class="btn btn--primary" routerLink="/" fragment="categorias">Explorar livros</a>
           <a class="btn btn--outline" routerLink="/como-funciona">Como funciona</a>
         </div>
       </div>
@@ -56,7 +56,7 @@
 </div>
   </details>
   @if (searchState() === null) {
-    <section class="section" aria-labelledby="genres-heading">
+    <section class="section" id="categorias" aria-labelledby="genres-heading">
       <div class="section__head">
         <h2 class="section__title" id="genres-heading">Categorias em destaque</h2>
       </div>

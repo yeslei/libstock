@@ -28,9 +28,10 @@ export class CatalogService {
     return this.http.get<Genre[]>(`${CATALOG_API}/genres`);
   }
 
-  getBooksByGenre(slug: string, page = 1): Observable<PagedBooks> {
+  getBooksByGenre(slug: string, page = 1, q = ''): Observable<PagedBooks> {
+    const term = q.trim();
     return this.http.get<PagedBooks>(`${CATALOG_API}/genres/${slug}/books`, {
-      params: { page },
+      params: term ? { page, q: term } : { page },
     });
   }
 

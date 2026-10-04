@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { BehaviorSubject, Subject, of } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { User } from '../../../core/models/user.model';
 import { CatalogBook } from '../models/catalog.model';
 
@@ -90,5 +90,62 @@ describe('CatalogHomeComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Resultado antigo');
     expect(fixture.nativeElement.textContent).toContain('Nenhum livro encontrado');
+  });
+});
+
+describe('CatalogHomeComponent (conteúdo da referência)', () => {
+  async function render(genres: unknown, books: unknown): Promise<HTMLElement> {
+    await TestBed.configureTestingModule({
+      imports: [CatalogHomeComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { queryParamMap: new BehaviorSubject(convertToParamMap({})) } },
+        { provide: AuthService, useValue: { user$: new BehaviorSubject<User | null>(null) } },
+        { provide: CatalogAdminService, useValue: { setBookFeatured: () => of(void 0) } },
+        { provide: CatalogService, useValue: { getFeaturedGenres: () => genres, getFeaturedBooks: () => books, searchBooks: () => of([]) } },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(CatalogHomeComponent);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('mostra o texto do hero e leva "Explorar livros" às categorias', async () => {
+    const root = await render(of([]), of([]));
+    expect(root.textContent).toContain('Consulte o acervo, solicite empréstimos ou compras e acompanhe tudo pelo LibStock.');
+    const explore = Array.from(root.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'Explorar livros')!;
+    expect(explore.getAttribute('href')).toBe('/#categorias');
+    expect(root.querySelector('#categorias')).not.toBeNull();
+  });
+
+  it('lista as categorias em destaque como links para /generos/:slug e a disponibilidade dos livros', async () => {
+    const root = await render(
+      of([{ id: 1, name: 'Romance', slug: 'romance' }]),
+      of([{
+        id: 7, title: 'Sapiens', author: 'Yuval', genres: [], cover_url: null,
+        offers: [{ destination: 'COMMERCIAL', available: true, price: '30.00', can_reserve: false }],
+      }, {
+        id: 8, title: '1984', author: 'Orwell', genres: [], cover_url: null,
+        offers: [{ destination: 'DIDACTIC', available: false, price: null, can_reserve: false }],
+      }]),
+    );
+    expect(root.querySelector('a.chip[href="/generos/romance"]')!.textContent).toContain('Romance');
+    expect(root.textContent).toContain('Venda disponível');
+    expect(root.textContent).toContain('Esgotado');
+    expect(root.querySelector('a[href="/livros/7"]')).not.toBeNull();
+  });
+
+  it('mostra carregando, vazio e erro nas categorias e nos livros em destaque', async () => {
+    const loading = await render(new Subject(), new Subject());
+    expect(loading.textContent).toContain('Carregando categorias');
+    expect(loading.textContent).toContain('Carregando livros');
+    TestBed.resetTestingModule();
+    const empty = await render(of([]), of([]));
+    expect(empty.textContent).toContain('Nenhuma categoria em destaque no momento.');
+    expect(empty.textContent).toContain('Nenhum livro em destaque ainda.');
+    TestBed.resetTestingModule();
+    const failed = await render(throwError(() => new Error('x')), throwError(() => new Error('x')));
+    expect(failed.textContent).toContain('Não foi possível carregar as categorias.');
+    expect(failed.textContent).toContain('Não foi possível carregar os livros em destaque.');
   });
 });

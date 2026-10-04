@@ -154,3 +154,42 @@ def test_inactive_employee_cannot_read_catalog(desk):  # noqa: F811
     for path in ('/books', f'/books/{book_id}', '/copies?q=abc'):
         response = http.get(BASE + path)
         assert (response.status_code, response.json()['code']) == (403, 'employee_record_required')
+
+
+def test_public_genre_search_filters_by_title_or_author_on_postgres(desk):  # noqa: F811
+    from app.main import app
+    from app.models.domain import BookGenre, Genre
+    from app.dependencies.services import get_catalog_service
+    from app.repositories.catalog_repository import CatalogRepository, GenreRepository
+    from app.services.catalog_service import CatalogService
+
+    http, engine, book_id, _, seller_id = desk
+    _, title, author = tag_book(engine, book_id, seller_id)
+    slug = f'genero-{uuid4().hex[:10]}'
+    with Session(engine) as db:
+        as_employee(db, seller_id)
+        genre = Genre(name=slug, slug=slug)
+        db.add(genre)
+        db.flush()
+        db.add(BookGenre(book_id=book_id, genre_id=genre.id))
+        db.commit()
+    sessions = []
+
+    def catalog_service():
+        db = Session(engine)
+        sessions.append(db)
+        return CatalogService(db=db, catalog_repository=CatalogRepository(db), genre_repository=GenreRepository(db))
+
+    app.dependency_overrides[get_catalog_service] = catalog_service
+    try:
+        url = f'/api/v1/catalog/genres/{slug}/books'
+        for term in (title, author, title.upper(), author[:8]):
+            body = http.get(url, params={'q': term}).json()
+            assert [b['id'] for b in body['items']] == [book_id] and body['total'] == 1, term
+        assert http.get(url, params={'q': '%%'}).json()['items'] == []
+        assert http.get(url, params={'q': 'inexistente-xyz'}).json()['total'] == 0
+        assert http.get(url).json()['total'] == 1
+    finally:
+        app.dependency_overrides.pop(get_catalog_service, None)
+        for db in sessions:
+            db.close()

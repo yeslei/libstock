@@ -9,11 +9,14 @@ import { AuthService } from '../../../core/services/auth.service';
 interface NavItem {
   readonly label: string;
   readonly route?: string;
+  /** Âncora na própria rota; o item não é marcado como ativo (Início já é). */
+  readonly fragment?: string;
   readonly roles?: readonly RoleCode[];
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Início', route: '/' },
+  { label: 'Explorar acervo', route: '/', fragment: 'categorias' },
   { label: 'Meus empréstimos', route: '/meus-emprestimos', roles: ['USER'] },
   { label: 'Minhas reservas', route: '/minhas-reservas', roles: ['USER'] },
   { label: 'Balcão', route: '/balcao', roles: ['SELLER', 'ADMINISTRATOR'] },

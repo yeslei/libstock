@@ -118,6 +118,7 @@ class CatalogService:
         slug: str,
         page: int,
         page_size: int,
+        q: str | None = None,
     ) -> PagedBooksResponse:
         genre = self.genre_repository.find_by_slug(slug)
         if genre is None:
@@ -127,6 +128,7 @@ class CatalogService:
             genre_id=genre.id,
             page=page,
             page_size=page_size,
+            q=(q or "").strip() or None,
         )
         return PagedBooksResponse(
             genre=GenreResponse.model_validate(genre),

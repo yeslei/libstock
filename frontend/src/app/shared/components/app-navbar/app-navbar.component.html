@@ -16,7 +16,9 @@
     </form>
     <nav class="navbar__links" aria-label="Navegação principal">
       @for (item of items(); track item.label) {
-        @if (item.route) {
+        @if (item.fragment) {
+          <a [routerLink]="item.route" [fragment]="item.fragment">{{ item.label }}</a>
+        } @else if (item.route) {
           <a [routerLink]="item.route" routerLinkActive="navbar__link--active" ariaCurrentWhenActive="page"
             [routerLinkActiveOptions]="{ exact: item.route === '/' }">{{ item.label }}</a>
         } @else {

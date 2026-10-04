@@ -1,4 +1,4 @@
-from sqlalchemy import Select, func, select, text
+from sqlalchemy import Select, func, or_, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.domain import Book, BookGenre, Copy, Employee, Genre
@@ -116,12 +116,21 @@ class CatalogRepository:
         genre_id: int,
         page: int,
         page_size: int,
+        q: str | None = None,
     ) -> tuple[list[Book], int]:
         filtered = self._catalog_books().where(
             select(BookGenre.book_id)
             .where(BookGenre.book_id == Book.id, BookGenre.genre_id == genre_id)
             .exists()
         )
+        if q:
+            pattern = f"%{self._escape_like(q)}%"
+            filtered = filtered.where(
+                or_(
+                    Book.title.ilike(pattern, escape="\\"),
+                    Book.author.ilike(pattern, escape="\\"),
+                )
+            )
 
         total = self.db.scalar(
             select(func.count()).select_from(filtered.order_by(None).subquery())

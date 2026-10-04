@@ -28,7 +28,7 @@
 .search__criterion, .search__submit { min-height: $target-min; padding: 0 $space-3; border: 1px solid $client-border; border-radius: $radius-md; background: white; }
 .search__submit { background: $client-green; color: white; cursor: pointer; }
 .search input:focus-visible, .search select:focus-visible, .search button:focus-visible { @include focus-ring; }
-.section { margin-top: $space-8; }
+.section { margin-top: $space-8; scroll-margin-top: 96px; }
 .section__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: $space-4; margin-bottom: $space-4; }
 .section__title { margin: 0; color: $client-green; font-size: 18px; font-weight: 600; }
 .section__link { font-size: $font-size-xs; font-weight: 600; color: $client-green; background: none; border: 0; cursor: pointer; text-decoration: none; }

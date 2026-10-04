@@ -26,7 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(
       routes,
       withComponentInputBinding(),
-      withInMemoryScrolling({ scrollPositionRestoration: 'enabled' }),
+      withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),
     // A ordem importa: o errorInterceptor é o mais externo, então normaliza o
     // erro que sobrar *depois* de o authInterceptor ter tentado o refresh.
