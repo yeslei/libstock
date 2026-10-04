@@ -205,6 +205,18 @@ Estados são projeções dos models existentes; NOTIFIED não dispara notificaç
 
 As transições são auditadas e falhas provocam rollback. Sem autenticação: 401; papel/cadastro inelegível: 403; recurso inexistente: 404; conflito operacional: 409; corpo/ID inválido: 422. Erros internos retornam código estável sem revelar SQL.
 
+### Comprovantes (somente leitura)
+
+Issue #152 (decisão 9 de #147). Sem escrita e sem migration; dados sempre lidos do banco, então a reimpressão é idêntica.
+
+| Endpoint | Resposta (200) |
+| --- | --- |
+| GET `/api/v1/receipts/loans/{id}` | `{number, client, employee, book, copy_id, copy_barcode, loan_date, due_date}`; `client`/`employee` são `{id, name, code}` (matrícula ou código de funcionário) e `book` é `{title, author, isbn}` |
+| GET `/api/v1/receipts/returns/{loan_id}` | O mesmo corpo mais `returned_at` e `days_late` (regra V2, calendário de America/Sao_Paulo). 409 `loan_not_returned` se o empréstimo ainda estiver aberto |
+| GET `/api/v1/receipts/sales/{id}` | `{number, client (ou null), employee, sale_date, items: [{copy_id, copy_barcode, book, unit_price}], total_amount}`; só vendas `CONFIRMED` |
+
+Autorização: `SELLER`/`ADMINISTRATOR` com cadastro ativo leem qualquer comprovante (inativo: 403 `employee_record_required`); `USER` lê só os próprios. Alheio, venda sem cliente, empréstimo cancelado, venda não confirmada e inexistente: 404 `receipt_not_found` (sem vazar existência). Sem token: 401; outros papéis: 403; ID inválido: 422; falha de leitura: 500 `receipt_query_error`.
+
 ### Consultas de balcão V2 (somente leitura)
 
 Todos os GET abaixo ficam sob `/api/v1/staff`, exigem `SELLER` ou `ADMINISTRATOR` e funcionário com cadastro ativo. Sem token: 401; usuário inativo: 403 `user_inactive` (autenticação); perfil/funcionário inativo ou ausente: 403 `employee_record_required`; `USER` e `STOCK_KEEPER`: 403 `permission_denied`. `q` é busca parcial sem diferenciar maiúsculas (máx. 100 caracteres; `%` e `_` são literais); `limit` vai de 1 a 100; `client_id` precisa ser inteiro positivo (422 caso contrário). Ordenação determinística. Nenhuma consulta altera dados.
