@@ -64,6 +64,7 @@ export class LoginComponent {
   protected readonly state = signal<FormState>({ status: 'idle' });
   protected readonly submitted = signal(false);
   protected readonly notice = signal(this.formState.consumeFlash());
+  protected readonly recoveryHelp = signal(false);
 
   constructor() {
     // Mantém o e-mail disponível para a tela de registro sem passá-lo pela URL.
