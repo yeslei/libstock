@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: Cria token da GitHub App
         id: app
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
