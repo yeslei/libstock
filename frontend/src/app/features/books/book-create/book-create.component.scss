@@ -7,8 +7,6 @@
 
 :host {
   display: block;
-  min-height: 100dvh;
-  background: $bg-page;
 }
 
 .topbar {
@@ -66,6 +64,10 @@
 .card__header p:last-child {
   color: $text-secondary;
 }
+.back {
+  font-size: $font-size-sm;
+  font-weight: 600;
+}
 .eyebrow {
   color: $verde-medio;
   font-size: $font-size-xs;
@@ -101,37 +103,6 @@
 .required-note {
   color: $text-muted;
   font-size: $font-size-xs;
-}
-
-.result {
-  display: grid;
-  gap: $space-4;
-}
-.result h2 {
-  color: $text-primary;
-  font-size: 1.125rem;
-}
-.result dl {
-  display: grid;
-  gap: $space-3;
-  margin: 0;
-}
-.result dl div {
-  display: grid;
-  grid-template-columns: minmax(80px, 0.3fr) 1fr;
-  gap: $space-3;
-  padding-bottom: $space-2;
-  border-bottom: 1px solid $bg-subtle;
-}
-.result dt {
-  color: $text-muted;
-  font-size: $font-size-sm;
-  font-weight: 600;
-}
-.result dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 .cover-preview {

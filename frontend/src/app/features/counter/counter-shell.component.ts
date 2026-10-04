@@ -8,23 +8,26 @@ import { SnackbarComponent } from '../../shared/components/snackbar/snackbar.com
 import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 
 interface NavEntry {
-  /** Se informado, o item só aparece para este papel (a rota mantém seus próprios guards). */
-  readonly role?: RoleCode;
+  /** Se informado, o item só aparece para quem tem algum destes papéis (a rota mantém seus próprios guards). */
+  readonly roles?: readonly RoleCode[];
   readonly label: string;
   readonly route: string;
   readonly exact: boolean;
 }
 
-/** Itens do menu lateral, na ordem do Figma (Funcionário / Painel).  */
+/** Papéis de atendimento; o estoquista (Issue #169) vê somente o Acervo. */
+const SERVICE_ROLES: readonly RoleCode[] = ['SELLER', 'ADMINISTRATOR'];
+
+/** Itens do menu lateral, na ordem do Figma (Funcionário / Painel). */
 const NAVIGATION: readonly NavEntry[] = [
-  { label: 'Painel', route: '/balcao/painel', exact: false },
+  { label: 'Painel', route: '/balcao/painel', exact: false, roles: SERVICE_ROLES },
   { label: 'Acervo', route: '/balcao/acervo', exact: false },
-  { label: 'Clientes', route: '/balcao/clientes', exact: false },
-  { label: 'Empréstimos', route: '/balcao/emprestimos', exact: false },
-  { label: 'Devoluções', route: '/balcao/devolucoes', exact: false },
-  { label: 'Vendas', route: '/balcao/vendas', exact: false },
-  { label: 'Reservas', route: '/balcao/reservas', exact: false },
-  { label: 'Usuários', route: '/gestao/usuarios', exact: false, role: 'ADMINISTRATOR' },
+  { label: 'Clientes', route: '/balcao/clientes', exact: false, roles: SERVICE_ROLES },
+  { label: 'Empréstimos', route: '/balcao/emprestimos', exact: false, roles: SERVICE_ROLES },
+  { label: 'Devoluções', route: '/balcao/devolucoes', exact: false, roles: SERVICE_ROLES },
+  { label: 'Vendas', route: '/balcao/vendas', exact: false, roles: SERVICE_ROLES },
+  { label: 'Reservas', route: '/balcao/reservas', exact: false, roles: SERVICE_ROLES },
+  { label: 'Usuários', route: '/gestao/usuarios', exact: false, roles: ['ADMINISTRATOR'] },
 ];
 
 /** Layout da área do funcionário: menu lateral (recolhível em telas pequenas) e conteúdo da rota filha. */
@@ -39,7 +42,7 @@ const NAVIGATION: readonly NavEntry[] = [
 export class CounterShellComponent {
   private readonly auth = inject(AuthService);
   protected readonly navigation = NAVIGATION.filter(
-    (entry) => !entry.role || (this.auth.currentUser?.role_codes ?? []).includes(entry.role),
+    (entry) => !entry.roles || (this.auth.currentUser?.role_codes ?? []).some((role) => entry.roles?.includes(role)),
   );
   protected readonly menuOpen = signal(false);
 

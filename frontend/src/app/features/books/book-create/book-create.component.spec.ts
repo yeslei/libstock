@@ -1,9 +1,10 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { FormControl, Validators } from '@angular/forms';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 
 import { ApiError } from '../../../core/models/auth.model';
+import { SnackbarService } from '../../../shared/components/snackbar/snackbar.service';
 import { BookResponse } from '../models/book.model';
 import { BookService } from '../services/book.service';
 import { isbnValidator } from '../validators/isbn.validator';
@@ -182,17 +183,29 @@ describe('BookCreateComponent', () => {
     expect(service.create).toHaveBeenCalledTimes(1);
   });
 
-  it('exibe os dados efetivamente devolvidos no 201', () => {
+  it('após o 201 avisa o sucesso e abre o detalhe da obra no balcão', () => {
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    const snackbar = spyOn(TestBed.inject(SnackbarService), 'show');
     service.create.and.returnValue(of(response));
     input('book-isbn', '9788575225530');
     submit();
-    const text = fixture.nativeElement.textContent;
-    expect(text).toContain('Obra cadastrada com sucesso.');
-    expect(text).toContain(response.isbn);
-    expect(text).toContain(response.title);
-    expect(text).toContain(response.author);
-    expect(text).toContain(response.genre);
-    expect(text).toContain(response.initial_copy!.barcode);
+    expect(navigate).toHaveBeenCalledOnceWith(['/balcao/acervo', response.id]);
+    expect(snackbar).toHaveBeenCalledOnceWith('Obra “Python Fluente” cadastrada com sucesso.', 'success');
+  });
+
+  it('não navega nem avisa sucesso quando o backend recusa o cadastro', () => {
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    const snackbar = spyOn(TestBed.inject(SnackbarService), 'show');
+    service.create.and.returnValue(throwError(() => ({ status: 409, code: 'duplicate_isbn', detail: 'ISBN já cadastrado.' } as ApiError)));
+    input('book-isbn', '9788575225530');
+    submit();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(snackbar).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('ISBN já cadastrado.');
+  });
+
+  it('oferece o retorno ao acervo do balcão', () => {
+    expect((fixture.nativeElement as HTMLElement).querySelector('a.back')?.getAttribute('href')).toBe('/balcao/acervo');
   });
 
   [

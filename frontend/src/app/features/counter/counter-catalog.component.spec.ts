@@ -91,15 +91,19 @@ describe('Balcão: acervo', () => {
     expect(root.textContent).toContain('Mostrando as primeiras 50 obras');
   });
 
-  it('oferece "+ Nova obra" a quem administra o acervo (vendedor e administrador), não a outros papéis', () => {
+  it('oferece "+ Nova obra" a vendedor, estoquista e administrador, não ao cliente', () => {
     const user = setup((s) => s.listCatalogBooks.and.returnValue(of([])), ['USER']);
     expect(user.root.textContent).not.toContain('+ Nova obra');
     TestBed.resetTestingModule();
     const seller = setup((s) => s.listCatalogBooks.and.returnValue(of([])));
     expect(seller.root.textContent).toContain('+ Nova obra');
     TestBed.resetTestingModule();
+    TestBed.resetTestingModule();
+    const keeper = setup((s) => s.listCatalogBooks.and.returnValue(of([])), ['STOCK_KEEPER']);
+    expect(Array.from(keeper.root.querySelectorAll('a')).some((a) => a.textContent?.trim() === '+ Nova obra')).toBeTrue();
+    TestBed.resetTestingModule();
     const admin = setup((s) => s.listCatalogBooks.and.returnValue(of([])), ['ADMINISTRATOR']);
     const link = Array.from(admin.root.querySelectorAll('a')).find((a) => a.textContent?.trim() === '+ Nova obra');
-    expect(link?.getAttribute('href')).toBe('/obras/nova');
+    expect(link?.getAttribute('href')).toBe('/balcao/acervo/nova');
   });
 });

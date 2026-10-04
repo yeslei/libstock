@@ -156,6 +156,31 @@ def test_inactive_employee_cannot_read_catalog(desk):  # noqa: F811
         assert (response.status_code, response.json()['code']) == (403, 'employee_record_required')
 
 
+def test_stock_keeper_reads_only_catalog_and_inactive_stock_keeper_is_denied(desk):  # noqa: F811
+    """Issue #169: STOCK_KEEPER ativo lê /staff/books; o resto de /staff e dos comprovantes segue negado."""
+    from types import SimpleNamespace as NS
+    from app.dependencies.authentication import get_current_user
+    from app.main import app
+    from test_staff_desk_postgres import new_user
+    http, engine, book_id, _, _ = desk
+    with Session(engine) as db:
+        keeper_id = new_user(db, 'STOCK_KEEPER', 'Estoquista Teste')
+    app.dependency_overrides[get_current_user] = lambda: NS(id=keeper_id, role_codes=['STOCK_KEEPER'])
+    assert http.get(f'{BASE}/books').status_code == 200
+    assert http.get(f'{BASE}/books/{book_id}').status_code == 200
+    for path in ('/copies?q=abc', '/dashboard', '/clients?q=ana', '/loan-requests', '/loans',
+                 '/purchase-reservations', '/clients/1/pendencies'):
+        assert http.get(BASE + path).status_code == 403, path
+    for path in ('/loans/1', '/returns/1', '/sales/1'):
+        assert http.get('/api/v1/receipts' + path).status_code == 403, path
+    with Session(engine) as db:
+        db.get(Profile, keeper_id).is_active = False
+        db.commit()
+    for path in ('/books', f'/books/{book_id}'):
+        response = http.get(BASE + path)
+        assert (response.status_code, response.json()['code']) == (403, 'employee_record_required')
+
+
 def test_public_genre_search_filters_by_title_or_author_on_postgres(desk):  # noqa: F811
     from app.main import app
     from app.models.domain import BookGenre, Genre

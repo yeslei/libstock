@@ -1,7 +1,8 @@
-<main class="page">
+<section class="page">
   <section class="card" aria-labelledby="book-create-title">
     <header class="card__header">
-      <p class="eyebrow">Gestão do acervo</p>
+      <a class="back" routerLink="/balcao/acervo">← Acervo</a>
+      <p class="eyebrow">Funcionário · Acervo</p>
       <h1 id="book-create-title">Cadastrar obra</h1>
       <p>
         Informe o ISBN para preencher os dados da obra automaticamente e depois cadastre o primeiro exemplar.
@@ -10,25 +11,6 @@
 
     @if (formError; as message) {
       <app-alert [message]="message" variant="error" />
-    }
-
-    @if (createdBook(); as book) {
-      <div class="result">
-        <app-alert message="Obra cadastrada com sucesso." variant="success" />
-        <h2>Dados cadastrados</h2>
-        <dl>
-          <div><dt>ISBN</dt><dd>{{ book.isbn }}</dd></div>
-          <div><dt>Título</dt><dd>{{ book.title }}</dd></div>
-          <div><dt>Autor</dt><dd>{{ book.author }}</dd></div>
-          <div><dt>Gênero</dt><dd>{{ book.genre ?? 'Não informado' }}</dd></div>
-          @if (book.initial_copy; as copy) {
-            <div><dt>Exemplar</dt><dd>{{ copy.barcode }}</dd></div>
-            <div><dt>Destinação</dt><dd>{{ copy.destination === 'COMMERCIAL' ? 'Comercial' : 'Didático' }}</dd></div>
-            <div><dt>Status</dt><dd>{{ copy.status }}</dd></div>
-            @if (copy.sale_price !== null) { <div><dt>Preço</dt><dd>{{ copy.sale_price }}</dd></div> }
-          }
-        </dl>
-      </div>
     }
 
     <form class="book-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -202,4 +184,4 @@
       </button>
     </form>
   </section>
-</main>
+</section>

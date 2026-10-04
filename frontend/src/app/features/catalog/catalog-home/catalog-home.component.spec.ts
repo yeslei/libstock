@@ -48,12 +48,12 @@ describe('CatalogHomeComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Cadastrar exemplar');
   });
 
-  it('preserva o cadastro de exemplares para o estoquista junto ao link de detalhes', () => {
+  it('não oferece cadastro de exemplar nos cards nem para o estoquista: ele passou para o balcão', () => {
     user$.next({ ...user$.value, role_codes: ['STOCK_KEEPER'] });
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.textContent).toContain('Cadastrar exemplar');
-    expect(root.querySelector('a[href="/obras/42/exemplares/novo"]')).not.toBeNull();
+    expect(root.textContent).not.toContain('Cadastrar exemplar');
+    expect(root.querySelector('a[href="/obras/42/exemplares/novo"]')).toBeNull();
     expect(root.querySelector('a[href="/livros/42"]')).not.toBeNull();
   });
 
