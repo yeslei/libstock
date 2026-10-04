@@ -11,6 +11,7 @@ from app.schemas.catalog_schema import (
     CatalogSearchParams,
     GenreResponse,
     PagedBooksResponse,
+    PagedCatalogResponse,
 )
 from app.services.catalog_service import CatalogService
 
@@ -58,10 +59,24 @@ def search_books(
 
 
 @router.get("/genres", response_model=list[GenreResponse])
-def list_featured_genres(
+def list_genres(
+    all: bool = Query(default=False, description="true devolve todas as categorias, não só as em destaque."),
     catalog_service: CatalogService = Depends(get_catalog_service),
 ) -> list[GenreResponse]:
+    if all:
+        return catalog_service.list_all_genres()
     return catalog_service.list_featured_genres()
+
+
+# Declarada antes de "/books/{book_id}" para que "all" não seja lido como id.
+@router.get("/books/all", response_model=PagedCatalogResponse)
+def list_all_books(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=12, ge=1, le=48),
+    q: str | None = Query(default=None, max_length=100),
+    catalog_service: CatalogService = Depends(get_catalog_service),
+) -> PagedCatalogResponse:
+    return catalog_service.list_all_books(page=page, page_size=page_size, q=q)
 
 
 @router.get("/books/{book_id}", response_model=CatalogBookDetailResponse)

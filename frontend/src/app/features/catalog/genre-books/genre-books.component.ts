@@ -7,6 +7,7 @@ import { AlertComponent } from '../../../shared/components/alert/alert.component
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { CatalogBookCardComponent } from '../components/catalog-book-card/catalog-book-card.component';
 import { Genre, PagedBooks } from '../models/catalog.model';
+import { createAllGenresLoader } from '../services/all-genres-loader';
 import { CatalogService } from '../services/catalog.service';
 
 interface GenreView {
@@ -20,7 +21,7 @@ interface GenreView {
 /**
  * Listagem de uma categoria, conforme "Ao selecionar uma categoria" (Figma):
  * trilha, título, busca dentro da categoria, chips das categorias em destaque
- * (navegação entre categorias) e cartões com a disponibilidade real.
+ * (navegação entre categorias, "Todos" para o acervo completo e "Mais" para todas as categorias) e cartões com a disponibilidade real.
  */
 @Component({
   selector: 'app-genre-books',
@@ -37,6 +38,7 @@ export class GenreBooksComponent {
   private readonly slug$ = this.route.paramMap.pipe(map((params) => params.get('slug') ?? ''));
   private readonly view$ = new BehaviorSubject<{ q: string; page: number }>({ q: '', page: 1 });
   private knownGenre: Genre | null = null;
+  protected readonly allGenres = createAllGenresLoader();
 
   /** Texto digitado; só vira consulta ao enviar (Enter ou "Buscar"). */
   protected readonly term = signal('');

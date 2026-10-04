@@ -5,7 +5,7 @@
         <h1 id="home-heading">Encontre livros,<br />acompanhe suas reservas<br />e fortaleça a leitura.</h1>
         <p>Consulte o acervo, solicite empréstimos ou compras e acompanhe tudo pelo LibStock.</p>
         <div class="hero__actions">
-          <a class="btn btn--primary" routerLink="/" fragment="categorias">Explorar livros</a>
+          <a class="btn btn--primary" routerLink="/acervo">Explorar livros</a>
           <a class="btn btn--outline" routerLink="/como-funciona">Como funciona</a>
         </div>
       </div>
@@ -74,12 +74,20 @@
               <p class="state">Nenhuma categoria em destaque no momento.</p>
             } @else {
               <ul class="chips">
-                @for (genre of state.data; track genre.id) {
+                @for (genre of allGenres.visible(state.data); track genre.id) {
                   <li>
                     <a class="chip" [routerLink]="['/generos', genre.slug]">{{ genre.name }}</a>
                   </li>
                 }
+                <li>
+                  <button class="chip chip--more" type="button" [attr.aria-expanded]="allGenres.expanded()" (click)="allGenres.toggle()">
+                    {{ allGenres.loading() ? 'Carregando…' : allGenres.expanded() ? 'Menos' : 'Mais' }}
+                  </button>
+                </li>
               </ul>
+              @if (allGenres.failed()) {
+                <app-alert message="Não foi possível carregar todas as categorias." variant="error" />
+              }
             }
           }
         }
@@ -118,7 +126,7 @@
     <section class="section" aria-labelledby="books-heading">
       <div class="section__head">
         <h2 class="section__title" id="books-heading">Livros em destaque</h2>
-        <button class="section__link" type="button" (click)="homeSearch.open = true; catalogSearch.focus()">Buscar livros →</button>
+        <a class="section__link" routerLink="/acervo">Ver todos →</a>
       </div>
 
       @if (featuredError(); as erro) {

@@ -17,6 +17,13 @@ class ClientRequestRepository:
             .join(User, User.id == Client.id).where(Client.id == client_id).with_for_update()
         ).first()
 
+    def find_client(self, client_id: int):
+        """Leitura sem bloqueio (consulta); escritas usam lock_client."""
+        return self.db.execute(
+            select(Client, Profile, User).join(Profile, Profile.id == Client.id)
+            .join(User, User.id == Client.id).where(Client.id == client_id)
+        ).first()
+
     def lock_book(self, book_id: int):
         return self.db.scalar(select(Book).where(Book.id == book_id).with_for_update())
 

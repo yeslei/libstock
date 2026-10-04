@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { BookAvailability, CatalogBook, CatalogBookDetail, Genre, PagedBooks } from '../models/catalog.model';
+import { BookAvailability, CatalogBook, CatalogBookDetail, Genre, PagedBooks, PagedCatalog } from '../models/catalog.model';
 
 export const CATALOG_API = '/api/v1/catalog';
 export type CatalogSearchCriterion = 'title' | 'author' | 'isbn' | 'barcode';
@@ -26,6 +26,19 @@ export class CatalogService {
 
   getFeaturedGenres(): Observable<Genre[]> {
     return this.http.get<Genre[]>(`${CATALOG_API}/genres`);
+  }
+
+  /** Todas as categorias, inclusive as fora de destaque (chip "Mais"). */
+  getAllGenres(): Observable<Genre[]> {
+    return this.http.get<Genre[]>(`${CATALOG_API}/genres`, { params: { all: true } });
+  }
+
+  /** Acervo público completo, paginado, com busca opcional por título ou autor. */
+  getAllBooks(page = 1, q = '', pageSize = 12): Observable<PagedCatalog> {
+    const term = q.trim();
+    return this.http.get<PagedCatalog>(`${CATALOG_API}/books/all`, {
+      params: term ? { page, page_size: pageSize, q: term } : { page, page_size: pageSize },
+    });
   }
 
   getBooksByGenre(slug: string, page = 1, q = ''): Observable<PagedBooks> {

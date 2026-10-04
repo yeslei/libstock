@@ -35,6 +35,7 @@
 .state { display: flex; gap: $space-2; align-items: center; color: $text-muted; font-size: $font-size-sm; }
 .chips { display: flex; flex-wrap: wrap; gap: $space-2; margin: 0; padding: 0; list-style: none; }
 .chip { display: inline-flex; align-items: center; min-height: $target-min; padding: 0 $space-4; border: 1px solid $client-border; border-radius: 999px; color: $text-primary; font-size: $font-size-xs; text-decoration: none; }
+.chip { background: transparent; cursor: pointer; font-family: inherit; }
 .chip:hover { background: $bg-subtle; border-color: $primary; }
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: $space-5; margin: 0; padding: 0; list-style: none; }
 .card__manage { width: 100%; font-size: $font-size-xs; }
