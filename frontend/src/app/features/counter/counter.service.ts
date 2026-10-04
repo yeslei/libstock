@@ -91,13 +91,21 @@ export interface StaffDashboard {
 export type CopyDestination = 'DIDACTIC' | 'COMMERCIAL';
 export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'RESERVED' | 'SOLD' | 'INACTIVE';
 
+export interface StaffGenre {
+  readonly id: number;
+  readonly name: string;
+  readonly slug: string;
+}
+
 /** `GET /api/v1/staff/books`: obra com a contagem de exemplares ativos e não vendidos. */
 export interface StaffCatalogBook {
   readonly id: number;
   readonly title: string;
   readonly author: string;
   readonly isbn: string | null;
+  /** Texto legado; as categorias do catálogo público estão em `genres` (Issue #174). */
   readonly genre: string | null;
+  readonly genres: readonly StaffGenre[];
   readonly is_active: boolean;
   readonly total_copies: number;
   readonly didactic_copies: number;

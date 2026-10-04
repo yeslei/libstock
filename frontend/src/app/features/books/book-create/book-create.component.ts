@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   ElementRef,
   inject,
@@ -16,6 +17,8 @@ import { AlertComponent } from '../../../shared/components/alert/alert.component
 import { SnackbarService } from '../../../shared/components/snackbar/snackbar.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { fieldError } from '../../../shared/validators/form-errors';
+import { Genre } from '../../catalog/models/catalog.model';
+import { GenrePickerComponent } from '../components/genre-picker/genre-picker.component';
 import { BookCreateRequest, BookMetadata } from '../models/book.model';
 import { BookService } from '../services/book.service';
 import { compactIsbn, isbnValidator } from '../validators/isbn.validator';
@@ -32,10 +35,6 @@ const TITLE_ERRORS = {
 const AUTHOR_ERRORS = {
   maxlength: 'O autor pode ter no máximo 255 caracteres.',
   server: 'Confira o autor informado.',
-};
-const GENRE_ERRORS = {
-  maxlength: 'O gênero pode ter no máximo 100 caracteres.',
-  server: 'Confira o gênero informado.',
 };
 const BARCODE_ERRORS = {
   required: 'Informe o código de barras do exemplar.',
@@ -59,7 +58,7 @@ const PRICE_ERRORS = {
 @Component({
   selector: 'app-book-create',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [ReactiveFormsModule, RouterLink, AlertComponent, SpinnerComponent, GenrePickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './book-create.component.html',
   styleUrl: './book-create.component.scss',
@@ -76,7 +75,6 @@ export class BookCreateComponent {
     isbn: ['', [Validators.required, isbnValidator]],
     title: ['', [Validators.maxLength(255)]],
     author: ['', [Validators.maxLength(255)]],
-    genre: ['', [Validators.maxLength(100)]],
     coverUrl: ['', [Validators.pattern(/^https?:\/\/.+/i)]],
     barcode: ['', [Validators.required, Validators.maxLength(100)]],
     destination: ['DIDACTIC' as 'DIDACTIC' | 'COMMERCIAL', [Validators.required]],
@@ -84,6 +82,9 @@ export class BookCreateComponent {
     salePrice: this.fb.control<number | null>(null, [Validators.min(0)]),
     acquiredAt: [''],
   });
+  /** Categorias do catálogo escolhidas (Issue #174); vão em `genre_ids`. */
+  protected readonly selectedGenres = signal<readonly Genre[]>([]);
+  protected readonly genreIds = computed(() => this.selectedGenres().map((genre) => genre.id));
   protected readonly state = signal<FormState>({ status: 'idle' });
   protected readonly submitted = signal(false);
   protected readonly imageFailed = signal(false);
@@ -144,10 +145,6 @@ export class BookCreateComponent {
     return fieldError(this.form.controls.author, AUTHOR_ERRORS, this.submitted());
   }
 
-  protected genreError(): string | null {
-    return fieldError(this.form.controls.genre, GENRE_ERRORS, this.submitted());
-  }
-
   protected barcodeError(): string | null {
     return fieldError(this.form.controls.barcode, BARCODE_ERRORS, this.submitted());
   }
@@ -204,7 +201,7 @@ export class BookCreateComponent {
       isbn: compactIsbn(value.isbn),
       title: optional(value.title),
       author: optional(value.author),
-      genre: optional(value.genre),
+      genre_ids: this.genreIds(),
       cover_url: optional(value.coverUrl),
       initial_copy: {
         barcode: value.barcode.trim(),
@@ -283,7 +280,7 @@ export class BookCreateComponent {
   }
 
   private focusFirstInvalid(): void {
-    const first = (['isbn', 'title', 'author', 'genre', 'coverUrl', 'barcode', 'destination', 'condition', 'salePrice', 'acquiredAt'] as const).find(
+    const first = (['isbn', 'title', 'author', 'coverUrl', 'barcode', 'destination', 'condition', 'salePrice', 'acquiredAt'] as const).find(
       (field) => this.form.controls[field].invalid,
     );
     if (first) {

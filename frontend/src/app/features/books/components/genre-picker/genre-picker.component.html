@@ -1,0 +1,32 @@
+<fieldset class="genre-picker" [disabled]="disabled()">
+  <legend>Categorias <span class="genre-picker__optional">Opcional</span></legend>
+  @if (state(); as current) {
+    @if (current.status === 'loading') {
+      <p class="genre-picker__status" role="status"><app-spinner /> Carregando categorias…</p>
+    } @else if (current.status === 'error') {
+      <p class="genre-picker__status genre-picker__status--error" role="alert">
+        Não foi possível carregar as categorias do catálogo.
+        <button class="genre-picker__retry" type="button" (click)="load()">Tentar novamente</button>
+      </p>
+    } @else if (current.status === 'loaded') {
+      <div class="genre-picker__options">
+        @for (genre of current.genres; track genre.id) {
+          <label class="genre-picker__option" [for]="idPrefix() + '-' + genre.id">
+            <input
+              type="checkbox"
+              [id]="idPrefix() + '-' + genre.id"
+              [checked]="isSelected(genre.id)"
+              (change)="toggle(genre)"
+            />
+            <span>{{ genre.name }}</span>
+          </label>
+        } @empty {
+          <p class="genre-picker__status">Nenhuma categoria cadastrada no catálogo.</p>
+        }
+      </div>
+    }
+  }
+  <p class="genre-picker__hint">
+    As categorias escolhidas definem em quais páginas públicas a obra aparece.
+  </p>
+</fieldset>

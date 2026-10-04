@@ -26,6 +26,12 @@ describe('errorInterceptor', () => {
     return received!;
   }
 
+  it('mapeia categoria inexistente no cadastro e na edição de obra (Issue #174)', () => {
+    const error = fail(404, { detail: 'Gênero não encontrado.', code: 'genre_not_found', details: { missing_ids: [9] } });
+    expect(error.detail).toContain('categorias escolhidas não existe mais');
+    expect(error.details).toEqual({ missing_ids: [9] });
+  });
+
   it('mapeia o código estável da exclusão de exemplar para mensagem de UI', () => {
     expect(fail(404, { detail: 'x', code: 'copy_not_found' }).detail).toBe('O exemplar não foi encontrado. Atualize a obra.');
     expect(fail(409, { detail: 'x', code: 'copy_not_available' }).detail).toContain('não está disponível');

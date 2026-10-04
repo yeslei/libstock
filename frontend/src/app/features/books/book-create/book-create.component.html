@@ -125,25 +125,7 @@
         }
       </div>
 
-      <div class="field">
-        <label class="field__label" for="book-genre">
-          Gênero <span class="optional">Opcional</span>
-        </label>
-        <div class="field__control" [class.field__control--invalid]="genreError() !== null">
-          <input
-            class="field__input"
-            id="book-genre"
-            type="text"
-            formControlName="genre"
-            maxlength="100"
-            [attr.aria-invalid]="genreError() !== null"
-            [attr.aria-describedby]="genreError() ? 'book-genre-error' : null"
-          />
-        </div>
-        @if (genreError(); as message) {
-          <p class="field__error" id="book-genre-error" aria-live="polite">{{ message }}</p>
-        }
-      </div>
+      <app-genre-picker idPrefix="book-genre" [selected]="genreIds()" (selectedChange)="selectedGenres.set($event)" />
 
       <div class="field">
         <label class="field__label" for="book-coverUrl">

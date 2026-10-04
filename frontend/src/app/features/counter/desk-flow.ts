@@ -101,6 +101,15 @@ export function formatPrice(value: string | number | null | undefined): string {
   return Number.isFinite(amount) ? BRL.format(amount) : '—';
 }
 
+/**
+ * Categorias da obra para exibição no balcão: as do catálogo público (`genres`, Issue #174); sem elas, cai
+ * no texto legado `genre`. Devolve `null` quando a obra não tem categoria alguma.
+ */
+export function genreLabel(book: { readonly genre: string | null; readonly genres?: readonly { readonly name: string }[] }): string | null {
+  const names = (book.genres ?? []).map((genre) => genre.name);
+  return names.length ? names.join(', ') : book.genre?.trim() || null;
+}
+
 export function destinationLabel(destination: CopyDestination): string {
   return destination === 'COMMERCIAL' ? 'Venda' : 'Empréstimo';
 }

@@ -35,6 +35,7 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   google_books_invalid_response:
     'O Google Books não retornou título e autor válidos para este ISBN.',
   book_persistence_error: 'Não foi possível cadastrar a obra. Tente novamente.',
+  genre_not_found: 'Uma das categorias escolhidas não existe mais no catálogo. Atualize a página e escolha de novo.',
   // Balcão V2 (circulação e consultas de funcionário).
   client_required: 'Este usuário não possui cadastro de cliente.',
   client_ineligible: 'O cliente está inativo, penalizado ou com empréstimo em atraso.',

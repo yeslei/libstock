@@ -11,7 +11,7 @@ import { CounterCopyCreateComponent } from './counter-copy-create.component';
 import { CounterService, StaffCatalogBookDetail } from './counter.service';
 
 const detail = (over: Partial<StaffCatalogBookDetail> = {}): StaffCatalogBookDetail => ({
-  id: 7, title: 'Dom Casmurro', author: 'Machado de Assis', isbn: null, genre: 'Romance', is_active: true,
+  id: 7, title: 'Dom Casmurro', author: 'Machado de Assis', isbn: null, genre: 'Romance', genres: [], is_active: true,
   total_copies: 4, didactic_copies: 2, commercial_copies: 2, copies: [], ...over,
 });
 

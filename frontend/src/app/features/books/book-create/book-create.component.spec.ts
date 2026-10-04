@@ -5,6 +5,8 @@ import { Observable, Subject, of, throwError } from 'rxjs';
 
 import { ApiError } from '../../../core/models/auth.model';
 import { SnackbarService } from '../../../shared/components/snackbar/snackbar.service';
+import { Genre } from '../../catalog/models/catalog.model';
+import { CatalogService } from '../../catalog/services/catalog.service';
 import { BookResponse } from '../models/book.model';
 import { BookService } from '../services/book.service';
 import { isbnValidator } from '../validators/isbn.validator';
@@ -13,6 +15,11 @@ import { BookCreateComponent } from './book-create.component';
 describe('BookCreateComponent', () => {
   let fixture: ComponentFixture<BookCreateComponent>;
   let service: jasmine.SpyObj<BookService>;
+  const catalogGenres: Genre[] = [
+    { id: 1, name: 'Ficção', slug: 'ficcao' },
+    { id: 4, name: 'Fantasia', slug: 'fantasia' },
+    { id: 7, name: 'Romance', slug: 'romance' },
+  ];
 
   const response: BookResponse = {
     id: 7,
@@ -43,9 +50,15 @@ describe('BookCreateComponent', () => {
       author: 'Luciano Ramalho',
       genre: 'Tecnologia',
     }));
+    const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['getAllGenres']);
+    catalog.getAllGenres.and.returnValue(of(catalogGenres));
     await TestBed.configureTestingModule({
       imports: [BookCreateComponent],
-      providers: [provideRouter([]), { provide: BookService, useValue: service }],
+      providers: [
+        provideRouter([]),
+        { provide: BookService, useValue: service },
+        { provide: CatalogService, useValue: catalog },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(BookCreateComponent);
     fixture.detectChanges();
@@ -132,7 +145,7 @@ describe('BookCreateComponent', () => {
     tick(451);
     fixture.detectChanges();
     submit();
-    expect(service.create.calls.mostRecent().args[0].genre).toBeNull();
+    expect(service.create.calls.mostRecent().args[0].genre_ids).toEqual([]);
   }));
 
   it('libera o preenchimento manual quando a consulta falha', fakeAsync(() => {
@@ -147,16 +160,39 @@ describe('BookCreateComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Preencha título e autor manualmente');
   }));
 
-  it('aplica os limites de título, autor e gênero', () => {
+  it('aplica os limites de título e autor', () => {
     input('book-isbn', '9788575225530');
     input('book-title', 'T'.repeat(256));
     input('book-author', 'A'.repeat(256));
-    input('book-genre', 'G'.repeat(101));
     submit();
     expect(service.create).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('título pode ter no máximo 255');
     expect(fixture.nativeElement.textContent).toContain('autor pode ter no máximo 255');
-    expect(fixture.nativeElement.textContent).toContain('gênero pode ter no máximo 100');
+  });
+
+  function pick(id: number): void {
+    const box = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(`#book-genre-${id}`)!;
+    box.click();
+    fixture.detectChanges();
+  }
+
+  it('oferece as categorias do catálogo para seleção múltipla (Issue #174)', () => {
+    const boxes = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+    expect(boxes.map((box) => box.id)).toEqual(['book-genre-1', 'book-genre-4', 'book-genre-7']);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Fantasia');
+    expect((fixture.nativeElement as HTMLElement).querySelector('#book-genre[type="text"]')).toBeNull();
+  });
+
+  it('envia as categorias escolhidas em genre_ids, sem usar o texto de gênero', () => {
+    service.create.and.returnValue(of(response));
+    input('book-isbn', '9788575225530');
+    pick(4);
+    pick(7);
+    pick(4);
+    submit();
+    const payload = service.create.calls.mostRecent().args[0];
+    expect(payload.genre_ids).toEqual([7]);
+    expect(payload.genre).toBeUndefined();
   });
 
   it('envia payload normalizado quando o formulário é válido', () => {
@@ -164,13 +200,13 @@ describe('BookCreateComponent', () => {
     input('book-isbn', ' 978-85-7522-553-0 ');
     input('book-title', '  Python Fluente  ');
     input('book-author', ' Luciano Ramalho ');
-    input('book-genre', ' Tecnologia ');
+    pick(1);
     submit();
     expect(service.create).toHaveBeenCalledOnceWith({
       isbn: '9788575225530',
       title: 'Python Fluente',
       author: 'Luciano Ramalho',
-      genre: 'Tecnologia',
+      genre_ids: [1],
       cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
@@ -185,7 +221,7 @@ describe('BookCreateComponent', () => {
     input('book-title', '   ');
     submit();
     expect(service.create).toHaveBeenCalledOnceWith({
-      isbn: '9788575225530', title: null, author: null, genre: null, cover_url: null,
+      isbn: '9788575225530', title: null, author: null, genre_ids: [], cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
         sale_price: null, acquired_at: null,
