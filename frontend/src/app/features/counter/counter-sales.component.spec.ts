@@ -3,7 +3,8 @@ import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
-import { CounterReservationsPageComponent } from './counter-pages';
+import { CounterReservationAttendComponent } from './counter-reservation-attend.component';
+import { CounterReservationsComponent } from './counter-reservations.component';
 import { CounterSalesComponent } from './counter-sales.component';
 import { CounterService, SaleRegistration, StaffCopyLookup } from './counter.service';
 
@@ -197,6 +198,7 @@ describe('Rotas de vendas e reservas do balcão', () => {
 
   it('libera /balcao/vendas para a venda direta e mantém as reservas em /balcao/reservas', async () => {
     expect(await children.find((r) => r.path === 'vendas')!.loadComponent!()).toBe(CounterSalesComponent);
-    expect(await children.find((r) => r.path === 'reservas')!.loadComponent!()).toBe(CounterReservationsPageComponent);
+    expect(await children.find((r) => r.path === 'reservas')!.loadComponent!()).toBe(CounterReservationsComponent);
+    expect(await children.find((r) => r.path === 'reservas/:id')!.loadComponent!()).toBe(CounterReservationAttendComponent);
   });
 });

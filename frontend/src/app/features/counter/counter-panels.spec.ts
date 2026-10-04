@@ -4,13 +4,12 @@ import { Router, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import { routes } from '../../app.routes';
-import { CounterService, StaffClient, StaffLoan, StaffLoanRequest, StaffPurchaseReservation } from './counter.service';
+import { CounterService, StaffClient, StaffLoan, StaffLoanRequest } from './counter.service';
 import { ClientsPanelComponent } from './clients-panel.component';
 import { businessToday } from './business-date';
 import { CounterContext } from './counter-context.service';
 import { CounterClientsPageComponent } from './counter-pages';
 import { PickupsPanelComponent } from './pickups-panel.component';
-import { ReservationsPanelComponent } from './reservations-panel.component';
 
 const client = (over: Partial<StaffClient> = {}): StaffClient => ({
   id: 3, name: 'Ana Souza', email: 'ana@x.dev', is_active: true, is_penalized: false,
@@ -26,12 +25,6 @@ const loanRequest = (over: Partial<StaffLoanRequest> = {}): StaffLoanRequest => 
 const loan = (over: Partial<StaffLoan> = {}): StaffLoan => ({
   id: 21, client: client(), book, copy_id: 91, copy_barcode: 'D-001', loan_date: '2026-09-01T12:00:00Z',
   due_date: '2026-10-01T12:00:00Z', status: 'OVERDUE', days_late: 2, ...over,
-});
-
-const reservation = (over: Partial<StaffPurchaseReservation> = {}): StaffPurchaseReservation => ({
-  id: 31, client: client(), book, status: 'WAITING', queue_position: 1, requested_at: '2026-10-01T12:00:00Z',
-  pickup_date: null, notified_at: null, expires_at: null, expired: false, allocated_copy_id: null,
-  allocated_copy_barcode: null, free_commercial_copies: 1, can_allocate: true, allocation_blocked_reason: null, ...over,
 });
 
 type Spies = {
@@ -194,86 +187,6 @@ describe('Balcão: retiradas', () => {
     fixture.componentRef.setInput('client', client());
     fixture.detectChanges();
     expect(service.listLoanRequests).toHaveBeenCalledWith({ q: '', clientId: 3 });
-  });
-});
-
-describe('Balcão: reservas de compra', () => {
-  it('permite destinar exemplar à primeira reserva e confirma antes de enviar', () => {
-    const { fixture, root, service } = setup(ReservationsPanelComponent, (s) => {
-      s.listPurchaseReservations.and.returnValue(of([reservation()]));
-      s.allocatePurchase.and.returnValue(of({ id: 31 }));
-    });
-    expect(root.textContent).toContain('1º');
-    click(fixture, button(root, 'Destinar exemplar'));
-    expect(service.allocatePurchase).not.toHaveBeenCalled();
-    click(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
-    expect(service.allocatePurchase).toHaveBeenCalledOnceWith(10);
-    expect(root.querySelector('[data-feedback]')?.textContent).toContain('Exemplar destinado a Ana Souza');
-  });
-
-  it('explica o bloqueio quando o primeiro da fila está inelegível, sem saltar a fila', () => {
-    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([
-      reservation({ can_allocate: false, allocation_blocked_reason: 'CLIENT_INELIGIBLE', client: client({ eligible: false, has_overdue_loan: true }) }),
-      reservation({ id: 32, queue_position: 2, can_allocate: false, allocation_blocked_reason: 'NOT_FIRST_IN_QUEUE' }),
-    ])));
-    expect(root.textContent).toContain('não pula a fila');
-    expect(root.textContent).toContain('só a primeira reserva da fila recebe exemplar');
-    root.querySelectorAll('button').forEach((b) => {
-      if (b.textContent?.trim() === 'Destinar exemplar') expect(b.disabled).toBeTrue();
-    });
-  });
-
-  it('mostra exemplar destinado sem inventar prazo e confirma a venda', () => {
-    const notified = reservation({ status: 'NOTIFIED', queue_position: null, allocated_copy_id: 55, allocated_copy_barcode: 'C-055',
-      notified_at: '2026-10-03T12:00:00Z', can_allocate: false, free_commercial_copies: 0 });
-    const { fixture, root, service } = setup(ReservationsPanelComponent, (s) => {
-      s.listPurchaseReservations.and.returnValue(of([notified]));
-      s.confirmSale.and.returnValue(of({ id: 5 }));
-    });
-    expect(root.textContent).toContain('C-055');
-    expect(root.textContent).not.toContain('Retirar até');
-    click(fixture, button(root, 'Confirmar venda'));
-    click(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
-    expect(service.confirmSale).toHaveBeenCalledOnceWith(31);
-    expect(root.querySelector('[data-feedback]')?.textContent).toContain('Venda #5 confirmada');
-  });
-
-  it('desabilita a venda de reserva expirada e informa a limitação', () => {
-    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([
-      reservation({ status: 'NOTIFIED', allocated_copy_id: 55, allocated_copy_barcode: 'C-055', expired: true, expires_at: '2026-09-01T12:00:00Z', can_allocate: false }),
-    ])));
-    expect(button(root, 'Confirmar venda').disabled).toBeTrue();
-    expect(root.textContent).toContain('Prazo de retirada expirado');
-  });
-
-  it('desabilita a venda para cliente inelegível ou obra inativa', () => {
-    const base = { status: 'NOTIFIED' as const, allocated_copy_id: 55, allocated_copy_barcode: 'C-055', can_allocate: false };
-    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([
-      reservation({ ...base, client: client({ eligible: false, is_penalized: true }) }),
-      reservation({ ...base, id: 32, book: { ...book, is_active: false } }),
-    ])));
-    root.querySelectorAll('button').forEach((b) => {
-      if (b.textContent?.trim() === 'Confirmar venda') expect(b.disabled).toBeTrue();
-    });
-  });
-
-  it('avisa quando a lista atinge o limite e pode estar truncada', () => {
-    const many = Array.from({ length: 50 }, (_, i) => reservation({ id: i + 1 }));
-    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of(many)));
-    expect(root.textContent).toContain('Mostrando os primeiros 50 resultados. Refine a busca');
-  });
-
-  it('não avisa de truncamento abaixo do limite', () => {
-    const { root } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([reservation()])));
-    expect(root.textContent).not.toContain('Mostrando os primeiros');
-  });
-
-  it('filtra por situação', () => {
-    const { fixture, root, service } = setup(ReservationsPanelComponent, (s) => s.listPurchaseReservations.and.returnValue(of([])));
-    const select = root.querySelector('#reservation-status') as HTMLSelectElement;
-    select.value = 'NOTIFIED'; select.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-    expect(service.listPurchaseReservations.calls.mostRecent().args[0]).toEqual({ q: '', clientId: undefined, status: 'NOTIFIED' });
   });
 });
 

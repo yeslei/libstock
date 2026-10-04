@@ -331,3 +331,40 @@ table {
     cursor: pointer;
   }
 }
+
+// Faixas informativas e ações das telas de reservas (complementos 02 e 07).
+.callout {
+  margin: 0 0 $space-4;
+  padding: 16px;
+  border-radius: 12px;
+  background: $staff-badge-warn;
+  color: $staff-text;
+  font-size: 13px;
+
+  p {
+    margin: 0;
+  }
+
+  p + p {
+    margin-top: 8px;
+  }
+
+  &--danger {
+    background: #fae8e5;
+  }
+
+  &--ok {
+    background: $staff-badge-ok;
+  }
+}
+
+.callout__title {
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: $space-4;
+}

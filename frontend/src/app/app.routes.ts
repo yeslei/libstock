@@ -56,8 +56,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/counter/counter-sales.component').then(m => m.CounterSalesComponent),
       },
       {
-        path: 'reservas', title: 'Reservas de compra · Balcão · LibStock',
-        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterReservationsPageComponent),
+        path: 'reservas', pathMatch: 'full', title: 'Reservas de compra · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-reservations.component').then(m => m.CounterReservationsComponent),
+      },
+      {
+        path: 'reservas/:id', title: 'Atender reserva · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-reservation-attend.component').then(m => m.CounterReservationAttendComponent),
       },
       { path: '**', redirectTo: 'painel' },
     ],
