@@ -135,7 +135,7 @@ backend e não gerencia o esquema. Toda alteração estrutural deve ser criada e
 
 ### Categorias da obra, validação e códigos de erro (Issues #174, #175 e #176)
 
-- `POST /api/v1/books/` e `PATCH /api/v1/books/{book_id}` aceitam `genre_ids: list[int]` (ids de `GET /api/v1/catalog/genres?all=true`). Sincronizam `book_genres` na mesma transação da obra e com auditoria do funcionário. No PATCH, `[]` remove todas as categorias, `null` é 422 e a ausência do campo não altera nada. Id inexistente: 404 `genre_not_found` com `details.missing_ids`. A resposta de obra traz `genres: [{id, name, slug}]`. O texto `genre` é mantido por compatibilidade e, quando `genre_ids` é enviado, espelha os nomes escolhidos (até 100 caracteres); a página pública de categoria lê `book_genres`. Detalhes em BUSINESS_RULES.md, seção 22.
+- `POST /api/v1/books/` e `PATCH /api/v1/books/{book_id}` aceitam `genre_ids: list[int]` (ids de `GET /api/v1/catalog/genres?all=true`). Sincronizam `book_genres` na mesma transação da obra e com auditoria do funcionário. No PATCH, `[]` remove todas as categorias, `null` é 422 e a ausência do campo não altera nada. Id inexistente: 404 `genre_not_found` com `details.missing_ids`. A resposta de obra traz `genres: [{id, name, slug}]`. O texto `genre` é legado e não alimenta o catálogo: mantido por compatibilidade, espelha os nomes escolhidos (até 100 caracteres) quando `genre_ids` é enviado, e enviar `genre` junto com `genre_ids` é 422 `genre_text_with_genre_ids`. Cada vínculo criado ou removido grava `audit_logs` (`book_genres`, `<obra>:<categoria>`) com o funcionário; categoria removida concorrentemente é 404 `genre_not_found`; a página pública de categoria lê `book_genres`. Detalhes em BUSINESS_RULES.md, seção 22.
 - Migration `20261004_0017` (dados, reversível): associa obras sem `book_genres` às categorias cujo nome coincide com `genre` (sem diferenciar maiúsculas e acentos; vírgula ou `;` separa várias). Rastreia as associações criadas em `audit_logs` (`source=migration_20261004_0017`); o downgrade remove só elas.
 - Cadastro com ISBN (Issue #176): título, autor, categorias e demais campos informados prevalecem; o Google Books só preenche campos vazios (título, autor, `cover_url`, `publisher`, `publication_year`) e nunca categorias. `GET /api/v1/books/metadata/{isbn}` devolve a sugestão (`title`, `author`, `genre` informativo, `cover_url`, `publisher`, `publication_year`).
 - `POST /api/v1/sales/`: `copy_id` repetido nos itens é 422 `duplicate_sale_item`.
@@ -147,6 +147,7 @@ Formato de erro: `{detail, code, details?}`. O 422 de validação (qualquer rota
 
 | Rota | Status | `code` |
 | --- | --- | --- |
+| `POST /books/`, `PATCH /books/{id}` | 404 / 422 | `genre_not_found` / `genre_text_with_genre_ids` |
 | `/copies/`, `/copies/batch` | 404 | `book_not_found` (obra inexistente ou inativa) |
 | `/copies/`, `/copies/batch` | 409 | `duplicate_barcode` |
 | `/copies/`, `/copies/batch` | 422 | `copy_sale_price_required` |
