@@ -1,4 +1,4 @@
-"""Migrations 0014 (backfill do prazo) e 0015 (fila WAITING com exemplar livre) em banco PostgreSQL próprio.
+"""Migrations 0015 (backfill do prazo) e 0016 (fila WAITING com exemplar livre) em banco PostgreSQL próprio.
 
 Cria e remove um banco temporário no mesmo servidor de LIBSTOCK_V2_TEST_DATABASE_URL, migra com o Alembic real
 (subprocesso, ciclo upgrade/downgrade) e nunca toca o banco da aplicação nem o banco compartilhado dos demais testes."""
@@ -79,7 +79,7 @@ def seed_book(db, copies=1):
 
 def test_backfill_sets_deadline_of_notified_reservations_and_cycle_is_reversible(scratch_database):
     engine, alembic = scratch_database
-    alembic('upgrade', '20261003_0013')
+    alembic('upgrade', '20261003_0014')
     notified_at = datetime(2026, 10, 4, 2, 30, tzinfo=timezone.utc)  # 23:30 de 03/10 em São Paulo
     with Session(engine) as db:
         book_id, (copy_a, copy_b, copy_c) = seed_book(db, copies=3)
@@ -107,7 +107,7 @@ def test_backfill_sets_deadline_of_notified_reservations_and_cycle_is_reversible
             return {row.id: row.expires_at for row in conn.execute(text('SELECT id, expires_at FROM purchase_reservations'))}
 
     assert expiries()[ids['legacy']] is None
-    alembic('upgrade', '20261003_0014')
+    alembic('upgrade', '20261003_0015')
     after = expiries()
     expected = datetime(2026, 10, 8, 23, 59, 59, 999000, tzinfo=timezone(offset=timedelta(hours=-3)))
     assert after[ids['legacy']] == expected  # mesma regra de reservation_pickup_deadline(notified_at)
@@ -119,7 +119,7 @@ def test_backfill_sets_deadline_of_notified_reservations_and_cycle_is_reversible
         assert conn.scalar(text("SELECT tgenabled FROM pg_trigger WHERE tgname = 'trg_validate_purchase_reservation'")) == 'O'
     from app.core.business_dates import reservation_pickup_deadline
     assert after[ids['legacy']] == reservation_pickup_deadline(notified_at)
-    alembic('downgrade', '20261003_0013')  # sem desfazer: os valores são válidos e não são rastreáveis
+    alembic('downgrade', '20261003_0014')  # sem desfazer: os valores são válidos e não são rastreáveis
     assert expiries() == after
     alembic('upgrade', 'head')
     assert expiries() == after
@@ -160,7 +160,7 @@ def test_waiting_reservation_with_free_copy_is_allowed_only_when_a_queue_exists_
     with engine.connect() as conn:
         assert conn.execute(text("SELECT queue_position FROM purchase_reservations WHERE client_id = :c"),
                             {'c': second}).scalar() == 2
-    alembic('downgrade', '20261003_0014')
+    alembic('downgrade', '20261003_0015')
     with Session(engine) as db:
         third = make_user(db, 'USER', 'Terceiro')
         db.commit()

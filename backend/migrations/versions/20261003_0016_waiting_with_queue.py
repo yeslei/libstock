@@ -4,8 +4,8 @@ A precedência da fila é preservada: nova solicitação entra no fim da fila me
 Sem fila WAITING, a regra anterior continua valendo. A 0012 não é alterada."""
 from alembic import op
 
-revision = '20261003_0015'
-down_revision = '20261003_0014'
+revision = '20261003_0016'
+down_revision = '20261003_0015'
 branch_labels = None
 depends_on = None
 

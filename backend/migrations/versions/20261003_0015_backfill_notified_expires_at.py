@@ -6,8 +6,8 @@ Reservas destinadas antes da política de prazo ficaram com expires_at NULL e nu
 """
 from alembic import op
 
-revision = '20261003_0014'
-down_revision = '20261003_0013'
+revision = '20261003_0015'
+down_revision = '20261003_0014'
 branch_labels = None
 depends_on = None
 
