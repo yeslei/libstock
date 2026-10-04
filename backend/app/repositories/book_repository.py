@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.domain import (
@@ -83,7 +83,12 @@ class BookRepository:
     def find_genres_by_ids(self, genre_ids: list[int]) -> list[Genre]:
         if not genre_ids:
             return []
-        return list(self.db.scalars(select(Genre).where(Genre.id.in_(genre_ids))))
+        # FOR SHARE: a categoria não pode ser removida por outra transação até o commit desta.
+        return list(
+            self.db.scalars(
+                select(Genre).where(Genre.id.in_(genre_ids)).order_by(Genre.id).with_for_update(read=True)
+            )
+        )
 
     def lock_book_row(self, book_id: int) -> None:
         """Serializa a sincronização de categorias da mesma obra (a chave de book_genres é composta)."""
@@ -103,6 +108,21 @@ class BookRepository:
         for genre_id in sorted(added):
             self.db.add(BookGenre(book_id=book.id, genre_id=genre_id))
         self.db.flush()
+        # `book_genres` não tem gatilho de auditoria (a tabela não tem coluna `id`): o vínculo é
+        # registrado aqui, no formato da migration 0017 mas sem `source`, com o funcionário da
+        # transação (`libstock.employee_id`). O downgrade da 0017 só considera linhas com `source`.
+        for operation, ids in (("DELETE", sorted(removed)), ("INSERT", sorted(added))):
+            for genre_id in ids:
+                column = "old_value" if operation == "DELETE" else "new_value"
+                self.db.execute(
+                    text(
+                        "INSERT INTO audit_logs (employee_id, entity_type, entity_id, operation, " + column + ") "
+                        "VALUES (current_audit_employee_id(), 'book_genres', :entity_id, :operation, "
+                        "jsonb_build_object('book_id', CAST(:book_id AS bigint), 'genre_id', CAST(:genre_id AS bigint)))"
+                    ),
+                    {"entity_id": f"{book.id}:{genre_id}", "operation": operation,
+                     "book_id": book.id, "genre_id": genre_id},
+                )
         # A coleção `book.genres` já carregada na sessão ficou velha.
         self.db.expire(book, ["genres"])
         return True

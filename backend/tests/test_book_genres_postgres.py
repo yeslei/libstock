@@ -243,3 +243,75 @@ def test_concurrent_genre_updates_of_the_same_book_never_fail(genres_env):
         assert all(pool.map(update, range(6)))
     assert links(env.engine, book_id) == {'Romance', 'Fantasia'}
 
+
+
+def test_genre_text_together_with_genre_ids_is_422_and_persists_nothing(genres_env):
+    env = genres_env
+    book_id = env.acervo.book_id
+    payload = create_payload(genre='Texto', genre_ids=[env.ids['Romance']])
+    response = env.http.post('/api/v1/books/', json=payload)
+    assert (response.status_code, response.json()['code']) == (422, 'genre_text_with_genre_ids')
+    with env.engine.connect() as conn:
+        assert conn.scalar(text('SELECT count(*) FROM books WHERE isbn = :i'), {'i': payload['isbn']}) == 0
+    patch = env.http.patch(f'/api/v1/books/{book_id}', json={'genre': 'Texto', 'genre_ids': [env.ids['Romance']]})
+    assert (patch.status_code, patch.json()['code']) == (422, 'genre_text_with_genre_ids')
+    assert links(env.engine, book_id) == set()
+
+
+def test_genre_removed_concurrently_is_404_never_500(genres_env):
+    """A categoria removida por outra transação (ainda não confirmada) é esperada pelo FOR SHARE: 404."""
+    import threading
+    import time
+    from app.core.exceptions import GenreNotFoundError
+    env = genres_env
+    book_id = env.acervo.book_id
+    with Session(env.engine) as db:
+        db.execute(text("INSERT INTO genres (name, slug) VALUES ('Efêmera', 'efemera')"))
+        db.commit()
+        gid = db.scalar(text("SELECT id FROM genres WHERE slug = 'efemera'"))
+    deleter = Session(env.engine)
+    deleter.execute(text('DELETE FROM genres WHERE id = :id'), {'id': gid})  # sem commit
+    outcome = {}
+
+    def patch():
+        with Session(env.engine) as db:
+            try:
+                BookService(db=db, repository=BookRepository(db)).update_book(
+                    book_id, BookUpdate(genre_ids=[gid]), employee_id=env.acervo.seller_id)
+                outcome['result'] = 'ok'
+            except GenreNotFoundError as error:
+                outcome['result'] = (error.status_code, error.code)
+
+    thread = threading.Thread(target=patch)
+    thread.start()
+    time.sleep(0.8)
+    assert thread.is_alive()  # espera atrás da exclusão pendente (FOR SHARE)
+    deleter.commit()
+    deleter.close()
+    thread.join(10)
+    assert outcome['result'] == (404, 'genre_not_found')
+    assert links(env.engine, book_id) == set()
+
+
+def test_api_genre_changes_are_audited_with_the_employee_and_not_tagged_as_migration(genres_env):
+    env = genres_env
+    book_id = env.acervo.book_id
+    r, f = env.ids['Romance'], env.ids['Fantasia']
+    assert env.http.patch(f'/api/v1/books/{book_id}', json={'genre_ids': [r]}).status_code == 200
+    assert env.http.patch(f'/api/v1/books/{book_id}', json={'genre_ids': [f]}).status_code == 200
+    with env.engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT operation, entity_id, employee_id, coalesce(new_value, old_value) AS value FROM audit_logs "
+            "WHERE entity_type = 'book_genres' AND entity_id LIKE :p ORDER BY id"), {'p': f'{book_id}:%'}).all()
+    assert [(row.operation, row.entity_id) for row in rows] == [
+        ('INSERT', f'{book_id}:{r}'), ('DELETE', f'{book_id}:{r}'), ('INSERT', f'{book_id}:{f}')]
+    assert {row.employee_id for row in rows} == {env.acervo.seller_id}
+    assert all(row.value == {'book_id': book_id, 'genre_id': int(row.entity_id.split(':')[1])} for row in rows)
+    assert all('source' not in row.value for row in rows)  # a migration 0017 só desfaz linhas com `source`
+
+    created = env.http.post('/api/v1/books/', json=create_payload(genre_ids=[r, f])).json()
+    with env.engine.connect() as conn:
+        count = conn.scalar(text("SELECT count(*) FROM audit_logs WHERE entity_type = 'book_genres' "
+                                 "AND operation = 'INSERT' AND entity_id LIKE :p AND employee_id = :e"),
+                            {'p': f"{created['id']}:%", 'e': env.acervo.seller_id})
+    assert count == 2
