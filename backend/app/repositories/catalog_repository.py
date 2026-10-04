@@ -1,4 +1,4 @@
-from sqlalchemy import Select, func, select, text
+from sqlalchemy import Select, func, or_, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.domain import Book, BookGenre, Copy, Employee, Genre
@@ -43,6 +43,25 @@ class CatalogRepository:
             .limit(limit)
         )
         return list(self.db.scalars(statement))
+
+    def find_public_book(self, book_id: int) -> Book | None:
+        return self.db.scalar(self._catalog_books().where(Book.id == book_id))
+
+    def find_free_copies(self, book_id: int) -> list[Copy]:
+        from app.repositories.inventory_availability import free_copies_statement
+        return list(self.db.scalars(free_copies_statement(book_id)))
+
+    def find_free_copy_ids(self, book_ids: list[int]) -> set[int]:
+        from app.repositories.inventory_availability import free_copies_statement
+        return set(self.db.scalars(free_copies_statement().where(
+            Copy.book_id.in_(book_ids),
+        ).with_only_columns(Copy.id)))
+
+    def find_reservable_copy_ids(self, book_ids: list[int]) -> set[int]:
+        from app.repositories.inventory_availability import reservable_commercial_statement
+        return set(self.db.scalars(reservable_commercial_statement().where(
+            Copy.book_id.in_(book_ids),
+        ).with_only_columns(Copy.id)))
 
     @staticmethod
     def _escape_like(value: str) -> str:
@@ -97,19 +116,50 @@ class CatalogRepository:
         genre_id: int,
         page: int,
         page_size: int,
+        q: str | None = None,
     ) -> tuple[list[Book], int]:
         filtered = self._catalog_books().where(
             select(BookGenre.book_id)
             .where(BookGenre.book_id == Book.id, BookGenre.genre_id == genre_id)
             .exists()
         )
+        return self._paginate(filtered, page=page, page_size=page_size, q=q)
+
+    def find_all_books(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        q: str | None = None,
+    ) -> tuple[list[Book], int]:
+        """Acervo público completo: mesma visibilidade do catálogo, paginado."""
+        return self._paginate(self._catalog_books(), page=page, page_size=page_size, q=q)
+
+    def _paginate(
+        self,
+        filtered: Select[tuple[Book]],
+        *,
+        page: int,
+        page_size: int,
+        q: str | None,
+    ) -> tuple[list[Book], int]:
+        if q:
+            pattern = f"%{self._escape_like(q)}%"
+            filtered = filtered.where(
+                or_(
+                    Book.title.ilike(pattern, escape="\\"),
+                    Book.author.ilike(pattern, escape="\\"),
+                )
+            )
 
         total = self.db.scalar(
             select(func.count()).select_from(filtered.order_by(None).subquery())
         )
         items = list(
             self.db.scalars(
-                filtered.order_by(Book.title.asc())
+                # Book.id desempata títulos iguais: sem ele a paginação pode
+                # repetir ou perder obras entre páginas.
+                filtered.order_by(Book.title.asc(), Book.id.asc())
                 .offset((page - 1) * page_size)
                 .limit(page_size)
             )
@@ -153,6 +203,9 @@ class GenreRepository:
             .order_by(Genre.display_order.asc().nulls_last(), Genre.name.asc())
         )
         return list(self.db.scalars(statement))
+
+    def find_all(self) -> list[Genre]:
+        return list(self.db.scalars(select(Genre).order_by(Genre.name.asc(), Genre.id.asc())))
 
     def find_by_slug(self, slug: str) -> Genre | None:
         return self.db.scalar(select(Genre).where(Genre.slug == slug))

@@ -1,0 +1,235 @@
+<section class="page" aria-labelledby="novo-emprestimo-titulo">
+  @switch (step()) {
+    @case ('form') {
+      <p class="page__crumb">LibStock / Novo empréstimo no balcão</p>
+      <h1 id="novo-emprestimo-titulo" tabindex="-1">Novo empréstimo no balcão</h1>
+
+      <div class="block">
+        <h2 class="block__label">Cliente *</h2>
+        @if (client(); as selected) {
+          <div class="selected">
+            <p class="selected__text"><strong>{{ selected.name }}</strong> · {{ selected.email }}</p>
+            <button class="btn" type="button" (click)="changeClient()">Trocar cliente</button>
+          </div>
+          @if (selected.eligible) {
+            <div class="callout callout--ok" role="status">
+              <p class="callout__title">Cliente apto</p>
+              <p>Conta ativa · sem pendências.</p>
+            </div>
+          } @else {
+            <div class="callout callout--danger" role="alert">
+              <p class="callout__title">Cliente não apto para empréstimo</p>
+              <p>{{ selected.name }} está inelegível ({{ ineligibleReasons(selected).join(', ') || 'situação informada pelo sistema' }}). Nenhum empréstimo será registrado. Consulte a pendência ou selecione outro cliente.</p>
+            </div>
+          }
+        } @else {
+          <form class="search" role="search" (submit)="searchClients($event)">
+            <label class="sr-only" for="loan-client">Nome ou e-mail do cliente</label>
+            <input
+              id="loan-client"
+              type="search"
+              maxlength="100"
+              autocomplete="off"
+              placeholder="Buscar por nome ou e-mail"
+              [value]="clientTerm()"
+              [attr.aria-invalid]="clientError() ? 'true' : null"
+              [attr.aria-describedby]="clientError() ? 'loan-client-error' : null"
+              (input)="setClientTerm($event)"
+            />
+            <button class="btn btn--primary" type="submit">Buscar cliente</button>
+          </form>
+          @if (clientError(); as message) {
+            <p class="field__error" id="loan-client-error" role="alert">{{ message }}</p>
+          } @else {
+            <p class="hint">Buscar por nome ou e-mail (mínimo de 2 caracteres).</p>
+          }
+          @if (clientState(); as s) {
+            @switch (s.status) {
+              @case ('loading') { <p class="loading" role="status"><app-spinner /> Buscando clientes…</p> }
+              @case ('error') { <app-alert [message]="s.message" /> }
+              @case ('loaded') {
+                @if (!s.data.length) {
+                  <p class="empty" role="status">Nenhum cliente encontrado. Confira o nome ou o e-mail.</p>
+                } @else {
+                  <ul class="results" aria-label="Clientes encontrados">
+                    @for (item of s.data; track item.id) {
+                      <li class="result" [class.result--blocked]="!item.eligible">
+                        <div>
+                          <p class="result__title">{{ item.name }}</p>
+                          <p class="result__meta">{{ item.email }} · {{ item.eligible ? 'apto' : 'não apto: ' + ineligibleReasons(item).join(', ') }}</p>
+                        </div>
+                        <button class="btn" type="button" (click)="selectClient(item)">Selecionar</button>
+                      </li>
+                    }
+                  </ul>
+                  @if (s.data.length >= clientLimit) {
+                    <p class="note">Mostrando os primeiros {{ clientLimit }} resultados. Refine a busca para localizar outro cliente.</p>
+                  }
+                }
+              }
+            }
+          }
+        }
+      </div>
+
+      <div class="block">
+        <h2 class="block__label">Exemplar *</h2>
+        @if (copy(); as selected) {
+          <div class="selected">
+            <p class="selected__text"><strong>#{{ selected.barcode }}</strong> · {{ selected.book.title }}</p>
+            <button class="btn" type="button" (click)="changeCopy()">Trocar exemplar</button>
+          </div>
+          <p class="hint">Disponível · destinado a empréstimo.</p>
+        } @else {
+          <form class="search" role="search" (submit)="searchCopies($event)">
+            <label class="sr-only" for="loan-copy">Código do exemplar, ISBN ou título</label>
+            <input
+              id="loan-copy"
+              type="search"
+              maxlength="100"
+              autocomplete="off"
+              placeholder="Código do exemplar, ISBN ou título"
+              [value]="copyTerm()"
+              [attr.aria-invalid]="copyError() ? 'true' : null"
+              [attr.aria-describedby]="copyError() ? 'loan-copy-error' : null"
+              (input)="setCopyTerm($event)"
+            />
+            <button class="btn btn--primary" type="submit">Buscar exemplar</button>
+          </form>
+          @if (copyError(); as message) {
+            <p class="field__error" id="loan-copy-error" role="alert">{{ message }}</p>
+          } @else {
+            <p class="hint">Somente exemplares didáticos disponíveis podem ser emprestados.</p>
+          }
+          @if (copyState(); as s) {
+            @switch (s.status) {
+              @case ('loading') { <p class="loading" role="status"><app-spinner /> Buscando exemplares…</p> }
+              @case ('error') {
+                <app-alert [message]="s.message" />
+              }
+              @case ('loaded') {
+                @if (!s.data.length) {
+                  <p class="empty" role="status">Nenhum exemplar encontrado. Confira o código, o ISBN ou o título.</p>
+                } @else {
+                  <ul class="results" aria-label="Exemplares encontrados">
+                    @for (item of s.data; track item.id) {
+                      <li class="result" [class.result--blocked]="!isLoanable(item)">
+                        <div>
+                          <p class="result__title">{{ item.book.title }}</p>
+                          <p class="result__meta">
+                            Exemplar #{{ item.barcode }} ·
+                            @if (isLoanable(item)) { Disponível · destinado a empréstimo }
+                            @else { Não disponível para empréstimo: {{ notLoanableReason(item) }} }
+                          </p>
+                        </div>
+                        <button class="btn" type="button" [disabled]="!isLoanable(item)" (click)="selectCopy(item)">Selecionar</button>
+                      </li>
+                    }
+                  </ul>
+                  @if (s.data.length >= copyLimit) {
+                    <p class="note">Mostrando os primeiros {{ copyLimit }} resultados. Refine a busca para localizar outro exemplar.</p>
+                  }
+                }
+              }
+            }
+          }
+        }
+      </div>
+
+      <div class="card">
+        <h2>Datas do empréstimo</h2>
+        <p class="line">Retirada: hoje · {{ today }}</p>
+        <p class="line">Devolução prevista: calculada automaticamente ao registrar</p>
+        <p class="line">O prazo é de um mês de calendário após o registro.</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn--primary" type="button" [disabled]="!canReview()" (click)="review()">Revisar empréstimo</button>
+        <a class="btn" routerLink="/balcao/emprestimos">Cancelar</a>
+      </div>
+    }
+
+    @case ('review') {
+      <p class="page__crumb">LibStock / Revisar empréstimo</p>
+      <h1 id="novo-emprestimo-titulo" tabindex="-1">Revisar empréstimo</h1>
+      @if (saveFailed()) {
+        <app-save-failure>
+          <a class="btn btn--primary" routerLink="/balcao/emprestimos/ativos">Consultar empréstimos ativos</a>
+          <button class="btn" type="button" (click)="back()">Voltar</button>
+        </app-save-failure>
+      }
+      @if (client(); as c) {
+        @if (copy(); as e) {
+          <div class="card">
+            <h2>Confira antes de entregar</h2>
+            <p class="line">Cliente: {{ c.name }} · {{ c.email }}</p>
+            <p class="line">Livro: {{ e.book.title }} · Exemplar #{{ e.barcode }}</p>
+            <p class="line">Retirada: {{ today }}</p>
+            <p class="line">Devolução prevista: valor calculado pelo sistema ao registrar</p>
+          </div>
+          <div class="callout">
+            <p class="callout__title">Confirmação no balcão</p>
+            <p>Ao confirmar, o empréstimo será registrado e o exemplar ficará Emprestado.</p>
+          </div>
+          <div class="actions">
+            <button class="btn btn--primary" type="button" [disabled]="submitting() || !canReview()" [attr.aria-busy]="submitting()" (click)="confirm()">
+              @if (submitting()) { Confirmando… } @else { Confirmar empréstimo }
+            </button>
+            <button class="btn" type="button" [disabled]="submitting()" (click)="back()">Voltar</button>
+          </div>
+        }
+      }
+    }
+
+    @case ('done') {
+      @if (completed(); as done) {
+        <p class="page__crumb">LibStock / Empréstimo registrado</p>
+        <h1 id="novo-emprestimo-titulo" tabindex="-1">Empréstimo registrado</h1>
+        <div class="callout callout--ok" role="status">
+          <p class="callout__title">Empréstimo registrado com sucesso</p>
+          <p>Entregue o exemplar #{{ done.copy.barcode }} ao cliente.</p>
+        </div>
+        <div class="card">
+          <h2>Dados do empréstimo</h2>
+          <p class="line">{{ done.client.name }} · {{ done.copy.book.title }} · #{{ done.copy.barcode }}</p>
+          <p class="line">Retirada: {{ done.loan.loan_date | date: 'dd/MM/yyyy' : '-0300' }}</p>
+          <p class="line">Devolução prevista: {{ done.loan.due_date | date: 'dd/MM/yyyy' : '-0300' }}</p>
+          <p class="line">Empréstimo nº {{ done.loan.id }}@if (done.loan.status === 'OPEN') { · Status do exemplar: Emprestado }</p>
+        </div>
+        <app-receipt kind="loan" [id]="done.loan.id" />
+        <div class="actions">
+          <button class="btn btn--primary" type="button" (click)="reset()">Novo empréstimo</button>
+          <a class="btn" routerLink="/balcao/emprestimos/ativos">Ver empréstimos ativos</a>
+        </div>
+      }
+    }
+
+    @case ('blocked') {
+      @if (blocked(); as b) {
+        <p class="page__crumb">LibStock / Empréstimo bloqueado</p>
+        <h1 id="novo-emprestimo-titulo" tabindex="-1">Empréstimo bloqueado</h1>
+        <div class="callout callout--danger" role="alert">
+          <p class="callout__title">{{ b.kind === 'client' ? 'Cliente não apto para empréstimo' : 'Exemplar indisponível para empréstimo' }}</p>
+          <p>{{ b.message }}</p>
+          <p>Nenhum empréstimo foi registrado.</p>
+        </div>
+        <div class="card">
+          <h2>Como continuar</h2>
+          @if (b.kind === 'client') {
+            <p class="line">Consulte a pendência e regularize a situação no balcão.</p>
+          }
+          <p class="line">Se o exemplar ficar indisponível durante a confirmação, atualize a seleção antes de tentar novamente.</p>
+        </div>
+        <div class="actions">
+          @if (b.kind === 'client') {
+            <a class="btn btn--primary" routerLink="/balcao/clientes">Consultar pendências</a>
+            <button class="btn" type="button" (click)="chooseAnotherClient()">Selecionar outro cliente</button>
+          } @else {
+            <button class="btn btn--primary" type="button" (click)="refreshSelection()">Atualizar seleção</button>
+            <button class="btn" type="button" (click)="chooseAnotherClient()">Selecionar outro cliente</button>
+          }
+        </div>
+      }
+    }
+  }
+</section>

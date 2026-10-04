@@ -1,22 +1,40 @@
 <main class="details-page">
-  <section class="details-card" aria-labelledby="details-title">
-    <p class="eyebrow">Gestão de usuários</p>
-    <h1 id="details-title">Detalhes do usuário</h1>
+  <a class="back" routerLink="/gestao/usuarios">← Usuários</a>
 
-    @if (loading()) {
-      <div class="state" role="status"><app-spinner /> Carregando usuário…</div>
-    } @else if (error(); as message) {
-      <app-alert [message]="message" variant="error" />
-      <button type="button" (click)="back()">Voltar</button>
-    } @else if (user(); as currentUser) {
+  @if (loading()) {
+    <div class="state" role="status"><app-spinner /> Carregando usuário…</div>
+  } @else if (error(); as message) {
+    <app-alert [message]="message" variant="error" />
+    <button class="button" type="button" (click)="back()">Voltar</button>
+  } @else if (user(); as currentUser) {
+    <header>
+      <h1 id="details-title">{{ currentUser.name }}</h1>
+      <p class="meta">{{ roles(currentUser) }} • {{ currentUser.is_active ? 'Ativo' : 'Inativo' }}</p>
+    </header>
+    <section class="details-card" aria-labelledby="data-title">
+      <h2 id="data-title">Dados do usuário</h2>
       <dl>
         <div><dt>Nome</dt><dd>{{ currentUser.name }}</dd></div>
         <div><dt>E-mail</dt><dd>{{ currentUser.email }}</dd></div>
-        <div><dt>Perfil</dt><dd>{{ currentUser.role_codes.join(', ') }}</dd></div>
+        <div><dt>Perfil</dt><dd>{{ roles(currentUser) }}</dd></div>
         <div><dt>Status</dt><dd>{{ currentUser.is_active ? 'Ativo' : 'Inativo' }}</dd></div>
         <div><dt>Cadastro</dt><dd>{{ currentUser.created_at | date: 'dd/MM/yyyy' }}</dd></div>
       </dl>
-      <button type="button" (click)="back()">Voltar</button>
-    }
-  </section>
+      @if (client(currentUser)) {
+        <app-user-pendencies [userId]="currentUser.id" />
+      } @else {
+        <section aria-labelledby="no-pendencies-title">
+          <h2 id="no-pendencies-title">Pendências</h2>
+          <p class="muted">Pendências se aplicam somente a clientes.</p>
+        </section>
+      }
+      <div class="actions">
+        @if (currentUser.is_active) {
+          <a class="button button--primary" [routerLink]="['/gestao/usuarios', currentUser.id, 'editar']">Editar usuário</a>
+        }
+        <button class="button" type="button" (click)="back()">Voltar</button>
+      </div>
+    </section>
+    <app-user-password-reset [user]="currentUser" />
+  }
 </main>

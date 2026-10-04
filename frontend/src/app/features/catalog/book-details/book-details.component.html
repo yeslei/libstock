@@ -1,0 +1,142 @@
+<main class="book-details">
+  @let view = state();
+  @switch (view.status) {
+    @case ('loading') { <a class="back" routerLink="/">← Voltar ao início</a><p role="status"><app-spinner /> Carregando livro…</p> }
+    @case ('error') { <a class="back" routerLink="/">← Voltar ao início</a><app-alert [message]="view.message" /> }
+    @case ('loaded') {
+      @let book = view.data;
+      @if (blocked(); as block) {
+        <nav class="crumbs" aria-label="Você está em"><a routerLink="/acervo">Explorar acervo</a> / Detalhes do livro</nav>
+        <section class="flow" aria-labelledby="flow-title">
+          <h1 id="flow-title">{{ blockedCopy()!.title }}</h1>
+          <div class="notice notice--error" role="alert"><strong>{{ blockedCopy()!.heading }}</strong><p>{{ block.message }}</p></div>
+          <div class="card">
+            <h2>O que precisa ser regularizado</h2>
+            @for (reason of block.reasons; track reason) { <p>{{ reason }}</p> }
+            @for (item of block.overdue; track item.id) {
+              <p>Empréstimo de {{ item.title }}@if (item.copy_barcode) { · Exemplar #{{ item.copy_barcode }} }</p>
+              <p>Devolução prevista: {{ item.due_date | date:'dd/MM/yyyy' }} · em atraso</p>
+            }
+            <p>Dirija-se ao balcão para regularizar a situação. Após a regularização, {{ blockedCopy()!.retry }}.</p>
+          </div>
+          <div class="actions">
+            <a class="primary" routerLink="/meus-emprestimos">Ver meus empréstimos</a>
+            <button class="secondary" type="button" (click)="backToBook()">Voltar ao livro</button>
+          </div>
+        </section>
+      } @else if (reserveStep() === 'confirm') {
+        <nav class="crumbs" aria-label="Você está em"><a routerLink="/acervo">Explorar acervo</a> / Detalhes do livro</nav>
+        <section class="flow" aria-labelledby="flow-title">
+          <h1 id="flow-title">Confirmar reserva de compra</h1>
+          <div class="card">
+            <h2>Confira sua reserva</h2>
+            <p>Livro: {{ book.title }}</p>
+            <p>Cliente: {{ user()?.name }} · {{ user()?.email }}</p>
+            <p>Modalidade: reserva de compra</p>
+            @let situation = eligibility();
+            @switch (situation.status) {
+              @case ('loading') { <p class="situation" role="status"><app-spinner /> Verificando situação do cliente…</p> }
+              @case ('loaded') {
+                @if (situation.data.eligible) {
+                  <p class="situation situation--ok" role="status">Situação do cliente: apto — conta ativa e sem pendências</p>
+                } @else {
+                  <div class="situation situation--blocked" role="alert">
+                    <p>Situação do cliente: inapto</p>
+                    <ul>@for (reason of situation.data.reasons; track reason.code) { <li>{{ reason.message }}</li> }</ul>
+                    <p>Dirija-se ao balcão para regularizar a situação.</p>
+                  </div>
+                }
+              }
+              @case ('error') { <p class="situation" role="status">{{ situation.message }} O envio confirma a situação.</p> }
+            }
+          </div>
+          <div class="notice notice--info"><strong>Como funciona a fila</strong><p>Sua posição será informada após o registro. A compra será finalizada presencialmente quando houver disponibilidade.</p></div>
+          <div class="actions">
+            <button class="primary" type="button" (click)="confirmReservation(book)" [disabled]="purchasing() || reservationBlocked()" [attr.aria-busy]="purchasing()">{{ purchasing() ? 'Reservando…' : 'Confirmar reserva' }}</button>
+            <button class="secondary" type="button" (click)="backToBook()" [disabled]="purchasing()">Voltar</button>
+          </div>
+        </section>
+      } @else if (reserveStep() === 'done') {
+        <nav class="crumbs" aria-label="Você está em"><a routerLink="/acervo">Explorar acervo</a> / Detalhes do livro</nav>
+        <section class="flow" aria-labelledby="flow-title">
+          <h1 id="flow-title">Reserva registrada</h1>
+          <div class="notice notice--success" role="status"><strong>Reserva de compra registrada</strong>@if (queuePosition(); as position) { <p>Você está em {{ position }}º lugar na fila de {{ book.title }}.</p> }</div>
+          <div class="card">
+            <h2>Acompanhe os próximos passos</h2>
+            <p>Status: aguardando disponibilidade</p>
+            <p>Consulte Minhas reservas para ver sua posição e, quando disponível, o prazo de retirada.</p>
+            <p>A reserva não registra uma venda nem reduz o estoque.</p>
+          </div>
+          <div class="actions">
+            <a class="primary" routerLink="/minhas-reservas">Ver minhas reservas</a>
+            <button class="secondary" type="button" (click)="backToBook()">Voltar ao livro</button>
+          </div>
+        </section>
+      } @else {
+      <a class="back" routerLink="/">← Voltar ao início</a>
+      <div class="book-layout">
+        @if (book.cover_url && !coverFailed()) {
+          <img class="cover" [src]="book.cover_url" [alt]="'Capa de ' + book.title" width="290" height="450" (error)="coverFailed.set(true)" />
+        } @else { <div class="cover cover--empty" aria-label="Capa não disponível">Capa não disponível</div> }
+        <section class="book-content" aria-labelledby="book-title">
+          <h1 id="book-title">{{ book.title }}</h1>
+          <p class="author">{{ book.author }}</p>
+          <p class="metadata">{{ book.genres.join(' · ') || 'Categoria não informada' }} <span aria-hidden="true"> · </span> ISBN {{ book.isbn || 'não informado' }}</p>
+          <div class="availability">
+            <h2>Disponibilidade</h2>
+            <details class="modality" [open]="openModality(book) === 'loan'">
+              <summary><span>Empréstimo <small>{{ countLabel(book.availability.loan.available_count) }}</small></span><span class="chevron" aria-hidden="true">⌄</span></summary>
+              <div class="modality-content">
+                @if (book.availability.loan.available) {
+                  @if (error(); as message) { <app-alert [message]="message" />@if (duplicateLink(errorCode()); as link) { <p><a [routerLink]="link">Acompanhar em Meus empréstimos →</a></p> } }
+                  <form (submit)="submit($event, book)">
+                    <div class="dates">
+                      <label for="pickup-date">Data de retirada<input id="pickup-date" type="date" required [min]="today()" [max]="'9998-12-31'" [value]="pickupDate()" (input)="pickupDate.set($any($event.target).value)" [disabled]="submitting() || requested()" /></label>
+                      <label for="due-date">Devolução prevista<input id="due-date" type="date" [value]="dueDate()" readonly aria-describedby="due-hint" /><small id="due-hint">Calculada automaticamente: 1 mês após a retirada.</small></label>
+                    </div>
+                    <button class="primary" type="submit" [disabled]="submitting() || requested()" [attr.aria-busy]="submitting()">{{ submitting() ? 'Enviando…' : requested() ? 'Solicitação enviada' : 'Confirmar solicitação' }}</button>
+                    <p class="hint">A solicitação fica pendente de confirmação da retirada.</p>
+                    @if (requested()) { <a routerLink="/meus-emprestimos">Acompanhar em Meus empréstimos →</a> }
+                  </form>
+                } @else { <p>Não há exemplares disponíveis para empréstimo no momento.</p> }
+              </div>
+            </details>
+            <details class="modality" [open]="openModality(book) === 'sale'">
+              <summary><span>Venda <small>{{ countLabel(book.availability.sale.available_count, ' para compra') }}</small></span><span class="chevron" aria-hidden="true">⌄</span></summary>
+              <div class="modality-content">
+                @if (book.availability.sale.price !== null) { <p>A partir de {{ book.availability.sale.price | currency:'BRL':'symbol':'1.2-2' }}</p> }
+                @if (book.availability.sale.available) {
+                  @if (purchaseError(); as message) { <app-alert [message]="message" />@if (duplicateLink(errorCode()); as link) { <p><a [routerLink]="link">Acompanhar em Minhas reservas →</a></p> } }
+                  <form class="purchase-form" (submit)="submitPurchase($event, book)">
+                    <div class="dates">
+                      <label for="purchase-date">Data pretendida de retirada<input id="purchase-date" type="date" required [min]="today()" [max]="purchaseMax()" [value]="purchaseDate()" (input)="purchaseDate.set($any($event.target).value)" [disabled]="purchasing() || purchaseRequested()" /></label>
+                      <div><p>A compra será finalizada presencialmente no balcão.</p><p class="hint">Na retirada, informe seu e-mail cadastrado. A retirada deve ocorrer em até 5 dias corridos.</p></div>
+                    </div>
+                    <button class="primary" type="submit" [disabled]="purchasing() || purchaseRequested()" [attr.aria-busy]="purchasing()">{{ purchasing() ? 'Enviando…' : purchaseRequested() ? 'Solicitação enviada' : 'Confirmar solicitação de compra' }}</button>
+                  </form>
+                } @else {
+                  <p>Venda · Esgotado — nenhum exemplar comercial disponível.</p>
+                  @if (book.availability.sale.can_reserve) {
+                    @if (purchaseError(); as message) { <app-alert [message]="message" />@if (duplicateLink(errorCode()); as link) { <p><a [routerLink]="link">Acompanhar em Minhas reservas →</a></p> } }
+                    <div class="notice notice--info"><strong>Você pode entrar na fila de compra</strong><p>A reserva não conclui uma compra. Quando houver um exemplar disponível, você poderá finalizar a compra no balcão.</p></div>
+                    <button class="primary" type="button" (click)="startReservation(book)" [disabled]="purchasing() || purchaseRequested()" [attr.aria-busy]="purchasing()">{{ purchasing() ? 'Verificando…' : purchaseRequested() ? 'Reserva enviada' : 'Reservar compra' }}</button>
+                  }
+                }
+                @if (purchaseRequested()) { <p><a routerLink="/minhas-reservas">Acompanhar em Minhas reservas →</a></p> }
+              </div>
+            </details>
+            <details class="modality">
+              <summary><span>Consulta local <small>{{ book.availability.local_consultation.configured ? (book.availability.local_consultation.available ? 'Disponível na biblioteca' : 'Indisponível') : 'Consulta local não configurada' }}</small></span><span class="chevron" aria-hidden="true">⌄</span></summary>
+              <div class="modality-content">
+                @if (book.availability.local_consultation.configured) { <p>Consulta local: leitura presencial na biblioteca.</p> }
+                @else { <p>Esta modalidade ainda não está configurada.</p> }
+              </div>
+            </details>
+          </div>
+        </section>
+      </div>
+      }
+    }
+  }
+</main>
+<app-snackbar />

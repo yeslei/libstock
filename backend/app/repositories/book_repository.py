@@ -1,7 +1,22 @@
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.domain import Book, Copy, CopyStatus, Employee
+from app.models.domain import (
+    Book,
+    Copy,
+    CopyStatus,
+    Employee,
+    Loan,
+    LoanStatus,
+    Profile,
+    PurchaseReservation,
+    ReservationStatus,
+)
+from app.models.loan_request import LoanRequest
+from app.models.user import User
+from app.repositories.reservation_expiry import expire_due_reservations
 from app.schemas.book_schema import BookCreate, BookUpdate, InitialCopyCreate
 
 
@@ -11,8 +26,18 @@ class BookRepository:
 
     def employee_exists(self, employee_id: int) -> bool:
         # Employee.id -> Profile.id -> User.id; as PKs/FKs compartilhadas, o ID
-        # do usuário autenticado precisa existir exatamente em employees.
-        return self.db.get(Employee, employee_id) is not None
+        # do usuário autenticado precisa existir exatamente em employees e o
+        # funcionário (perfil e usuário) precisa estar ativo (Issue #151).
+        return self.db.scalar(
+            select(Employee.id)
+            .join(Profile, Profile.id == Employee.id)
+            .join(User, User.id == Employee.id)
+            .where(
+                Employee.id == employee_id,
+                Profile.is_active.is_(True),
+                User.is_active.is_(True),
+            )
+        ) is not None
 
     def find_by_id(self, book_id: int) -> Book | None:
         return self.db.get(Book, book_id)
@@ -22,6 +47,11 @@ class BookRepository:
 
     def find_by_isbn_except(self, isbn: str, book_id: int) -> Book | None:
         return self.db.scalar(select(Book).where(Book.isbn == isbn, Book.id != book_id))
+
+    def has_active_copy(self, book_id: int) -> bool:
+        return self.db.scalar(
+            select(Copy.id).where(Copy.book_id == book_id, Copy.is_active.is_(True)).limit(1)
+        ) is not None
 
     def get_with_copies(self, book_id: int) -> Book | None:
         return self.db.scalar(
@@ -83,3 +113,97 @@ class BookRepository:
             )
             .all()
         )
+
+    def lock_book_for_inactivation(self, book_id: int, now: datetime) -> Book | None:
+        """Trava o livro, expira as reservas vencidas e trava os exemplares (livro, reservas, exemplares),
+        serializando com empréstimos, vendas e destinações concorrentes."""
+        book = self.db.scalar(
+            select(Book)
+            .where(Book.id == book_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if book is not None:
+            expire_due_reservations(self.db, book_id, now)
+        self.db.execute(
+            select(Copy.id).where(Copy.book_id == book_id).order_by(Copy.id).with_for_update()
+        )
+        return book
+
+    def active_operation_counts(self, book_id: int) -> dict[str, int]:
+        return {
+            "open_loans": self.db.scalar(
+                select(func.count())
+                .select_from(Loan)
+                .join(Copy, Copy.id == Loan.copy_id)
+                .where(Copy.book_id == book_id, Loan.status == LoanStatus.OPEN)
+            ),
+            "pending_loan_requests": self.db.scalar(
+                select(func.count())
+                .select_from(LoanRequest)
+                .where(LoanRequest.book_id == book_id, LoanRequest.loan_id.is_(None))
+            ),
+            "purchase_reservations": self.db.scalar(
+                select(func.count())
+                .select_from(PurchaseReservation)
+                .where(
+                    PurchaseReservation.book_id == book_id,
+                    PurchaseReservation.status.in_(
+                        [ReservationStatus.WAITING, ReservationStatus.NOTIFIED]
+                    ),
+                )
+            ),
+        }
+
+    def active_operation_links(
+        self, book_id: int, limit: int = 10, *, include_clients: bool = False
+    ) -> list[dict]:
+        """Vínculos legíveis (código do exemplar e cliente) para a tela de bloqueio."""
+        links: list[dict] = []
+        loans = self.db.execute(
+            select(Copy.barcode, User.name)
+            .select_from(Loan)
+            .join(Copy, Copy.id == Loan.copy_id)
+            .join(User, User.id == Loan.client_id)
+            .where(Copy.book_id == book_id, Loan.status == LoanStatus.OPEN)
+            .order_by(Loan.id)
+            .limit(limit)
+        )
+        links += [
+            {"type": "open_loan", "copy_barcode": barcode, "client_name": name}
+            for barcode, name in loans
+        ]
+        requests = self.db.execute(
+            select(User.name)
+            .select_from(LoanRequest)
+            .join(User, User.id == LoanRequest.client_id)
+            .where(LoanRequest.book_id == book_id, LoanRequest.loan_id.is_(None))
+            .order_by(LoanRequest.id)
+            .limit(limit)
+        )
+        links += [
+            {"type": "pending_loan_request", "copy_barcode": None, "client_name": name}
+            for (name,) in requests
+        ]
+        reservations = self.db.execute(
+            select(Copy.barcode, User.name)
+            .select_from(PurchaseReservation)
+            .join(User, User.id == PurchaseReservation.client_id)
+            .outerjoin(Copy, Copy.id == PurchaseReservation.allocated_copy_id)
+            .where(
+                PurchaseReservation.book_id == book_id,
+                PurchaseReservation.status.in_(
+                    [ReservationStatus.WAITING, ReservationStatus.NOTIFIED]
+                ),
+            )
+            .order_by(PurchaseReservation.id)
+            .limit(limit)
+        )
+        links += [
+            {"type": "purchase_reservation", "copy_barcode": barcode, "client_name": name}
+            for barcode, name in reservations
+        ]
+        if not include_clients:
+            for link in links:
+                link.pop("client_name")
+        return links

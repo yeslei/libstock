@@ -1,0 +1,69 @@
+<section class="page" aria-labelledby="devolucao-titulo">
+  <p class="page__crumb">Devoluções / Registrar devolução</p>
+  <h1 id="devolucao-titulo">Registrar devolução</h1>
+
+  <form class="search" role="search" (submit)="search($event)">
+    <label class="sr-only" for="return-q">Código do exemplar ou ISBN</label>
+    <input
+      id="return-q"
+      type="search"
+      maxlength="100"
+      placeholder="Código do exemplar ou ISBN"
+      [value]="term()"
+      [attr.aria-invalid]="missingTerm()"
+      [attr.aria-describedby]="missingTerm() ? 'return-q-error' : null"
+      (input)="setTerm($event)"
+    />
+    <button class="btn btn--primary" type="submit">Buscar</button>
+  </form>
+  @if (missingTerm()) {
+    <p class="field__error" id="return-q-error" role="alert">Informe o código do exemplar ou o ISBN.</p>
+  }
+
+  @if (returnedLoanId(); as loanId) {
+    <app-receipt kind="return" [id]="loanId" [closable]="true" [focusOnLoad]="true" (closed)="returnedLoanId.set(null)" />
+  }
+
+  @if (flow.saveFailed()) {
+    <app-save-failure>
+      <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>
+      <button class="btn" type="button" (click)="flow.saveFailed.set(false)">Voltar</button>
+    </app-save-failure>
+  }
+
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') { <p class="loading" role="status"><app-spinner /> Buscando empréstimo…</p> }
+      @case ('error') {
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        @if (!s.data.length) {
+          <p class="empty" role="status">Nenhum empréstimo ativo encontrado para “{{ searched() }}”. Confira o código do exemplar ou o ISBN.</p>
+        } @else {
+          <ul class="results">
+            @for (loan of s.data; track loan.id) {
+              <li>
+                <article class="card result" [class.card--danger]="loan.status === 'OVERDUE'" [attr.aria-labelledby]="'loan-' + loan.id">
+                  <div>
+                    <h2 [id]="'loan-' + loan.id">{{ loan.book.title }}</h2>
+                    <p class="result__copy">Exemplar {{ loan.copy_barcode }}</p>
+                    <p>Cliente: {{ loan.client.name }} ({{ loan.client.email }})</p>
+                    <p>Devolução prevista: {{ loan.due_date | date: 'dd/MM/yyyy' : '-0300' }}
+                      @if (loan.status === 'OVERDUE') { <span class="badge badge--danger">Atrasado há {{ loan.days_late }} dia(s)</span> }
+                    </p>
+                  </div>
+                  <button class="btn btn--primary" type="button" [disabled]="flow.submitting()" (click)="confirmReturn(loan)">Confirmar devolução</button>
+                </article>
+              </li>
+            }
+          </ul>
+        }
+      }
+    }
+  }
+
+  @if (flow.confirming(); as c) {
+    <app-confirm-dialog [title]="c.title" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="flow.submitting()" (confirmed)="flow.confirm()" (cancelled)="flow.cancel()" />
+  }
+</section>

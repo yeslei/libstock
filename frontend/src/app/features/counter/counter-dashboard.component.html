@@ -1,0 +1,35 @@
+<section class="dash" aria-labelledby="painel-titulo">
+  <h1 id="painel-titulo">Painel</h1>
+  <p class="dash__intro">Acesso rápido às operações da biblioteca.</p>
+
+  <ul class="dash__grid dash__grid--access">
+    @for (item of access; track item.route) {
+      <li>
+        <a class="card card--access" [routerLink]="item.route">
+          <span class="card__title">{{ item.title }}</span>
+          <span class="card__text">{{ item.description }}</span>
+          <span class="card__link">Acessar <span aria-hidden="true">→</span></span>
+        </a>
+      </li>
+    }
+  </ul>
+
+  @if (state(); as s) {
+    @if (s.status === 'error') {
+      <div class="dash__feedback">
+        <app-alert [message]="s.message">
+          <button class="dash__retry" type="button" (click)="reload()">Tentar novamente</button>
+        </app-alert>
+      </div>
+    }
+
+    <ul class="dash__grid dash__grid--indicators" aria-label="Indicadores" [attr.aria-busy]="s.status === 'loading'">
+      @for (item of indicators; track item.key) {
+        <li class="card card--indicator">
+          <span class="card__value">{{ value(s, item.key) }}</span>
+          <span class="card__label">{{ item.label }}</span>
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -1,9 +1,17 @@
 class ApplicationError(Exception):
-    def __init__(self, message: str, code: str, status_code: int) -> None:
+    def __init__(
+        self,
+        message: str,
+        code: str,
+        status_code: int,
+        details: dict | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.code = code
         self.status_code = status_code
+        # Dados estruturados opcionais (ex.: motivos de um bloqueio de domínio).
+        self.details = details
 
 
 class DuplicateEmailError(ApplicationError):
@@ -245,3 +253,129 @@ class ClientPenaltyPersistenceError(ApplicationError):
             "client_penalty_persistence_error",
             500,
         )
+
+
+class CopyWithoutPriceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O exemplar comercial não tem preço de venda cadastrado.",
+            "copy_without_price",
+            409,
+        )
+
+
+class BookInactiveError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "A obra do exemplar está inativa e não aceita novas operações.",
+            "book_inactive",
+            409,
+        )
+
+
+class CopyReservedError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O exemplar está destinado a uma reserva de compra dentro do prazo de retirada.",
+            "copy_reserved",
+            409,
+        )
+
+
+class CopyNotFoundError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Exemplar não encontrado.", "copy_not_found", 404)
+
+
+class CopyDeletionBlockedError(ApplicationError):
+    """Exclusão de exemplar bloqueada. O código é o do primeiro motivo.
+
+    Os motivos possíveis são `copy_not_available`, `copy_has_history` e
+    `last_active_copy`; todos seguem em `details["reasons"]`.
+    """
+
+    def __init__(self, reasons: list[dict], history: dict[str, int]) -> None:
+        message = "Exclusão bloqueada: " + " ".join(reason["message"] for reason in reasons)
+        super().__init__(
+            message,
+            reasons[0]["code"],
+            409,
+            {"reasons": reasons, "history": history},
+        )
+
+
+class CopyDeletionPersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível excluir o exemplar. Nada foi alterado.",
+            "copy_delete_persistence_error",
+            500,
+        )
+
+
+class BookHasActiveOperationsError(ApplicationError):
+    def __init__(self, counts: dict[str, int], links: list[dict]) -> None:
+        super().__init__(
+            "A obra possui operações em andamento e não pode ser inativada.",
+            "book_has_active_operations",
+            409,
+            {"counts": counts, "links": links},
+        )
+
+
+class CopyNotForLoanError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Somente exemplares didáticos podem ser emprestados.", "copy_not_for_loan", 409)
+
+
+class BookWithoutActiveCopyError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "A obra não pode ser reativada sem ao menos um exemplar ativo.",
+            "book_without_active_copy",
+            409,
+        )
+
+
+class CopyUpdateBlockedError(ApplicationError):
+    """Edição/conversão de exemplar bloqueada. O código é o do primeiro motivo.
+
+    Os motivos possíveis são `copy_inactive`, `copy_not_available`,
+    `copy_allocated` e `copy_in_operation`; todos seguem em `details["reasons"]`.
+    """
+
+    def __init__(self, reasons: list[dict]) -> None:
+        message = "Edição bloqueada: " + " ".join(reason["message"] for reason in reasons)
+        super().__init__(message, reasons[0]["code"], 409, {"reasons": reasons})
+
+
+class CopySalePriceRequiredError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Exemplar destinado à venda exige preço de venda maior que zero.",
+            "copy_sale_price_required",
+            422,
+        )
+
+
+class CopySalePriceNotAllowedError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Exemplar didático não pode ter preço de venda.",
+            "copy_sale_price_not_allowed",
+            422,
+        )
+
+
+class CopyUpdatePersistenceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Não foi possível atualizar o exemplar. Nada foi alterado.",
+            "copy_update_persistence_error",
+            500,
+        )
+
+
+# SQLSTATEs próprios do gatilho `guard_copy_integrity` (migration 20261003_0014).
+SQLSTATE_COPY_DESTINATION_FORBIDDEN = "LS001"
+SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE = "LS002"

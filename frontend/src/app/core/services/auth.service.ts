@@ -24,6 +24,7 @@ export class AuthService {
    * (o backend rotaciona o refresh token e revoga a família em caso de reuso).
    */
   private refreshInFlight: Observable<AuthSession> | null = null;
+  private sessionGeneration = 0;
 
   readonly user$ = this.store.user$;
   readonly isAuthenticated$ = this.store.isAuthenticated$;
@@ -33,9 +34,12 @@ export class AuthService {
   }
 
   login(payload: LoginRequest): Observable<AuthSession> {
+    const generation = ++this.sessionGeneration;
     return this.http
       .post<AuthSession>(`${AUTH_API}/login`, payload, { withCredentials: true })
-      .pipe(tap((session) => this.store.setSession(session.access_token, session.user)));
+      .pipe(tap((session) => {
+        if (generation === this.sessionGeneration) this.store.setSession(session.access_token, session.user);
+      }));
   }
 
   /**
@@ -47,14 +51,17 @@ export class AuthService {
   }
 
   refresh(): Observable<AuthSession> {
+    const generation = this.sessionGeneration;
     this.refreshInFlight ??= this.http
       .post<AuthSession>(`${AUTH_API}/refresh`, null, { withCredentials: true })
       .pipe(
-        tap((session) => this.store.setSession(session.access_token, session.user)),
+        tap((session) => {
+          if (generation === this.sessionGeneration) this.store.setSession(session.access_token, session.user);
+        }),
         catchError((error: unknown) => {
           // 401 aqui significa cookie ausente, expirado ou reutilizado — o
           // backend já revogou a família de sessões. Só resta limpar o estado.
-          this.store.clear();
+          if (generation === this.sessionGeneration) this.store.clear();
           return throwError(() => error);
         }),
         finalize(() => (this.refreshInFlight = null)),
@@ -65,34 +72,38 @@ export class AuthService {
   }
 
   logout(): Observable<void> {
+    const generation = ++this.sessionGeneration;
     return this.http
       .post<MessageResponse>(`${AUTH_API}/logout`, null, { withCredentials: true })
       .pipe(
         // A sessão local cai mesmo se a chamada falhar: manter o usuário
         // "logado" após um pedido explícito de saída seria pior.
         catchError(() => of(null)),
-        finalize(() => this.store.clear()),
+        finalize(() => { if (generation === this.sessionGeneration) this.store.clear(); }),
         map(() => undefined),
       );
   }
 
   /** Encerra todas as sessões do usuário. Exige `Authorization: Bearer`. */
   logoutAll(): Observable<void> {
+    const generation = ++this.sessionGeneration;
     return this.http
       .post<MessageResponse>(`${AUTH_API}/logout-all`, null, { withCredentials: true })
       .pipe(
         catchError(() => of(null)),
-        finalize(() => this.store.clear()),
+        finalize(() => { if (generation === this.sessionGeneration) this.store.clear(); }),
         map(() => undefined),
       );
   }
 
   /**
-   * Executada no boot pelo APP_INITIALIZER. Se houver cookie de refresh válido,
+   * Executada em segundo plano no boot e aguardada pelos guards. Se houver cookie de refresh válido,
    * a sessão é recuperada; caso contrário o app simplesmente inicia deslogado.
    */
+  private sessionRestoration: Promise<void> | null = null;
+
   restoreSession(): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return this.sessionRestoration ??= new Promise<void>((resolve) => {
       this.refresh()
         .pipe(catchError(() => of(null)))
         .subscribe({ next: () => resolve(), error: () => resolve() });

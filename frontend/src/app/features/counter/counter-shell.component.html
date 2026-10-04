@@ -1,0 +1,33 @@
+<div class="shell">
+  <button
+    type="button"
+    class="shell__toggle"
+    aria-controls="counter-menu"
+    [attr.aria-expanded]="menuOpen()"
+    (click)="toggleMenu()"
+  >{{ menuOpen() ? 'Fechar menu' : 'Menu do balcão' }}</button>
+
+  <aside class="shell__side" id="counter-menu" [class.shell__side--open]="menuOpen()">
+    <p class="shell__brand">LibStock</p>
+    <nav aria-label="Navegação do balcão">
+      <ul>
+        @for (item of navigation; track item.route) {
+          <li>
+            <a
+              class="shell__link"
+              [routerLink]="item.route"
+              routerLinkActive="shell__link--active"
+              ariaCurrentWhenActive="page"
+              [routerLinkActiveOptions]="{ exact: item.exact }"
+            >{{ item.label }}</a>
+          </li>
+        }
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="shell__main" id="balcao-conteudo">
+    <router-outlet />
+  </main>
+</div>
+<app-snackbar />

@@ -125,13 +125,11 @@ Pode:
 * consultar clientes;
 * atualizar dados permitidos de clientes;
 * consultar pendências;
-* inativar clientes, quando autorizado pela regra de negócio.
+* inativar clientes, quando autorizado pela regra de negócio;
+* administrar o acervo (decisão de 2026-10-03, Issue #151): cadastrar, editar, inativar e reativar obras; incluir, editar, converter destinação e excluir exemplares.
 
 Não pode:
 
-* cadastrar ou editar obras;
-* gerenciar exemplares;
-* alterar destinação;
 * cadastrar funcionários;
 * alterar papéis;
 * executar venda, empréstimo ou devolução na V1;
@@ -160,12 +158,12 @@ Não pode:
 * alterar papéis;
 * consultar auditoria;
 * executar operações transacionais da V2;
-* converter exemplar didático em comercial quando a trigger `guard_copy_integrity` exigir administrador.
+* executar operações transacionais da V2 reservadas ao balcão.
 
-A definição inicial da destinação é diferente da conversão posterior:
+A definição inicial da destinação e a conversão posterior seguem a mesma lista de papéis (migration `20261003_0014`, que ajustou o gatilho `guard_copy_integrity`, antes restrito a `ADMINISTRATOR`):
 
-* no cadastro: `STOCK_KEEPER` e `ADMINISTRATOR`;
-* na conversão de exemplar existente: somente `ADMINISTRATOR`, enquanto essa for a regra vigente no banco.
+* no cadastro: `SELLER`, `STOCK_KEEPER` e `ADMINISTRATOR`;
+* na conversão de exemplar existente (somente exemplar disponível, ativo e sem operação em andamento): `SELLER`, `STOCK_KEEPER` e `ADMINISTRATOR`.
 
 ### 4.5 `ADMINISTRATOR` — Gerente/Dono
 
@@ -200,16 +198,19 @@ Não pode, na V1:
 | Cadastrar/editar clientes   |    Não    |   Não  | Condicional |       Não      |       Sim       |
 | Consultar pendências        |    Não    |   Não  |     Sim     |       Não      |       Sim       |
 | Alterar penalidade          |    Não    |   Não  | Condicional |       Não      |       Sim       |
-| Cadastrar obras             |    Não    |   Não  |     Não     |       Sim      |       Sim       |
-| Editar obras                |    Não    |   Não  |     Não     |       Sim      |       Sim       |
-| Inativar obras              |    Não    |   Não  |     Não     |   Condicional  |       Sim       |
-| Cadastrar exemplares        |    Não    |   Não  |     Não     |       Sim      |       Sim       |
-| Editar exemplares           |    Não    |   Não  |     Não     |       Sim      |       Sim       |
-| Definir destinação inicial  |    Não    |   Não  |     Não     |       Sim      |       Sim       |
-| Converter destinação        |    Não    |   Não  |     Não     |       Não      |       Sim       |
+| Cadastrar obras             |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
+| Editar obras                |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
+| Inativar e reativar obras   |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
+| Cadastrar exemplares        |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
+| Editar exemplares           |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
+| Excluir exemplares          |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
+| Definir destinação inicial  |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
+| Converter destinação        |    Não    |   Não  |     Sim     |       Sim      |       Sim       |
 | Gerenciar funcionários      |    Não    |   Não  |     Não     |       Não      |       Sim       |
 | Atribuir papéis             |    Não    |   Não  |     Não     |       Não      |       Sim       |
 | Consultar auditoria         |    Não    |   Não  |     Não     |       Não      |        V3       |
+
+Decisão delegada pelo responsável em 2026-10-03 (Issue #147, decisão 6; implementada na Issue #151): como o LibStock é um ERP de biblioteca em que os vendedores administram a operação, `SELLER` também administra o acervo (cadastrar, editar, inativar e reativar obra; incluir, editar/converter e excluir exemplar), com as mesmas regras de integridade dos demais papéis. Gestão de usuários, funcionários e papéis continua exclusiva do `ADMINISTRATOR`. Fonte: [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 5.
 
 “Condicional” significa que a ação somente pode ser apresentada como funcional depois que sua regra e seu endpoint estiverem confirmados.
 
@@ -384,8 +385,9 @@ Criação e edição reutilizam o mesmo template. Drawers, modais, confirmaçõe
 
 Na gestão de usuários, o botão “Cadastrar novo usuário” conduz à tela de
 cadastro já existente em `/gestao/funcionarios`. Não existe a rota
-`/gestao/usuarios/novo`. A exclusão definitiva permanece pendente e deve ser
-mostrada desabilitada; a inativação é a ação operacional disponível.
+`/gestao/usuarios/novo`. A exclusão definitiva permanece pendente e, seguindo a
+referência da Issue #131, não é mais exibida na listagem; a inativação é a ação
+operacional disponível e fica na tela de edição, com confirmação.
 
 ## 11. Navegação por papel
 
@@ -408,6 +410,7 @@ mostrada desabilitada; a inativação é a ação operacional disponível.
 
 * Painel;
 * Explorar;
+* Balcão (V2, `/balcao`);
 * Clientes;
 * Perfil;
 * Sair.
@@ -544,7 +547,7 @@ A V1 estará coerente com os papéis quando:
 * proteger rotas e operações no frontend e backend;
 * apresentar navegação diferente por capacidade;
 * permitir que o administrador herde as capacidades internas;
-* impedir que o estoquista converta destinação sem autorização;
+* impedir que cliente converta destinação ou administre o acervo;
 * restringir gestão de funcionários ao administrador;
 * permitir que vendedor e administrador consultem clientes;
 * diferenciar obra de exemplar;
@@ -556,12 +559,104 @@ A V1 estará coerente com os papéis quando:
 
 | Papel | Item na navegação | Rota | Backend | Estado |
 |---|---|---|---|---|
-| Todos | Início / Explorar livros | `/`, `/explorar` | `/api/v1/catalog/*` | Funcional |
+| Todos | Início / Explorar livros | `/`, `/acervo`, `/explorar` | `/api/v1/catalog/*` | Funcional |
 | `USER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
 | `SELLER` | Meu painel | `/painel` | sessão de autenticação | Funcional |
+| `SELLER`, `ADMINISTRATOR` | Balcão (V2) | `/balcao` | `/api/v1/staff/*` (consultas e confirmações V2), `/api/v1/staff/clients/{id}/pendencies` | Funcional |
 | `STOCK_KEEPER` | Cadastrar exemplar | `/gestao/acervo` | `/api/v1/books/*`, `/api/v1/copies/` | Funcional |
+| `SELLER` | Cadastrar obra e exemplar | `/obras/nova`, `/obras/:id/exemplares/novo` e Acervo do balcão | `/api/v1/books/*`, `/api/v1/copies/*` | Funcional (Issue #151) |
 | `ADMINISTRATOR` | Cadastrar exemplar / Gestão de usuários | `/gestao/acervo`, `/gestao/usuarios` | acervo e usuários | Funcional |
 
 Venda, empréstimo, devolução e reserva permanecem planejados. Como ainda não
 possuem controllers e services transacionais completos, não aparecem como
 botões operacionais na navbar nem nos cards do catálogo.
+
+### Balcão V2 (`/balcao`) — Issue #122
+
+Área operacional da V2, separada das operações transacionais antigas da V1 (que seguem como planejadas nesta matriz). Aparece na navbar e no painel apenas para `SELLER` e `ADMINISTRATOR`. A área segue os frames "Funcionário" do Figma (arquivo `gjM1ugpgfNOl5tjngzH65P`, página "LibStock — UX V2"): menu lateral de 250px (Painel, Acervo, Clientes, Empréstimos, Devoluções, Vendas, Reservas) que vira menu recolhível em telas menores. Cada alteração abre diálogo de confirmação, bloqueia envio duplicado e recarrega a lista após a resposta do backend. A destinação vai para a primeira reserva elegível da fila: cliente inelegível mantém a posição e a interface explica o bloqueio (Issue #150).
+
+Mapa frame → rota (estado atual):
+
+| Frame Figma | Rota | Situação |
+| --- | --- | --- |
+| Funcionário / Painel (3:133) | `/balcao/painel` | Conforme o frame; indicadores de `GET /api/v1/staff/dashboard` |
+| Funcionário / Empréstimos / Início (20:2) | `/balcao/emprestimos` | Conforme o frame |
+| Funcionário / Empréstimos / Solicitações de retirada (19:2) | `/balcao/emprestimos/solicitacoes` | Conforme o frame; "Fila desta obra" omitida (sem dado de fila de empréstimo no backend); notas "DEvs" do frame não são UI |
+| Funcionário / Acervo (14:2) | `/balcao/acervo` | Conforme o frame: busca por título, autor ou ISBN, tabela e "Ver obra"; "+ Nova obra" (`/obras/nova`) só para quem o backend autoriza; nota "DEV" do frame não é UI |
+| Funcionário / Acervo / Detalhes da obra (8:81) e Exemplares | `/balcao/acervo/:id` | Dados da obra, categoria e exemplares com finalidade/status reais; "Editar obra", "Salvar alteração", "Inativar obra" e, em obra inativa, "Reativar obra" para SELLER/STOCK_KEEPER/MANAGER/ADMINISTRATOR, com confirmação; por exemplar, "Editar" (painel "Editando exemplar": finalidade, preço de venda, condição; código imutável) e "Excluir exemplar" para SELLER/STOCK_KEEPER/ADMINISTRATOR (decisões delegadas de 2026-10-03, Issues #135, #147 e #151). Divergências: sem rádio Didático/Comercial da obra (destinação é por exemplar); o painel fica abaixo da lista, sem o campo Status; ver BUSINESS_RULES, seção 21 |
+| Funcionário / Empréstimos / Ativos (19:35) | `/balcao/emprestimos/ativos` | Conforme o frame: busca por cliente, e-mail, obra ou exemplar, contador "x ativos • x atrasados", tabela somente leitura (Cliente, Obra / exemplar, Retirada, Devolução, Status) e rodapé sobre pendência. Dados de `GET /api/v1/staff/loans`; atraso decidido pelo backend (regra V2). Os contadores refletem os itens listados (busca, filtro de cliente e limite de 50). Acrescenta o e-mail sob o nome e "há N dia(s)" no atrasado. |
+| Funcionário / Devolução (3:219) | `/balcao/devolucoes` | Conforme o frame: "Registrar devolução", campo "Código do exemplar ou ISBN" (sem busca vazia), cartão com obra, exemplar, cliente e devolução prevista, "Confirmar devolução" com diálogo, bloqueio de envio duplicado e sucesso somente após 2xx (`POST /api/v1/staff/loans/{id}/confirm-return`); estados vazio, erro de consulta e erro de domínio (ex.: empréstimo já encerrado). Divergências: botão "Buscar" explícito; a trilha "← Devoluções" é texto, sem destino próprio; comprovante de devolução exibido após o 2xx, com "Imprimir comprovante" (Issue #152); o ISBN pode listar vários exemplares emprestados da mesma obra, cada um com seu botão |
+| Funcionário / Venda (3:238) | `/balcao/vendas` | Conforme o frame: "Registrar venda", campo "Código do exemplar, ISBN ou título" (`GET /api/v1/staff/copies`), cartão com obra, "Comercial • Disponível para venda", preço do exemplar e "Registrar venda" com diálogo, bloqueio de envio duplicado e sucesso somente após 2xx (`POST /api/v1/sales/`). Cartão de bloqueio para exemplar didático (sem a nota "LEMBRETE PARA OS DEVS", que não é interface) e cartão de indisponível. A venda é confirmada no ato e o exemplar fica vendido (decisão delegada de 2026-10-03, Issue #147/#149); o preço é sempre o do exemplar e a tela não o envia. Sucesso: "Venda registrada" com obra, exemplar vendido, total e número da venda retornados. Divergências: sem estoque antes e depois (o backend não o devolve); preço não editável e venda sem cliente; botão "Buscar" explícito; trilha em texto; sem comprovante |
+| Complementos V2 · 02 Reservas de compra no balcão (4 telas) e 07 Estados de recuperação (referências: `png telas/paineis/07 — Complementos V2 · Fluxos para implementação.png`, seções 02 e 07; `png telas/referencias/05 — Estados & Modais.png`) | `/balcao/reservas`, `/balcao/reservas/:id?cliente=` | Item "Reservas" na sidebar. Lista "Reservas de compra" (fila por obra, busca por título, nome ou e-mail, "Atender X" e "Destinar exemplar a X" e "Cancelar reserva de X" com confirmação; "Retirar até <data>" com o prazo real; "Liberar exemplares vencidos" quando há reserva vencida) → "Atender reserva" (cliente, exemplar destinado, prazo só se persistido, "Código do exemplar" conferido contra o exemplar destinado do backend, "Conferir venda") → "Confirmar venda da reserva" (`POST /api/v1/staff/purchase-reservations/{id}/confirm-sale`, bloqueio de envio duplicado) → "Venda da reserva concluída" somente após 2xx. Estados "Nenhuma reserva encontrada" (busca sem resultado, "Limpar busca", "Voltar ao painel") e "Reserva fora do prazo" (apenas se o backend informar `expired`). Divergências: sem estoque antes/depois, sem ordinal "1ª" para a reserva com exemplar destinado, "Consultar outra obra" foca a busca; notas para devs não são UI; decisões em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21 |
+| Complementos V2 · 03 Inclusão de exemplar, 04 Inativação de obra e 05 Exclusão de exemplar (referências: `png telas/paineis/07 — Complementos V2 · Fluxos para implementação.png`, seções 03 a 05) | `/balcao/acervo/:id/exemplares/novo`, `/balcao/acervo/:id` | "Novo exemplar" nos detalhes da obra (apenas papéis que o backend autoriza e obra ativa) → formulário Código e Finalidade (+ Preço de venda para Venda) → `POST /api/v1/copies/` → "Exemplar incluído" com quantidade antes/depois; código duplicado (409) mantém os dados e pede outro código. Inativação: modal "Inativar <obra>?" com "Situação verificada" e "Confirmar inativação" (`PATCH /api/v1/books/{id}`) → mensagem de obra inativada e cartão "Situação da obra"; se houver empréstimo em aberto, solicitação de retirada pendente ou reserva de compra aguardando/destinada, o backend responde 409 `book_has_active_operations` e a tela mostra "Inativação bloqueada" com "Vínculos encontrados" (contagens e vínculos devolvidos) e atalhos "Consultar empréstimos" e "Consultar reservas". Exclusão: botão "Excluir exemplar" por exemplar (SELLER/STOCK_KEEPER/ADMINISTRATOR), desabilitado com o motivo quando o status já indica bloqueio → modal "Excluir exemplar #código?" com "Confira o exemplar" e quantidade antes → depois (`DELETE /api/v1/copies/{id}`) → "Exemplar excluído" com a nova quantidade, ou "Exclusão bloqueada" com os motivos do 409 (`copy_not_available`, `copy_has_history`, `last_active_copy`). Divergências: preço de venda adicionado; os estados bloqueada/excluído aparecem na própria página da obra; o bloqueio de exemplar não mostra cliente nem data de devolução (o backend não os devolve); o painel "Editando exemplar" e a reativação de obra foram entregues na Issue #151; notas para devs não são UI; decisões em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21 |
+| Complementos V2 · 06 Empréstimo direto no balcão (referências: `png telas/paineis/07 — Complementos V2 · Fluxos para implementação.png`, seção 06, proposta condicional; `png telas/referencias/05 — Estados & Modais.png`) | `/balcao/emprestimos/novo` | Acessível por "Novo empréstimo" em Empréstimos/Início e pelo card "Empréstimo" do Painel. Cliente (`GET /api/v1/staff/clients`) e exemplar didático livre (`GET /api/v1/staff/copies`) → "Revisar empréstimo" → "Confirmar empréstimo" (`POST /api/v1/loans/`, `SELLER`/`ADMINISTRATOR`, prazo calculado pelo backend) → "Empréstimo registrado" com `loan_date`/`due_date` retornados; "Empréstimo bloqueado" a partir dos erros de domínio reais (cliente inativo, com pendência ou inexistente; exemplar indisponível ou inexistente), com antecipação por `eligible`. Divergências: comprovante imprimível exibido após o registro (Issue #152; "Imprimir comprovante" no lugar de "Baixar comprovante"), sem CPF, sem prazo exibido antes do registro (prazo de um mês de calendário calculado pelo backend, Issue #148); decisões em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21 |
+| Controle de pendências (referências: `png telas/telas/funcionario/Controle de pendências.png`, `04 — Administrador.png` tela 3; `png telas/referencias/05 — Estados & Modais.png`) | `/balcao/clientes` | Item "Clientes" da sidebar. Busca por nome ou e-mail (`GET /api/v1/staff/clients`) → cartão da situação (`GET /api/v1/staff/clients/{id}/pendencies`, somente leitura, regra V2): "Pendência ativa" com obra, exemplar, vencimento e dias de atraso, ou "Sem pendência"; atalhos Solicitações, Empréstimos ativos e Reservas filtrados pelo cliente. Estados de carregamento, vazio, erro com nova tentativa. Divergências: CPF não existe no modelo (limitação técnica, o placeholder diz só nome ou e-mail), lista de escolha para vários resultados, estado "Sem pendência" e avisos de penalizado/inativo não existem no desenho; notas para devs não são UI; decisões em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21 |
+| Controle de pendências (8:69), Novo empréstimo (39:519 a 39:609) | `/balcao/clientes` | Funcionam com a implementação anterior dentro do novo layout; aguardando leitura dos frames |
+
+#### Feedback e estados de recuperação do balcão — Issue #137
+
+Referências: `png telas/referencias/01 - UX - Snackbars & Feedback.png` e Complementos V2, seção 07 ("Não foi possível salvar").
+
+- Componente `app-snackbar` (variantes sucesso, erro, atenção e informação), hospedado no layout `/balcao`: sucesso e recusa de uma operação de escrita aparecem ali; bloqueios, decisões e telas de resultado (venda concluída, empréstimo registrado, exemplar incluído, reserva fora do prazo) continuam como estado/cartão, sem mensagem duplicada; confirmação destrutiva continua em diálogo.
+- Acessibilidade: regiões vivas persistentes (`status` educada e `alert` assertiva para erros), sem mover o foco, botão "Fechar" e Esc. Sucesso e informação somem em 8 s (a referência não indica tempo); erro, atenção e mensagens com ação permanecem até serem fechadas.
+- Falha de rede ou 5xx em escrita mostra "Não foi possível salvar" com "Atualizar consulta" e "Voltar"; não há reenvio automático nem botão que reenvie a escrita, porque o resultado pode ser incerto e o backend não é idempotente. A repetição é manual, após atualizar a consulta e confirmar de novo.
+- Divergências: textos prontos da referência não usados quando divergem do comportamento real (ex.: a venda direta mostra os dados devolvidos pelo backend); a variante informação ainda não é usada por nenhuma tela do balcão.
+
+Regras e decisões pendentes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21.
+
+### Telas do cliente: login, início e categoria — Issue #129
+
+Referências: `png telas/paineis/02 — Cliente.png` (telas 1 a 3), `png telas/telas/cliente/Início & Acervo.png` e `png telas/telas/cliente/Ao selecionar uma categoria.png`.
+
+| Frame | Rota | Endpoints | Situação |
+| --- | --- | --- | --- |
+| Cliente / Login (tela 1) | `/login` | `POST /api/v1/auth/login` | Conforme a referência (dois campos, "Entrar", "Criar conta"). "Esqueceu a senha?" (Issue #154) abre a orientação "Procure o balcão da biblioteca para redefinir sua senha.", sem formulário nem e-mail; o ADMINISTRATOR redefine a senha em `/gestao/usuarios/:id` ("Redefinir senha", com confirmação) |
+| Cliente / Início & Acervo (tela 2) | `/` | `GET /api/v1/catalog/genres`, `GET /api/v1/catalog/featured-books`, `GET /api/v1/catalog/books` (busca) | Navbar com busca, Início, Explorar acervo, Meus empréstimos, Minhas reservas e menu do usuário; hero com o texto da referência e "Explorar livros" (vai ao acervo completo); categorias em destaque com o chip "Mais" (todas as categorias, `GET /api/v1/catalog/genres?all=true`); livros em destaque com Empréstimo disponível, Venda disponível ou Esgotado e "Ver detalhes"; "Ver todos" leva a `/acervo` |
+| Cliente / Acervo completo (Issue #153) | `/acervo` | `GET /api/v1/catalog/books/all?page=&q=`, `GET /api/v1/catalog/genres` (e `?all=true`) | Trilha "Início / Explorar acervo", busca por título ou autor, chips com "Todos" ativo, categorias e "Mais", cartões com a disponibilidade real e paginação; página e busca na URL (`?page=&q=`); estados de carregamento, erro, acervo vazio e "nenhum resultado" com "Limpar busca" |
+| Cliente / Ao selecionar uma categoria (tela 3) | `/generos/:slug` | `GET /api/v1/catalog/genres/{slug}/books?q=&page=`, `GET /api/v1/catalog/genres` | Trilha "Explorar acervo / categoria" (a trilha e o chip "Todos" levam a `/acervo`; "Mais" mostra todas as categorias), título, subtítulo, busca "Buscar dentro de <categoria>" (título ou autor, consulta do backend), chips de categorias com a atual marcada, cartões e paginação; estados de carregamento, categoria inexistente, erro, vazio e "nenhum resultado" com "Limpar busca" |
+
+Divergências e lacunas (detalhes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21): chip "Mais" (todas as categorias), "Ver todos" e "Todos" (acervo completo em `/acervo`, `GET /api/v1/catalog/books/all?page=&q=`) atendidos pela Issue #153; "Indisponível" aparece como "Esgotado"; "gênero" não é critério da busca global; o bloco de busca recolhível do início foi mantido; sem filtro por várias categorias. Dados das imagens são ilustrativos e notas para desenvolvedores não são interface.
+
+### Telas do cliente: detalhes, reservas e empréstimos — Issue #130
+
+Referências: `png telas/paineis/02 — Cliente.png` (telas 4 a 7), `png telas/paineis/07 — Complementos V2 · Fluxos para implementação.png` (seção 01) e `png telas/referencias/05 — Estados & Modais.png`.
+
+| Frame | Rota | Endpoints | Situação |
+| --- | --- | --- | --- |
+| Detalhes do livro, Empréstimo expandido (tela 4) | `/livros/:id` | `GET /api/v1/catalog/books/{id}`, `POST /api/v1/loan-requests` | Conforme: data de retirada, devolução prevista calculada (somente leitura; é uma estimativa até a retirada, pois o prazo real é calculado na confirmação da retirada, um mês após a retirada efetiva), "Confirmar solicitação"; Venda e Consulta local recolhidas. A primeira modalidade em que o cliente pode agir abre por padrão; quantidades no singular/plural ("1 exemplar disponível") |
+| Detalhes do livro, Venda expandido (tela 5) | `/livros/:id` | `POST /api/v1/purchase-requests` | Conforme: data pretendida, "A compra será finalizada presencialmente no balcão", "Confirmar solicitação de compra" |
+| Complementos 01-1: venda esgotada | `/livros/:id` (Venda) | `GET /catalog/books/{id}` (`can_reserve`) | "Venda · Esgotado — nenhum exemplar comercial disponível", aviso "Você pode entrar na fila de compra" e "Reservar compra", somente quando o backend informa `can_reserve` |
+| Complementos 01-2: confirmar reserva | `/livros/:id` (etapa de confirmação) | nenhum até confirmar | Livro, cliente (nome e e-mail da sessão), modalidade e "Como funciona a fila"; "Confirmar reserva" ou "Voltar". Nada é criado antes de confirmar |
+| Complementos 01-3: reserva registrada | `/livros/:id` (resultado) | `POST /api/v1/purchase-reservations` | Só após 2xx; mostra a posição devolvida pela API, "Ver minhas reservas" e snackbar de sucesso (componente compartilhado, hospedado na página) |
+| Complementos 01-4: reserva bloqueada | `/livros/:id` (bloqueio) | erro `client_ineligible`; leitura `GET /api/v1/loans/me` | Mostra a mensagem do backend e, somente leitura, os empréstimos `OVERDUE` do próprio cliente ("Empréstimo de X · Exemplar #N", "Devolução prevista … · em atraso"); sem atraso listado, apenas a mensagem e a orientação de ir ao balcão. O mesmo bloqueio vale para solicitações de empréstimo e de compra |
+| Minhas reservas (tela 6) | `/minhas-reservas` | `GET /api/v1/purchase-reservations/me` | Conforme: Aguardando disponibilidade (posição) e Disponível para retirada (exemplar, "Disponível desde", "Retire até <data>" com o prazo real de 5 dias corridos), "Cancelar reserva" com confirmação (aguardando ou destinada; `POST /api/v1/purchase-reservations/{id}/cancel`), "Prazo de retirada encerrado" sem cancelamento quando `expired`, nota "Compras concluídas não aparecem aqui." |
+| Meus empréstimos (tela 7) | `/meus-emprestimos` | `GET /api/v1/loans/me` | Conforme: Aguardando retirada, Empréstimo ativo e Em atraso ("vencido há N dia(s)" no plural correto e orientação sobre a pendência) |
+
+Feedback: sucesso só após 2xx; envio bloqueado enquanto há requisição em curso; erros de domínio (duplicidade, indisponível, inelegível) usam a mensagem e o código do backend e não geram snackbar de sucesso; duplicidade oferece o link para Meus empréstimos / Minhas reservas.
+
+Divergências e lacunas (detalhes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21): (1) "Retire até <data>" aparece somente quando `expires_at` existe; não há prazo aprovado, e a data de 23/09 da imagem é ilustrativa; (2) "Situação do cliente: apto — conta ativa e sem pendências" (01-2) vem de `GET /api/v1/me/eligibility` (Issue #153) na confirmação da reserva; se inapto, a tela mostra os motivos e desabilita "Confirmar reserva", e a decisão final continua no backend no envio; (3) a penalidade sem empréstimo em atraso aparece como motivo `penalized` da mesma consulta; (4) as etapas de confirmar, registrada e bloqueada são estados da própria rota `/livros/:id`, sem rotas novas; (5) "Consulta local" segue não configurada e só mostra texto informativo se um dia estiver configurada; (6) o tipo de "Outras formas de acesso" de 01-1 não foi criado, pois repete as modalidades já exibidas. Dados das imagens são ilustrativos e notas para desenvolvedores não são interface.
+
+### Comprovante digital — Issue #152
+
+| Tela | Rota | Comportamento |
+| --- | --- | --- |
+| Comprovante (componente `app-receipt`) | Exibido em `/balcao/emprestimos/solicitacoes` (retirada), `/balcao/emprestimos/novo`, `/balcao/devolucoes`, `/balcao/vendas` e `/balcao/reservas/:id` após o 2xx | Consulta `GET /api/v1/receipts/...` com o identificador devolvido pela operação; estados carregando, erro com "Tentar novamente" e carregado; "Imprimir comprovante" chama `window.print()` e o CSS de impressão mostra só o comprovante; "Fechar comprovante" nas listas. |
+| Comprovante de empréstimo, devolução e venda | `/comprovantes/emprestimo/:id`, `/comprovantes/devolucao/:id`, `/comprovantes/venda/:id` | Rotas dedicadas para reimpressão (balcão, totem e cliente dono); guard de sessão e papéis `USER`, `SELLER`, `ADMINISTRATOR`; o backend nega comprovantes alheios com 404. |
+| Cliente / Meus empréstimos | `/meus-emprestimos` | Link "Ver comprovante" em empréstimos ativos e em atraso. |
+
+Lacunas: sem e-mail; sem listagem de empréstimos encerrados ou compras do cliente, então comprovantes de devolução e de venda do cliente só abrem pelo link da rota (detalhes em [BUSINESS_RULES.md](BUSINESS_RULES.md), Issue #152).
+
+### Gestão de usuários do administrador — Issue #131
+
+Referências: `png telas/paineis/04 — Administrador.png` (telas 1 e 2), `png telas/recortes/admin_01.png`, `admin_02.png` e `png telas/telas/administrador/Detalhe e edição de usuário.png`.
+
+| Frame | Rota | Endpoints | Situação |
+| --- | --- | --- | --- |
+| Gestão de usuários (admin_01) | `/gestao/usuarios` | `GET /api/v1/users?role=` | Colunas Usuário, E-mail, Perfil, Status e Ações (Ver / Editar; apenas Ver para inativos). Busca local por nome ou e-mail sobre a lista carregada; filtro por perfil mantido. Sem Inativar nem Excluir na lista |
+| Sidebar com "Usuários" (admin_01) | item do menu lateral do balcão | nenhum | Item "Usuários" visível somente para `ADMINISTRATOR`, apontando para `/gestao/usuarios`; as rotas mantêm `authGuard` e `roleGuard` (`ADMINISTRATOR`) |
+| Detalhe e edição de usuário (admin_02) | `/gestao/usuarios/:id/editar` | `GET /api/v1/users/{id}`, `PATCH /api/v1/users/{id}`, `PATCH /api/v1/users/{id}/inactivate`, `GET /api/v1/staff/clients/{id}/pendencies` | Nome, e-mail e Perfil editáveis; "Salvar alterações"; "Inativar usuário" abre o cartão "Inativar usuário?" (Cancelar / Confirmar inativação). Mudança de perfil também pede confirmação. Sucesso só após 2xx, botões bloqueados durante a requisição, erros de domínio no snackbar compartilhado |
+| Detalhe somente leitura | `/gestao/usuarios/:id` | `GET /api/v1/users/{id}`, `GET /api/v1/staff/clients/{id}/pendencies` | Mesmos dados e a seção Pendências, com "Editar usuário" apenas para ativos |
+
+Pendências (somente leitura): para usuários com perfil Cliente, usa a consulta V2 do balcão, que não sincroniza penalidade (o id do cliente coincide com o id do usuário): "Sem pendências ativas" ou, por empréstimo em atraso, obra, exemplar, vencimento e dias de atraso, mais o aviso de penalizado. Não usa a consulta V1 `/api/v1/clients/{id}/pendencies`, que grava penalidade. Para os demais perfis aparece "Pendências se aplicam somente a clientes."
+
+Divergências e lacunas (detalhes em [BUSINESS_RULES.md](BUSINESS_RULES.md), seção 21): (1) CPF não existe no modelo: o campo e o termo "CPF" da busca não são exibidos (limitação técnica); (2) a referência usa uma única tela para detalhe e edição; as duas rotas existentes foram mantidas; (3) a página de gestão de usuários fica fora do layout do balcão (rota `/gestao/usuarios` existente), portanto a sidebar leva até ela mas não é exibida nela; (4) rótulos de perfil reais (Cliente, Vendedor, Estoquista, Administrador) em vez de "Funcionário"; (5) a referência não tem ação de penalidade manual; embora `PATCH /api/v1/clients/{id}/penalty` esteja aprovado na seção 20, não foi exposto. Dados das imagens são ilustrativos e notas para desenvolvedores não são interface.

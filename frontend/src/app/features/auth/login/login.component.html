@@ -1,6 +1,6 @@
 <header class="auth-header">
   <h1 class="auth-header__title">Entrar</h1>
-  <p class="auth-header__subtitle">Acesse sua conta LibStock para continuar.</p>
+  <p class="auth-header__subtitle">Acesse sua conta da biblioteca.</p>
 </header>
 
 @if (notice(); as flash) {
@@ -43,9 +43,14 @@
   />
 
   <div class="auth-form__row">
-    <button class="link-button" type="button" disabled title="Em breve">
-      Esqueceu a senha? <span class="link-button__badge">em breve</span>
+    <button class="link-button" type="button" aria-controls="password-recovery-help" [attr.aria-expanded]="recoveryHelp()" (click)="recoveryHelp.set(!recoveryHelp())">
+      Esqueceu a senha?
     </button>
+  </div>
+  <div id="password-recovery-help" role="status" aria-live="polite">
+    @if (recoveryHelp()) {
+      <p>Procure o balcão da biblioteca para redefinir sua senha. Não enviamos recuperação por e-mail.</p>
+    }
   </div>
 
   <button class="button" type="submit" [disabled]="isSubmitting" [attr.aria-busy]="isSubmitting">

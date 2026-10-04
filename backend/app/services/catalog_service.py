@@ -11,15 +11,19 @@ from app.core.exceptions import (
     DuplicateGenreError,
     GenreNotFoundError,
 )
-from app.models.domain import Book, CopyStatus, DestinationType, Genre
+from app.models.domain import Book, DestinationType, Genre
 from app.repositories.catalog_repository import CatalogRepository, GenreRepository
 from app.schemas.catalog_schema import (
     BookOffer,
     CatalogBookResponse,
+    CatalogBookDetailResponse,
+    BookAvailability,
+    ModalityAvailability,
     FeaturedUpdate,
     GenreCreate,
     GenreResponse,
     PagedBooksResponse,
+    PagedCatalogResponse,
 )
 
 FEATURED_BOOKS_LIMIT = 12
@@ -55,7 +59,27 @@ class CatalogService:
 
     def list_featured_books(self) -> list[CatalogBookResponse]:
         books = self.catalog_repository.find_featured_books(limit=FEATURED_BOOKS_LIMIT)
-        return [self._to_response(book) for book in books]
+        return self._to_responses(books)
+
+    def get_public_book(self, book_id: int) -> CatalogBookDetailResponse:
+        book = self.catalog_repository.find_public_book(book_id)
+        if book is None:
+            raise BookNotFoundError()
+        copies = self.catalog_repository.find_free_copies(book_id)
+        reservable_ids = self.catalog_repository.find_reservable_copy_ids([book_id])
+        didactic = [copy for copy in copies if copy.destination == DestinationType.DIDACTIC]
+        commercial = [copy for copy in copies if copy.destination == DestinationType.COMMERCIAL]
+        prices = [copy.sale_price for copy in commercial if copy.sale_price is not None]
+        return CatalogBookDetailResponse(
+            **self._to_response(book, {copy.id for copy in copies}, reservable_ids).model_dump(), isbn=book.isbn,
+            availability=BookAvailability(
+                loan=ModalityAvailability(available=bool(didactic), available_count=len(didactic)),
+                sale=ModalityAvailability(available=bool(commercial), available_count=len(commercial),
+                                          can_reserve=not commercial and bool(reservable_ids),
+                                          price=min(prices) if prices else None),
+                local_consultation=ModalityAvailability(available=None, available_count=None, configured=False),
+            ),
+        )
 
     def search_books(
         self,
@@ -78,7 +102,7 @@ class CatalogService:
             books = self.catalog_repository.search_books(
                 title=title, author=author, isbn=isbn, barcode=barcode
             )
-        return [self._to_response(book) for book in books]
+        return self._to_responses(books)
 
     def search_by_title(self, title: str) -> list[CatalogBookResponse]:
         return self.search_books(title=title)
@@ -89,12 +113,35 @@ class CatalogService:
     def list_featured_genres(self) -> list[Genre]:
         return self.genre_repository.find_featured()
 
+    def list_all_genres(self) -> list[Genre]:
+        return self.genre_repository.find_all()
+
+    def list_all_books(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        q: str | None = None,
+    ) -> PagedCatalogResponse:
+        books, total = self.catalog_repository.find_all_books(
+            page=page,
+            page_size=page_size,
+            q=(q or "").strip() or None,
+        )
+        return PagedCatalogResponse(
+            items=self._to_responses(books),
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
     def list_books_by_genre(
         self,
         *,
         slug: str,
         page: int,
         page_size: int,
+        q: str | None = None,
     ) -> PagedBooksResponse:
         genre = self.genre_repository.find_by_slug(slug)
         if genre is None:
@@ -104,10 +151,11 @@ class CatalogService:
             genre_id=genre.id,
             page=page,
             page_size=page_size,
+            q=(q or "").strip() or None,
         )
         return PagedBooksResponse(
             genre=GenreResponse.model_validate(genre),
-            items=[self._to_response(book) for book in books],
+            items=self._to_responses(books),
             total=total,
             page=page,
             page_size=page_size,
@@ -178,18 +226,25 @@ class CatalogService:
 
     # ---- Projeção --------------------------------------------------------
 
-    def _to_response(self, book: Book) -> CatalogBookResponse:
+    def _to_responses(self, books: list[Book]) -> list[CatalogBookResponse]:
+        if not books:
+            return []
+        free_ids = self.catalog_repository.find_free_copy_ids([book.id for book in books])
+        reservable_ids = self.catalog_repository.find_reservable_copy_ids([book.id for book in books])
+        return [self._to_response(book, free_ids, reservable_ids) for book in books]
+
+    def _to_response(self, book: Book, free_ids: set[int], reservable_ids: set[int]) -> CatalogBookResponse:
         return CatalogBookResponse(
             id=book.id,
             title=book.title,
             author=book.author,
             cover_url=book.cover_url,
             genres=[link.genre.name for link in book.genres],
-            offers=self._offers_for(book),
+            offers=self._offers_for(book, free_ids, reservable_ids),
         )
 
     @staticmethod
-    def _offers_for(book: Book) -> list[BookOffer]:
+    def _offers_for(book: Book, free_ids: set[int], reservable_ids: set[int]) -> list[BookOffer]:
         """Resume os exemplares ativos em uma oferta por destino.
 
         O mesmo livro pode ter exemplares didáticos e comerciais ao mesmo
@@ -210,9 +265,9 @@ class CatalogService:
             emprestados.setdefault(destino, False)
             precos.setdefault(destino, None)
 
-            if copy.status == CopyStatus.AVAILABLE:
+            if copy.id in free_ids:
                 disponiveis[destino] = True
-            elif copy.status in (CopyStatus.BORROWED, CopyStatus.RESERVED):
+            elif copy.id in reservable_ids:
                 emprestados[destino] = True
 
             # O preço vale mesmo com o exemplar indisponível: quem vê

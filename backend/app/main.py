@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 
 from app.controllers.admin_catalog_controller import router as admin_catalog_router
 from app.controllers.auth_controller import router as auth_router
@@ -9,6 +11,12 @@ from app.controllers.catalog_controller import router as catalog_router
 from app.controllers.employee_controller import router as employee_router
 from app.controllers.copy_controller import router as copy_router
 from app.controllers.user_controller import router as user_router
+from app.controllers.loan_request_controller import router as loan_request_router
+from app.controllers.purchase_request_controller import router as purchase_request_router
+from app.controllers.client_tracking_controller import router as client_tracking_router
+from app.controllers.client_eligibility_controller import router as client_eligibility_router
+from app.controllers.circulation_controller import router as circulation_router
+from app.controllers.staff_desk_controller import router as staff_desk_router
 from app.core.config import get_settings
 from app.core.exceptions import ApplicationError
 from app.controllers.client_pendency_controller import (
@@ -16,6 +24,7 @@ from app.controllers.client_pendency_controller import (
 )
 from app.controllers.loan_controller import router as loan_router
 from app.controllers.sale_controller import router as sale_router
+from app.controllers.receipt_controller import router as receipt_router
 
 
 settings = get_settings()
@@ -43,15 +52,31 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(RequestValidationError)
+async def password_reset_validation_handler(request: Request, exception: RequestValidationError):
+    if getattr(request.scope.get("route"), "name", None) == "reset_user_password":
+        # FastAPI's default includes raw input. Never reflect credentials in 422 responses.
+        errors = [{key: error[key] for key in ("loc", "msg", "type") if key in error}
+                  for error in exception.errors()]
+        for error in errors:
+            if error.get("type") == "extra_forbidden":
+                error["loc"] = ["body", "campo_desconhecido"]
+        return JSONResponse(status_code=422, content={"detail": errors})
+    return await request_validation_exception_handler(request, exception)
+
+
 @app.exception_handler(ApplicationError)
 async def application_error_handler(
     _request: Request,
     exception: ApplicationError,
 ) -> JSONResponse:
     headers = {"WWW-Authenticate": "Bearer"} if exception.status_code == 401 else None
+    content: dict[str, object] = {"detail": exception.message, "code": exception.code}
+    if exception.details is not None:
+        content["details"] = exception.details
     return JSONResponse(
         status_code=exception.status_code,
-        content={"detail": exception.message, "code": exception.code},
+        content=content,
         headers=headers,
     )
 
@@ -68,6 +93,14 @@ app.include_router(copy_router)
 app.include_router(book_router)
 app.include_router(catalog_router)
 app.include_router(admin_catalog_router)
+app.include_router(loan_request_router)
+app.include_router(purchase_request_router)
+app.include_router(client_tracking_router)
+app.include_router(client_eligibility_router)
+
+app.include_router(circulation_router)
+app.include_router(staff_desk_router)
 app.include_router(client_pendency_router)
 app.include_router(loan_router)
 app.include_router(sale_router)
+app.include_router(receipt_router)

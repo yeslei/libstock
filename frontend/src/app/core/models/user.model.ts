@@ -36,3 +36,12 @@ export interface UpdateUserRequest {
   readonly email: string;
   readonly role_code: RoleCode;
 }
+
+export interface ResetPasswordRequest {
+  readonly new_password: string;
+}
+
+export interface ResetPasswordResponse {
+  readonly user_id: number;
+  readonly message: string;
+}

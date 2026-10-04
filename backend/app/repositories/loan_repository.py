@@ -3,13 +3,25 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Copy, CopyStatus, Loan, LoanStatus
+from app.models.domain import Book, Copy, CopyStatus, Loan, LoanStatus
 from app.schemas.loan_schema import LoanCreate
 
 
 class LoanRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    def lock_book_for_copy(self, copy_id: int) -> Book | None:
+        """Trava o livro do exemplar antes do exemplar (ordem livro -> exemplar dos demais fluxos)."""
+        book_id = self.db.scalar(select(Copy.book_id).where(Copy.id == copy_id))
+        if book_id is None:
+            return None
+        return self.db.scalar(
+            select(Book)
+            .where(Book.id == book_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
 
     def find_copy_for_loan(self, copy_id: int) -> Copy | None:
         return self.db.scalar(

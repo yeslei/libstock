@@ -5,6 +5,91 @@ import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
+    path: 'meus-emprestimos', canActivate: [authGuard, roleGuard], data: { roles: ['USER'], tracking: 'loans' },
+    title: 'Meus empréstimos · LibStock',
+    loadComponent: () => import('./features/client-tracking/client-tracking.component').then(m => m.ClientTrackingComponent),
+  },
+  {
+    path: 'minhas-reservas', canActivate: [authGuard, roleGuard], data: { roles: ['USER'], tracking: 'reservations' },
+    title: 'Minhas reservas · LibStock',
+    loadComponent: () => import('./features/client-tracking/client-tracking.component').then(m => m.ClientTrackingComponent),
+  },
+  {
+    path: 'comprovantes/emprestimo/:id', canActivate: [authGuard, roleGuard], data: { roles: ['USER', 'SELLER', 'ADMINISTRATOR'], receipt: 'loan' },
+    title: 'Comprovante de empréstimo · LibStock',
+    loadComponent: () => import('./features/receipts/receipt-page.component').then(m => m.ReceiptPageComponent),
+  },
+  {
+    path: 'comprovantes/devolucao/:id', canActivate: [authGuard, roleGuard], data: { roles: ['USER', 'SELLER', 'ADMINISTRATOR'], receipt: 'return' },
+    title: 'Comprovante de devolução · LibStock',
+    loadComponent: () => import('./features/receipts/receipt-page.component').then(m => m.ReceiptPageComponent),
+  },
+  {
+    path: 'comprovantes/venda/:id', canActivate: [authGuard, roleGuard], data: { roles: ['USER', 'SELLER', 'ADMINISTRATOR'], receipt: 'sale' },
+    title: 'Comprovante de venda · LibStock',
+    loadComponent: () => import('./features/receipts/receipt-page.component').then(m => m.ReceiptPageComponent),
+  },
+  {
+    path: 'balcao', canActivate: [authGuard, roleGuard], data: { roles: ['SELLER', 'ADMINISTRATOR'] },
+    loadComponent: () => import('./features/counter/counter-shell.component').then(m => m.CounterShellComponent),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'painel' },
+      {
+        path: 'painel', title: 'Painel · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-dashboard.component').then(m => m.CounterDashboardComponent),
+      },
+      {
+        path: 'acervo', pathMatch: 'full', title: 'Acervo · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-catalog.component').then(m => m.CounterCatalogComponent),
+      },
+      {
+        path: 'acervo/:id/exemplares/novo', title: 'Novo exemplar · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-copy-create.component').then(m => m.CounterCopyCreateComponent),
+      },
+      {
+        path: 'acervo/:id', title: 'Obra · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-catalog-book.component').then(m => m.CounterCatalogBookComponent),
+      },
+      {
+        path: 'clientes', title: 'Clientes · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterClientsPageComponent),
+      },
+      {
+        path: 'emprestimos', pathMatch: 'full', title: 'Empréstimos · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-loans-home.component').then(m => m.CounterLoansHomeComponent),
+      },
+      {
+        path: 'emprestimos/novo', title: 'Novo empréstimo · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-loan-create.component').then(m => m.CounterLoanCreateComponent),
+      },
+      {
+        path: 'emprestimos/solicitacoes', title: 'Solicitações de empréstimo · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-pages').then(m => m.CounterPickupsPageComponent),
+      },
+      {
+        path: 'emprestimos/ativos', title: 'Empréstimos ativos · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-active-loans.component').then(m => m.CounterActiveLoansComponent),
+      },
+      {
+        path: 'devolucoes', title: 'Registrar devolução · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-returns.component').then(m => m.CounterReturnsComponent),
+      },
+      {
+        path: 'vendas', title: 'Registrar venda · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-sales.component').then(m => m.CounterSalesComponent),
+      },
+      {
+        path: 'reservas', pathMatch: 'full', title: 'Reservas de compra · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-reservations.component').then(m => m.CounterReservationsComponent),
+      },
+      {
+        path: 'reservas/:id', title: 'Atender reserva · Balcão · LibStock',
+        loadComponent: () => import('./features/counter/counter-reservation-attend.component').then(m => m.CounterReservationAttendComponent),
+      },
+      { path: '**', redirectTo: 'painel' },
+    ],
+  },
+  {
     path: '',
     pathMatch: 'full',
     title: 'LibStock — Gestão de acervo',
@@ -15,10 +100,21 @@ export const routes: Routes = [
   },
   {
     path: 'explorar',
-    title: 'Explorar livros · LibStock',
+    redirectTo: '',
+    pathMatch: 'full',
+  },
+  {
+    path: 'acervo',
+    title: 'Acervo completo · LibStock',
     loadComponent: () =>
-      import('./features/catalog/explore-books/explore-books.component').then(
-        (m) => m.ExploreBooksComponent,
+      import('./features/catalog/all-books/all-books.component').then((m) => m.AllBooksComponent),
+  },
+  {
+    path: 'livros/:id',
+    title: 'Detalhes do livro · LibStock',
+    loadComponent: () =>
+      import('./features/catalog/book-details/book-details.component').then(
+        (m) => m.BookDetailsComponent,
       ),
   },
   {
@@ -40,7 +136,7 @@ export const routes: Routes = [
   {
     path: 'obras/nova',
     canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar obra · LibStock',
     loadComponent: () =>
       import('./features/books/book-create/book-create.component').then(
@@ -50,7 +146,7 @@ export const routes: Routes = [
   {
     path: 'obras/:id/exemplares/novo',
     canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar exemplar · LibStock',
     loadComponent: () =>
       import('./features/copies/copy-create/copy-create.component').then(

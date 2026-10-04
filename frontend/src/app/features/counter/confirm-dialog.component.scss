@@ -1,0 +1,78 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+.confirm {
+  width: min(92vw, 30rem);
+  padding: $space-6;
+  border: 1px solid $client-border;
+  border-radius: $radius-md;
+  color: $text-primary;
+  box-shadow: $shadow-md;
+
+  &::backdrop {
+    background: rgba(10, 59, 41, 0.45);
+  }
+}
+
+h2 {
+  margin: 0 0 $space-3;
+  color: $client-green;
+  font-size: 1.125rem;
+}
+
+.confirm__intro {
+  margin: 0 0 $space-3;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+.confirm__details-title {
+  margin: 0 0 $space-2;
+  color: $client-green;
+  font-size: 1rem;
+}
+
+.confirm__details {
+  margin: 0 0 $space-6;
+  padding-left: $space-5;
+  color: $text-muted;
+  font-size: $font-size-sm;
+  overflow-wrap: anywhere;
+}
+
+.confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: $space-3;
+}
+
+button {
+  @include touch-target;
+  gap: $space-2;
+  padding: 0 $space-5;
+  border: 1px solid $primary;
+  border-radius: $radius-sm;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+}
+
+.confirm__cancel {
+  background: #fff;
+  color: $primary;
+}
+
+.confirm__submit {
+  background: $primary;
+  color: #fff;
+}

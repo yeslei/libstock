@@ -1,10 +1,13 @@
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models.domain import CopyStatus, DestinationType, SaleStatus
+from app.core.business_dates import BUSINESS_ZONE as ZONE
+from app.core.exceptions import ApplicationError, BookInactiveError, CopyReservedError, CopyWithoutPriceError
+from app.models.domain import CopyStatus, DestinationType
 from app.repositories.sale_repository import SaleRepository
 from app.schemas.sale_schema import SaleCreate, SaleItemResponse, SaleResponse
 
@@ -36,7 +39,11 @@ class SaleService:
 
             copy_ids = [item.copy_id for item in sale_data.items]
 
+            books = self.repository.lock_books_for_copies(copy_ids)
+            # Reservas vencidas liberam o exemplar: efetiva a expiração antes de travar os exemplares.
+            self.repository.expire_due_reservations(books.keys(), datetime.now(ZONE))
             copies = self.repository.find_copies_for_sale(copy_ids)
+            reserved = self.repository.reserved_copy_ids(copy_ids)
 
             copies_by_id = {copy.id: copy for copy in copies}
 
@@ -53,11 +60,18 @@ class SaleService:
                         detail="Um ou mais exemplares estão inativos.",
                     )
 
+                book = books.get(copy.book_id)
+                if book is None or not book.is_active:
+                    raise BookInactiveError()
+
                 if copy.status != CopyStatus.AVAILABLE:
                     raise HTTPException(
                         status_code=409,
                         detail="Um ou mais exemplares não estão disponíveis para venda.",
                     )
+
+                if copy.id in reserved:
+                    raise CopyReservedError()
 
                 if copy.destination == DestinationType.DIDACTIC:
                     raise HTTPException(
@@ -65,8 +79,16 @@ class SaleService:
                         detail="Exemplares didáticos não podem ser vendidos.",
                     )
 
+            # O preço é sempre o cadastrado no exemplar (banco); o valor enviado é ignorado.
+            priced_items = []
+            for item in sale_data.items:
+                price = copies_by_id[item.copy_id].sale_price
+                if price is None:
+                    raise CopyWithoutPriceError()
+                priced_items.append((item.copy_id, price))
+
             total_amount = sum(
-                (item.unit_price for item in sale_data.items),
+                (price for _, price in priced_items),
                 Decimal("0.00"),
             )
 
@@ -78,8 +100,13 @@ class SaleService:
 
             sale_items = self.repository.create_sale_items(
                 sale_id=sale.id,
-                items=sale_data.items,
+                items=priced_items,
             )
+
+            # Venda direta é paga no balcão: confirma no ato. O gatilho do banco
+            # (mesmo mecanismo do confirm-sale V2) marca o exemplar como SOLD,
+            # recalcula o total e registra o funcionário na auditoria.
+            self.repository.confirm_sale(sale)
 
             self.db.commit()
             self.db.refresh(sale)
@@ -96,6 +123,10 @@ class SaleService:
                     for item in sale_items
                 ],
             )
+
+        except ApplicationError:
+            self.db.rollback()
+            raise
 
         except HTTPException:
             self.db.rollback()

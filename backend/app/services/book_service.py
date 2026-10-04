@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 
 import httpx
 from pydantic import ValidationError
@@ -7,9 +8,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.business_dates import BUSINESS_ZONE
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
+    BookHasActiveOperationsError,
     BookPersistenceError,
     BookUpdatePersistenceError,
     DuplicateBarcodeError,
@@ -20,6 +23,7 @@ from app.core.exceptions import (
     GoogleBooksRateLimitError,
     GoogleBooksUnavailableError,
     BookNotFoundError,
+    BookWithoutActiveCopyError,
 )
 from app.models.domain import Book
 from app.repositories.book_repository import BookRepository
@@ -38,6 +42,7 @@ from app.schemas.book_schema import (
 GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
 GOOGLE_BOOKS_TIMEOUT_SECONDS = 5.0
 logger = logging.getLogger(__name__)
+LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
 
 UNIQUE_CONSTRAINT_ERRORS = {
     "books_isbn_key": DuplicateIsbnError,
@@ -250,7 +255,12 @@ class BookService:
         return BookDetailResponse.model_validate(book)
 
     def update_book(
-        self, book_id: int, changes: BookUpdate, *, employee_id: int
+        self,
+        book_id: int,
+        changes: BookUpdate,
+        *,
+        employee_id: int,
+        can_view_clients: bool = False,
     ) -> BookDetailResponse:
         try:
             if not self.repository.employee_exists(employee_id):
@@ -266,6 +276,14 @@ class BookService:
                 text("SELECT set_config('libstock.employee_id', :employee_id, true)"),
                 {"employee_id": str(employee_id)},
             )
+            if changes.is_active is not None:
+                # Trava a obra e os exemplares antes de decidir o ramo, usando o valor
+                # travado: duas mudanças de situação concorrentes não decidem sobre dado velho.
+                self.repository.lock_book_for_inactivation(book_id, datetime.now(BUSINESS_ZONE))
+                if changes.is_active is False and book.is_active:
+                    self._ensure_no_active_operations(book_id, can_view_clients)
+                elif changes.is_active is True and not book.is_active:
+                    self._ensure_has_active_copy(book_id)
             updated = self.repository.update_book(book, changes)
             response = BookDetailResponse.model_validate(updated)
             self.db.commit()
@@ -280,4 +298,25 @@ class BookService:
             raise
         except SQLAlchemyError as exc:
             self.db.rollback()
+            # O gatilho adiado trg_active_book_has_copy é a última barreira da reativação.
+            diag = getattr(getattr(exc, "orig", None), "diag", None)
+            if getattr(diag, "message_primary", None) == LAST_ACTIVE_COPY_MESSAGE:
+                raise BookWithoutActiveCopyError() from exc
             raise BookUpdatePersistenceError() from exc
+
+    def _ensure_has_active_copy(self, book_id: int) -> None:
+        """Reativação exige ao menos um exemplar ativo (decisão 7 de #147, Issue #151)."""
+        # O livro e os exemplares já estão travados em update_book: nenhum exemplar é
+        # excluído ou inativado entre a conferência e o commit.
+        if not self.repository.has_active_copy(book_id):
+            raise BookWithoutActiveCopyError()
+
+    def _ensure_no_active_operations(self, book_id: int, can_view_clients: bool) -> None:
+        """Bloqueia a inativação enquanto houver operação em andamento (Issue #135)."""
+        # Com o livro e os exemplares travados (em update_book), nenhuma retirada, empréstimo ou
+        # destinação concorrente confirma entre a contagem e o commit.
+        counts = self.repository.active_operation_counts(book_id)
+        if any(counts.values()):
+            raise BookHasActiveOperationsError(
+                counts, self.repository.active_operation_links(book_id, include_clients=can_view_clients)
+            )

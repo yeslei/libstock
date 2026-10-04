@@ -1,0 +1,186 @@
+<section class="page" aria-labelledby="obra-titulo">
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo</a>
+        <p class="loading" role="status"><app-spinner /> Carregando obra…</p>
+      }
+      @case ('error') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo</a>
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        <a class="page__back" routerLink="/balcao/acervo">← Acervo / {{ s.data.title }}</a>
+        <h1 id="obra-titulo">{{ s.data.title }}</h1>
+        <p class="page__intro">{{ s.data.author }}@if (s.data.isbn) { • ISBN {{ s.data.isbn }} }</p>
+
+        @if (flow.saveFailed()) {
+          <app-save-failure>
+            <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>
+            <button class="btn" type="button" (click)="flow.saveFailed.set(false)">Voltar</button>
+          </app-save-failure>
+        }
+
+        @if (blocked(); as b) {
+          <section class="blocked" aria-labelledby="bloqueio-titulo" data-blocked>
+            <h2 id="bloqueio-titulo">{{ b.title }}</h2>
+            <div class="blocked__alert" role="alert">
+              <p><strong>{{ b.headline }}</strong></p>
+              <p>{{ b.note }}</p>
+            </div>
+            @if (b.lines.length) {
+              <article class="card">
+                <h3>{{ b.sectionTitle }}</h3>
+                <ul class="blocked__lines">
+                  @for (line of b.lines; track $index) { <li>{{ line }}</li> }
+                </ul>
+              </article>
+            }
+            <div class="actions">
+              @if (b.kind === 'book') {
+                <a class="btn btn--primary" routerLink="/balcao/emprestimos/ativos">Consultar empréstimos</a>
+                <a class="btn" routerLink="/balcao/reservas">Consultar reservas</a>
+              } @else {
+                <button class="btn btn--primary" type="button" (click)="dismissBlocked()">Voltar aos exemplares</button>
+              }
+            </div>
+          </section>
+        }
+
+        <div class="stack">
+          <article class="card" aria-labelledby="dados-titulo">
+            <h2 id="dados-titulo">Dados da obra</h2>
+            <p>Categoria literária: {{ s.data.genre || '—' }}</p>
+            <p>Destinação dos exemplares: {{ s.data.didactic_copies }} para empréstimo · {{ s.data.commercial_copies }} para venda</p>
+            <p>Status da obra: {{ s.data.is_active ? 'Ativa' : 'Inativa' }}</p>
+            <p>Quantidade total: {{ s.data.total_copies === 1 ? '1 exemplar' : s.data.total_copies + ' exemplares' }}</p>
+            @if (canEdit && !editing()) {
+              <button class="btn btn--primary" type="button" (click)="startEditing()">Editar obra</button>
+            }
+          </article>
+
+          @if (canEdit && editing()) {
+            <article class="card" aria-labelledby="editar-titulo">
+              <h2 id="editar-titulo">Editar obra</h2>
+              <div class="field" [class.field--error]="genreTooLong()">
+                <label for="book-genre">Categoria literária</label>
+                <input id="book-genre" type="text" [value]="genre()" (input)="setGenre($event)" [attr.aria-invalid]="genreTooLong()" />
+                @if (genreTooLong()) { <span class="field__error" role="alert">A categoria aceita até {{ genreMax }} caracteres.</span> }
+              </div>
+              <p class="note">A destinação é definida em cada exemplar; a conversão de destinação ainda não está disponível.</p>
+              <div class="actions">
+                <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || genreTooLong() || !changed(s.data)" (click)="askSaveGenre(s.data)">Salvar alteração</button>
+                @if (s.data.is_active) {
+                  <button class="btn btn--danger" type="button" [disabled]="flow.submitting()" (click)="askDeactivate(s.data)">Inativar obra</button>
+                }
+              </div>
+            </article>
+          }
+
+          @if (!s.data.is_active) {
+            <article class="card" aria-labelledby="situacao-titulo">
+              <h2 id="situacao-titulo">Situação da obra</h2>
+              <p>Status: Inativa</p>
+              <p>Exemplares vinculados: {{ s.data.total_copies }}</p>
+              <p>Disponibilidade operacional: indisponível</p>
+              @if (canEdit) {
+                @let reactivateReason = reactivateBlockReason(s.data);
+                <div class="actions">
+                  <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !!reactivateReason" [attr.title]="reactivateReason" [attr.aria-describedby]="reactivateReason ? 'reativar-motivo' : null" (click)="askReactivate(s.data)">Reativar obra</button>
+                  <a class="btn" routerLink="/balcao/acervo">Voltar ao acervo</a>
+                </div>
+                @if (reactivateReason) { <span class="hint" id="reativar-motivo">{{ reactivateReason }}</span> }
+              } @else {
+                <a class="btn btn--primary" routerLink="/balcao/acervo">Voltar ao acervo</a>
+              }
+            </article>
+          }
+
+          <article class="card" aria-labelledby="exemplares-titulo">
+            <h2 id="exemplares-titulo">Exemplares de “{{ s.data.title }}”</h2>
+            @if (canAddCopy && s.data.is_active) {
+              <a class="btn btn--primary" [routerLink]="['/balcao/acervo', s.data.id, 'exemplares', 'novo']">Novo exemplar</a>
+            }
+            <p class="note">A obra guarda os dados bibliográficos. Cada exemplar possui código, finalidade e status próprios.</p>
+            @if (!s.data.copies.length) {
+              <p class="empty" role="status">Nenhum exemplar cadastrado para esta obra.</p>
+            } @else {
+              <div class="table-wrap">
+                <table>
+                  <caption class="sr-only">Exemplares da obra</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Código</th>
+                      <th scope="col">Finalidade</th>
+                      <th scope="col">Status</th>
+                      @if (canEditCopy || canDeleteCopy) { <th scope="col">Ações</th> }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (copy of s.data.copies; track copy.id) {
+                      <tr>
+                        <td>{{ copy.barcode }}</td>
+                        <td>{{ destinationLabel(copy.destination) }}</td>
+                        <td><span class="pill">{{ copyStatusLabel(copy) }}</span></td>
+                        @if (canEditCopy || canDeleteCopy) {
+                          <td>
+                            @let editReason = editCopyBlockReason(copy);
+                            <button class="btn" type="button" [disabled]="flow.submitting() || !!editReason" [attr.title]="editReason" [attr.aria-describedby]="editReason ? 'editar-motivo-' + copy.id : null" [attr.aria-label]="'Editar exemplar ' + copy.barcode" (click)="startEditingCopy(copy)">Editar</button>
+                            @if (editReason) { <span class="hint" [id]="'editar-motivo-' + copy.id">{{ editReason }}</span> }
+                            @let reason = deleteCopyBlockReason(s.data, copy);
+                            <button class="btn btn--danger" type="button" [disabled]="flow.submitting() || !!reason" [attr.title]="reason" [attr.aria-describedby]="reason ? 'excluir-motivo-' + copy.id : null" (click)="askDeleteCopy(s.data, copy)">Excluir exemplar</button>
+                            @if (reason) { <span class="hint" [id]="'excluir-motivo-' + copy.id">{{ reason }}</span> }
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </article>
+          @if (editingCopy(s.data); as editing) {
+          <article class="card" aria-labelledby="editar-exemplar-titulo" data-copy-panel>
+            <p class="note">Editar exemplar #{{ editing.barcode }}</p>
+            <h2 id="editar-exemplar-titulo">Editando exemplar #{{ editing.barcode }}</h2>
+            <p class="note">Obra: {{ s.data.title }}</p>
+            <div class="field">
+              <label for="copy-barcode">Código do exemplar</label>
+              <input id="copy-barcode" type="text" [value]="editing.barcode" readonly aria-describedby="copy-barcode-help" />
+              <span id="copy-barcode-help">O código identifica a cópia e não pode ser alterado.</span>
+            </div>
+            <div class="field">
+              <label for="copy-destination">Finalidade do acervo</label>
+              <select id="copy-destination" [value]="copyDestination()" (change)="setCopyDestination($event)">
+                <option value="DIDACTIC" [selected]="copyDestination() === 'DIDACTIC'">Empréstimo</option>
+                <option value="COMMERCIAL" [selected]="copyDestination() === 'COMMERCIAL'">Venda</option>
+              </select>
+            </div>
+            @if (copyDestination() === 'COMMERCIAL') {
+              <div class="field" [class.field--error]="priceError()">
+                <label for="copy-price">Preço de venda (R$)</label>
+                <input id="copy-price" type="text" inputmode="decimal" autocomplete="off" [value]="copyPrice()" (input)="setCopyPrice($event)" [attr.aria-invalid]="priceError() ? 'true' : null" />
+                @if (priceError(); as message) { <span class="field__error" role="alert">{{ message }}</span> }
+              </div>
+            }
+            <div class="field" [class.field--error]="conditionTooLong()">
+              <label for="copy-condition">Condição</label>
+              <input id="copy-condition" type="text" autocomplete="off" [value]="copyCondition()" (input)="setCopyCondition($event)" [attr.aria-invalid]="conditionTooLong() ? 'true' : null" />
+              @if (conditionTooLong()) { <span class="field__error" role="alert">A condição aceita até {{ conditionMax }} caracteres.</span> }
+            </div>
+            <p class="note">{{ conversionNote(editing) }}</p>
+            <div class="actions">
+              <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !!priceError() || conditionTooLong() || !copyChanged(editing)" (click)="askSaveCopy(s.data, editing)">Salvar exemplar</button>
+              <button class="btn" type="button" [disabled]="flow.submitting()" (click)="cancelEditingCopy()">Cancelar</button>
+            </div>
+          </article>
+          }
+        </div>
+
+        @if (flow.confirming(); as c) {
+          <app-confirm-dialog [title]="c.title" [intro]="c.intro ?? ''" [detailsTitle]="c.detailsTitle ?? ''" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="flow.submitting()" (confirmed)="flow.confirm()" (cancelled)="flow.cancel()" />
+        }
+      }
+    }
+  }
+</section>
