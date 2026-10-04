@@ -13,7 +13,7 @@ import { SnackbarService } from '../../../shared/components/snackbar/snackbar.se
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { CatalogBookDetail, LoadState } from '../models/catalog.model';
 import { CatalogService } from '../services/catalog.service';
-import { nextMonth, todayInSaoPaulo } from './loan-dates';
+import { nextMonth, pickupDeadline, todayInSaoPaulo } from './loan-dates';
 
 /** Tipo de operação do cliente, usado nos textos de bloqueio por pendência. */
 export type RequestKind = 'loan' | 'purchase' | 'reservation';
@@ -89,6 +89,8 @@ export class BookDetailsComponent {
   }
 
   protected today(): string { return todayInSaoPaulo(); }
+  /** Limite da data de retirada: a compra com exemplar destinado vence 5 dias corridos após a solicitação. */
+  protected purchaseMax(): string { return pickupDeadline(); }
 
   /** Texto de quantidade conforme a referência: "1 exemplar disponível" / "2 exemplares disponíveis". */
   protected countLabel(count: number | null, suffix = ''): string {
@@ -174,12 +176,17 @@ export class BookDetailsComponent {
     if (!nextMonth(this.purchaseDate()) || this.purchaseDate() < this.today()) {
       this.purchaseError.set('Informe uma data de retirada válida, a partir de hoje.'); return;
     }
+    if (this.purchaseDate() > this.purchaseMax()) {
+      this.purchaseError.set('A data de retirada não pode passar de ' + this.purchaseMax().split('-').reverse().join('/') + ', o prazo de retirada da reserva (5 dias corridos).'); return;
+    }
     this.purchasing.set(true);
     if (!(await this.ensureSession(book, () => this.purchasing.set(false)))) return;
     this.requests.requestPurchase(book.id, this.purchaseDate()).pipe(takeUntil(this.bookChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (response) => {
         this.purchasing.set(false); this.purchaseRequested.set(true); this.purchaseDate.set(response.pickup_date);
-        this.snackbar.show('Solicitação de compra realizada com sucesso.', 'success');
+        this.snackbar.show(response.reservation_status === 'WAITING'
+          ? 'Solicitação registrada no fim da fila de compra. A retirada depende de um exemplar ser destinado a você.'
+          : 'Solicitação de compra realizada com sucesso.', 'success');
       },
       error: (error: ApiError) => {
         this.purchasing.set(false);

@@ -50,6 +50,8 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   reservation_expired: 'O prazo de retirada desta reserva expirou.',
   reservation_not_cancellable: 'Esta reserva já foi encerrada e não pode ser cancelada. Atualize a lista.',
   no_eligible_reservation: 'Nenhuma reserva da fila tem cliente elegível no momento. Nada foi destinado.',
+  pickup_date_after_deadline: 'A data de retirada não pode ultrapassar o prazo de retirada da reserva (5 dias corridos).',
+  copy_reserved: 'Este exemplar está destinado a uma reserva de compra dentro do prazo de retirada. Conclua pela reserva ou aguarde o prazo.',
   purchase_unavailable: 'Não há exemplar comercial livre para esta operação.',
   circulation_persistence_error: 'Não foi possível concluir a operação. Nada foi alterado; tente novamente.',
   search_term_too_short: 'Informe ao menos 2 caracteres para buscar.',

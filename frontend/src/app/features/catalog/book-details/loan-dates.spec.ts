@@ -1,4 +1,4 @@
-import { nextMonth } from './loan-dates';
+import { nextMonth, pickupDeadline } from './loan-dates';
 
 describe('Prazo de um mês de calendário', () => {
   it('ajusta dias no fim do mês e considera anos bissextos', () => {
@@ -9,5 +9,14 @@ describe('Prazo de um mês de calendário', () => {
   });
   it('rejeita datas inexistentes e entrada incompleta', () => {
     for (const value of ['', '2026-02-31', '2026-13-01', '2026-00-03', 'texto']) expect(nextMonth(value)).toBe('');
+  });
+});
+
+describe('Prazo de retirada da compra', () => {
+  it('soma 5 dias corridos, inclusive na virada de mês e de ano', () => {
+    expect(pickupDeadline('2026-10-03')).toBe('2026-10-08');
+    expect(pickupDeadline('2026-10-28')).toBe('2026-11-02');
+    expect(pickupDeadline('2026-12-29')).toBe('2027-01-03');
+    expect(pickupDeadline('2028-02-27')).toBe('2028-03-03');
   });
 });
