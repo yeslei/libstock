@@ -226,6 +226,10 @@ class CatalogService:
 
     # ---- Projeção --------------------------------------------------------
 
+    def to_catalog_response(self, book: Book) -> CatalogBookResponse:
+        """Projeção pública de um livro com as ofertas reais (usada pela resposta do destaque)."""
+        return self._to_responses([book])[0]
+
     def _to_responses(self, books: list[Book]) -> list[CatalogBookResponse]:
         if not books:
             return []
