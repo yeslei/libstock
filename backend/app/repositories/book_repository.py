@@ -133,7 +133,9 @@ class BookRepository:
             ),
         }
 
-    def active_operation_links(self, book_id: int, limit: int = 10) -> list[dict]:
+    def active_operation_links(
+        self, book_id: int, limit: int = 10, *, include_clients: bool = False
+    ) -> list[dict]:
         """Vínculos legíveis (código do exemplar e cliente) para a tela de bloqueio."""
         links: list[dict] = []
         loans = self.db.execute(
@@ -179,4 +181,7 @@ class BookRepository:
             {"type": "purchase_reservation", "copy_barcode": barcode, "client_name": name}
             for barcode, name in reservations
         ]
+        if not include_clients:
+            for link in links:
+                link.pop("client_name")
         return links
