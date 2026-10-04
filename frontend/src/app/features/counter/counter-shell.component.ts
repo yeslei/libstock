@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
+import { SnackbarComponent } from '../../shared/components/snackbar/snackbar.component';
+import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
 
 interface NavEntry {
   readonly label: string;
@@ -24,7 +26,7 @@ const NAVIGATION: readonly NavEntry[] = [
 @Component({
   selector: 'app-counter-shell',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, SnackbarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-shell.component.html',
   styleUrl: './counter-shell.component.scss',
@@ -34,6 +36,8 @@ export class CounterShellComponent {
   protected readonly menuOpen = signal(false);
 
   constructor() {
+    const snackbar = inject(SnackbarService);
+    inject(DestroyRef).onDestroy(() => snackbar.dismiss());
     inject(Router)
       .events.pipe(
         filter((event) => event instanceof NavigationEnd),
