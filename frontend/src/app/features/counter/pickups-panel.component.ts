@@ -9,11 +9,13 @@ import { ConfirmDialogComponent } from './confirm-dialog.component';
 import { businessToday } from './business-date';
 import { DeskPanel } from './desk-panel';
 import { StaffLoanRequest } from './counter.service';
+import { ReceiptComponent } from '../receipts/receipt.component';
+import { ReceiptKind } from '../receipts/receipt.service';
 
 @Component({
   selector: 'app-pickups-panel',
   standalone: true,
-  imports: [SaveFailureComponent, DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
+  imports: [SaveFailureComponent, DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent, ReceiptComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './pickups-panel.component.html',
   styleUrl: './pickups-panel.component.scss',
@@ -21,6 +23,8 @@ import { StaffLoanRequest } from './counter.service';
 export class PickupsPanelComponent extends DeskPanel<StaffLoanRequest> {
   protected readonly loadError = 'Não foi possível carregar as solicitações de empréstimo.';
   protected readonly selected = signal<Readonly<Record<number, number>>>({});
+  /** Comprovante do empréstimo recém-registrado pela retirada. */
+  protected readonly receipt = signal<{ readonly kind: ReceiptKind; readonly id: number } | null>(null);
 
   protected fetch() {
     return this.service.listLoanRequests({ q: this.term(), clientId: this.client?.id });
@@ -55,6 +59,7 @@ export class PickupsPanelComponent extends DeskPanel<StaffLoanRequest> {
       confirmLabel: 'Confirmar retirada',
       run: () => this.service.confirmPickup(request.id, copy.id),
       success: (result) => `Retirada confirmada. Empréstimo #${result.id} registrado para ${request.client.name}.`,
+      done: (result) => this.receipt.set({ kind: 'loan', id: result.id }),
     });
   }
 

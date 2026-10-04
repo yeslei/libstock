@@ -22,6 +22,7 @@ from app.controllers.client_pendency_controller import (
 )
 from app.controllers.loan_controller import router as loan_router
 from app.controllers.sale_controller import router as sale_router
+from app.controllers.receipt_controller import router as receipt_router
 
 
 settings = get_settings()
@@ -87,3 +88,4 @@ app.include_router(staff_desk_router)
 app.include_router(client_pendency_router)
 app.include_router(loan_router)
 app.include_router(sale_router)
+app.include_router(receipt_router)

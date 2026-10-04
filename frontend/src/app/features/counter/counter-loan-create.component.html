@@ -196,6 +196,7 @@
           <p class="line">Devolução prevista: {{ done.loan.due_date | date: 'dd/MM/yyyy' : '-0300' }}</p>
           <p class="line">Empréstimo nº {{ done.loan.id }}@if (done.loan.status === 'OPEN') { · Status do exemplar: Emprestado }</p>
         </div>
+        <app-receipt kind="loan" [id]="done.loan.id" />
         <div class="actions">
           <button class="btn btn--primary" type="button" (click)="reset()">Novo empréstimo</button>
           <a class="btn" routerLink="/balcao/emprestimos/ativos">Ver empréstimos ativos</a>

@@ -31,6 +31,12 @@ describe('Acompanhamento do cliente', () => {
     expect(root.textContent).toContain('Este atraso gera pendência');
     expect(root.querySelector('button')).toBeNull();
   });
+  it('oferece a reimpressão do comprovante só para empréstimos já registrados (ativos e em atraso)', async () => {
+    const base = { book_id: 42, author: 'A', cover_url: null, copy_barcode: '1', due_date: '2026-11-01', pickup_date: '2026-10-01', days_late: 0 };
+    const { root } = await render('loans', [{ ...base, id: 7, title: 'Ativo', status: 'ACTIVE' }, { ...base, id: 8, title: 'Atrasado', status: 'OVERDUE', days_late: 2 }, { ...base, id: 9, title: 'Pedido', status: 'AWAITING_PICKUP' }]);
+    const hrefs = Array.from(root.querySelectorAll('a')).filter((a) => a.textContent?.trim() === 'Ver comprovante').map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(['/comprovantes/emprestimo/7', '/comprovantes/emprestimo/8']);
+  });
   it('mostra a posição retornada e o prazo apenas quando existe', async () => {
     const { root } = await render('reservations', [{id:1,book_id:42,title:'Sapiens',author:'Autor',cover_url:null,status:'WAITING',queue_position:2},
       {id:2,book_id:43,title:'Livro',author:'Autor',cover_url:null,status:'NOTIFIED',copy_barcode:'0032',available_since:'2026-10-03T12:00:00Z',expires_at:null}]);

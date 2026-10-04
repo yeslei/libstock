@@ -14,6 +14,7 @@ import { SaveFailureComponent } from './save-failure.component';
 import { isPersistenceFailure, showFailure } from './save-failure';
 import { toLoadState } from './desk-flow';
 import { canSellReservation } from './reservation-queue';
+import { ReceiptComponent } from '../receipts/receipt.component';
 
 type Step = 'check' | 'confirm' | 'done';
 type Screen = 'missing' | 'expired' | 'unavailable' | Step;
@@ -34,7 +35,7 @@ interface Completed {
 @Component({
   selector: 'app-counter-reservation-attend',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent],
+  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent, ReceiptComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-reservation-attend.component.html',
   styleUrl: './counter-reservation-attend.component.scss',

@@ -21,6 +21,7 @@ import {
 import { toLoadState } from './desk-flow';
 import { errorMessage, ineligibleReasons } from './desk-panel';
 import { SaveFailureComponent } from './save-failure.component';
+import { ReceiptComponent } from '../receipts/receipt.component';
 import { isPersistenceFailure, showFailure } from './save-failure';
 
 type Step = 'form' | 'review' | 'done' | 'blocked';
@@ -68,7 +69,7 @@ function notLoanableReason(copy: StaffCopyLookup): string {
 @Component({
   selector: 'app-counter-loan-create',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent],
+  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent, ReceiptComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-loan-create.component.html',
   styleUrl: './counter-loan-create.component.scss',
