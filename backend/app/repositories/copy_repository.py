@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.domain import (
     Book,
     Copy,
+    DestinationType,
     Employee,
     Loan,
     Profile,
@@ -15,6 +16,7 @@ from app.models.domain import (
 from app.models.loan_request import LoanRequest
 from app.models.purchase_request import PurchaseRequest
 from app.models.user import User
+from app.repositories.inventory_availability import free_copies_statement
 from app.schemas.copy_schema import CopyCreate
 
 class CopyRepository:
@@ -163,3 +165,16 @@ class CopyRepository:
             setattr(copy, field, value)
         self.db.flush()
         return copy
+
+    def has_other_free_didactic_copy(self, book_id: int, copy_id: int) -> bool:
+        statement = free_copies_statement(book_id).where(
+            Copy.destination == DestinationType.DIDACTIC, Copy.id != copy_id
+        ).limit(1)
+        return self.db.scalar(statement) is not None
+
+    def has_pending_loan_request(self, book_id: int) -> bool:
+        return self.db.scalar(
+            select(LoanRequest.id)
+            .where(LoanRequest.book_id == book_id, LoanRequest.loan_id.is_(None))
+            .limit(1)
+        ) is not None

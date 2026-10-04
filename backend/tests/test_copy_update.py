@@ -24,7 +24,10 @@ from app.services.copy_service import CopyService
 
 
 class FakeRepository:
-    def __init__(self, copy, *, employee=True, allocated=False, open_sale=False, apply_error=None):
+    def __init__(self, copy, *, employee=True, allocated=False, open_sale=False, apply_error=None,
+                 pending_request=False, other_free=True):
+        self.pending_request = pending_request
+        self.other_free = other_free
         self.copy = copy
         self.employee = employee
         self.allocated = allocated
@@ -55,6 +58,12 @@ class FakeRepository:
 
     def has_open_sale(self, _copy_id):
         return self.open_sale
+
+    def has_pending_loan_request(self, _book_id):
+        return self.pending_request
+
+    def has_other_free_didactic_copy(self, _book_id, _copy_id):
+        return self.other_free
 
     def apply_copy_changes(self, copy, changes):
         self.calls.append(f"apply({sorted(changes)})")
@@ -139,6 +148,22 @@ def test_blocked_copies_return_409_with_all_reasons_and_change_nothing(copy, kwa
     assert (session.commits, session.rollbacks) == (0, 1)
 
 
+def test_last_free_didactic_copy_with_pending_pickup_request_cannot_become_commercial():
+    repository = FakeRepository(a_copy(), pending_request=True, other_free=False)
+    session = FakeSession()
+    with pytest.raises(CopyUpdateBlockedError) as raised:
+        update(repository, {"destination": DestinationType.COMMERCIAL, "sale_price": Decimal("10")}, session)
+    assert (raised.value.status_code, raised.value.code) == (409, "copy_needed_for_requests")
+    assert not any(call.startswith("apply") for call in repository.calls)
+    assert (session.commits, session.rollbacks) == (0, 1)
+
+
+@pytest.mark.parametrize("kwargs", [{"pending_request": False, "other_free": False}, {"pending_request": True, "other_free": True}])
+def test_conversion_is_allowed_without_pending_request_or_with_another_free_copy(kwargs):
+    copy, _ = update(FakeRepository(a_copy(), **kwargs), {"destination": DestinationType.COMMERCIAL, "sale_price": Decimal("10")})
+    assert copy.destination == DestinationType.COMMERCIAL
+
+
 def test_missing_copy_inactive_employee_and_noop():
     with pytest.raises(CopyNotFoundError):
         update(FakeRepository(None), {"condition": "Bom"})
@@ -158,16 +183,24 @@ def test_missing_copy_inactive_employee_and_noop():
     assert not any(call.startswith("apply") for call in noop.calls) and session.commits == 1
 
 
-@pytest.mark.parametrize("message,error", [
-    ("An allocated copy cannot change book, destination", CopyUpdateBlockedError),
-    ("Only available or inactive copies can change destination", CopyUpdateBlockedError),
-    ("Changing destination requires a seller", PermissionDeniedError),
-    ("chk_commercial_price", CopySalePriceRequiredError),
-    ("chk_didactic_without_sale_price", CopySalePriceNotAllowedError),
-    ("qualquer outra falha", CopyUpdatePersistenceError),
+class DbOrig(Exception):
+    def __init__(self, sqlstate=None, message=None, constraint=None):
+        super().__init__(message or "erro")
+        self.sqlstate = sqlstate
+        self.diag = SimpleNamespace(message_primary=message, constraint_name=constraint)
+
+
+@pytest.mark.parametrize("orig,error", [
+    (DbOrig(message="An allocated copy cannot change book, destination, activity or availability"), CopyUpdateBlockedError),
+    (DbOrig(sqlstate="LS002"), CopyUpdateBlockedError),
+    (DbOrig(sqlstate="LS001"), PermissionDeniedError),
+    (DbOrig(constraint="chk_commercial_price"), CopySalePriceRequiredError),
+    (DbOrig(constraint="chk_didactic_without_sale_price"), CopySalePriceNotAllowedError),
+    (DbOrig(message="qualquer outra falha"), CopyUpdatePersistenceError),
+    (DbOrig(message="texto parecido: Changing destination requires"), CopyUpdatePersistenceError),
 ])
-def test_database_barriers_never_surface_as_a_raw_500(message, error):
-    repository = FakeRepository(a_copy(), apply_error=InternalError("UPDATE", {}, Exception(message)))
+def test_database_barriers_never_surface_as_a_raw_500(orig, error):
+    repository = FakeRepository(a_copy(), apply_error=InternalError("UPDATE", {}, orig))
     session = FakeSession()
     with pytest.raises(error):
         update(repository, {"condition": "Bom"}, session)

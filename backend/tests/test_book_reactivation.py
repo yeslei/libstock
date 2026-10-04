@@ -78,8 +78,9 @@ def test_other_changes_to_an_active_book_do_not_check_copies():
 
 def test_trigger_failure_on_commit_is_mapped_to_the_domain_error():
     repository = Repository(has_copy=True)
-    repository.db.commit.side_effect = InternalError(
-        "UPDATE", {}, Exception("An active book requires at least one active copy"))
+    orig = Exception("x")
+    orig.diag = SimpleNamespace(message_primary="An active book requires at least one active copy")
+    repository.db.commit.side_effect = InternalError("UPDATE", {}, orig)
     with pytest.raises(BookWithoutActiveCopyError):
         service(repository).update_book(1, BookUpdate(is_active=True), employee_id=9)
     repository.db.rollback.assert_called_once()

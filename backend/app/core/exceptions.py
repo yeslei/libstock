@@ -365,3 +365,8 @@ class CopyUpdatePersistenceError(ApplicationError):
             "copy_update_persistence_error",
             500,
         )
+
+
+# SQLSTATEs próprios do gatilho `guard_copy_integrity` (migration 20261003_0014).
+SQLSTATE_COPY_DESTINATION_FORBIDDEN = "LS001"
+SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE = "LS002"

@@ -12,6 +12,8 @@ from app.core.exceptions import (
     CopySalePriceRequiredError,
     CopyUpdateBlockedError,
     CopyUpdatePersistenceError,
+    SQLSTATE_COPY_DESTINATION_FORBIDDEN,
+    SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE,
     EmployeeRecordRequiredError,
     PermissionDeniedError,
 )
@@ -32,6 +34,15 @@ LAST_ACTIVE_REASON = {
     "message": "É o último exemplar ativo de uma obra ativa.",
 }
 
+ALLOCATED_COPY_MESSAGE = "An allocated copy cannot change book, destination, activity or availability"
+NOT_CONVERTIBLE_REASON = {
+    "code": "copy_not_available",
+    "message": "O exemplar não está disponível para conversão.",
+}
+NEEDED_FOR_REQUESTS_REASON = {
+    "code": "copy_needed_for_requests",
+    "message": "Este é o último exemplar didático livre da obra e há solicitação de retirada pendente.",
+}
 INACTIVE_REASON = {
     "code": "copy_inactive",
     "message": "O exemplar está inativo.",
@@ -164,6 +175,13 @@ class CopyService:
                 raise CopyUpdateBlockedError(reasons)
 
             values = self._resolve_update(copy, changes)
+            if (
+                values.get("destination") == DestinationType.COMMERCIAL
+                and copy.destination == DestinationType.DIDACTIC
+                and self.repository.has_pending_loan_request(copy.book_id)
+                and not self.repository.has_other_free_didactic_copy(copy.book_id, copy.id)
+            ):
+                raise CopyUpdateBlockedError([NEEDED_FOR_REQUESTS_REASON])
             if values:
                 self.repository.apply_copy_changes(copy, values)
             self.db.commit()
@@ -199,18 +217,21 @@ class CopyService:
 
     @staticmethod
     def _update_failure(exc: SQLAlchemyError) -> ApplicationError:
-        message = str(getattr(exc, "orig", None) or exc)
-        if "allocated copy" in message.lower():
-            return CopyUpdateBlockedError([ALLOCATED_REASON])
-        if "can change destination" in message:
-            return CopyUpdateBlockedError(
-                [{"code": "copy_not_available", "message": "O exemplar não está disponível para conversão."}]
-            )
-        if "Changing destination requires" in message:
+        orig = getattr(exc, "orig", None)
+        sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+        diag = getattr(orig, "diag", None)
+        constraint = getattr(diag, "constraint_name", None)
+        # Gatilho da migration 0014: SQLSTATE próprio por motivo.
+        if sqlstate == SQLSTATE_COPY_DESTINATION_FORBIDDEN:
             return PermissionDeniedError()
-        if "chk_commercial_price" in message:
+        if sqlstate == SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE:
+            return CopyUpdateBlockedError([NOT_CONVERTIBLE_REASON])
+        # Gatilho da migration 0013 (já integrada, sem SQLSTATE próprio): mensagem exata.
+        if getattr(diag, "message_primary", None) == ALLOCATED_COPY_MESSAGE:
+            return CopyUpdateBlockedError([ALLOCATED_REASON])
+        if constraint == "chk_commercial_price":
             return CopySalePriceRequiredError()
-        if "chk_didactic_without_sale_price" in message:
+        if constraint == "chk_didactic_without_sale_price":
             return CopySalePriceNotAllowedError()
         return CopyUpdatePersistenceError()
 

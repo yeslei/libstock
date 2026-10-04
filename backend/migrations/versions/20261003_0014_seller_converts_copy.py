@@ -29,7 +29,7 @@ BEGIN
     IF TG_OP = 'UPDATE' THEN
         IF NEW.destination IS DISTINCT FROM OLD.destination
            AND OLD.status NOT IN ('AVAILABLE', 'INACTIVE') THEN
-            RAISE EXCEPTION 'Only available or inactive copies can change destination';
+            RAISE EXCEPTION 'Only available or inactive copies can change destination'%(errcode_not_available)s;
         END IF;
 
         IF NEW.destination IS DISTINCT FROM OLD.destination THEN
@@ -41,7 +41,7 @@ BEGIN
                 WHERE ur.user_id = actor_id
                   AND r.code %(papeis)s
             ) THEN
-                RAISE EXCEPTION '%(mensagem)s';
+                RAISE EXCEPTION '%(mensagem)s'%(errcode_forbidden)s;
             END IF;
         END IF;
 
@@ -101,6 +101,9 @@ def upgrade() -> None:
         % {
             "papeis": "IN ('SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR')",
             "mensagem": "Changing destination requires a seller, stock keeper or administrator",
+            # SQLSTATE próprios (mapeados no service sem depender do texto da mensagem).
+            "errcode_forbidden": " USING ERRCODE = 'LS001'",
+            "errcode_not_available": " USING ERRCODE = 'LS002'",
         }
     )
 
@@ -111,5 +114,7 @@ def downgrade() -> None:
         % {
             "papeis": "= 'ADMINISTRATOR'",
             "mensagem": "Changing destination requires an administrator",
+            "errcode_forbidden": "",
+            "errcode_not_available": "",
         }
     )
