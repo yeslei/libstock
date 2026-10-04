@@ -143,6 +143,12 @@ export const LIST_LIMIT = 50;
 export const CLIENT_SEARCH_LIMIT = 20;
 export const COPY_LOOKUP_LIMIT = 20;
 
+/** Filtros da lista padrão de exemplares (`GET /staff/copies` sem termo). */
+export interface CopyListFilter {
+  readonly destination?: 'COMMERCIAL' | 'DIDACTIC';
+  readonly available?: boolean;
+}
+
 /** Item pedido a `POST /api/v1/sales/`: só o exemplar; o preço é sempre o cadastrado, definido pelo backend. */
 export interface SaleItemRequest {
   readonly copy_id: number;
@@ -151,7 +157,7 @@ export interface SaleItemRequest {
 /** Resposta de `POST /api/v1/sales/`: a venda direta nasce CONFIRMED e o exemplar passa a SOLD. */
 export interface SaleRegistration {
   readonly id: number;
-  readonly client_id: number | null;
+  readonly client_id: number;
   readonly employee_id?: number;
   readonly sale_date?: string;
   readonly status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
@@ -200,8 +206,9 @@ export class CounterService {
     return this.http.get<StaffDashboard>(`${STAFF}/dashboard`);
   }
 
-  searchClients(q: string): Observable<StaffClient[]> {
-    return this.http.get<StaffClient[]>(`${STAFF}/clients`, { params: params({ q: q.trim(), limit: CLIENT_SEARCH_LIMIT }) });
+  /** Sem termo, lista os clientes ativos por nome (Issue #172); com termo, busca por nome ou e-mail (mínimo de 2 caracteres). */
+  searchClients(q?: string): Observable<StaffClient[]> {
+    return this.http.get<StaffClient[]>(`${STAFF}/clients`, { params: params({ q: q?.trim(), limit: CLIENT_SEARCH_LIMIT }) });
   }
 
   getClientPendencies(clientId: number): Observable<ClientPendencies> {
@@ -232,10 +239,17 @@ export class CounterService {
     return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, { params: params({ q: q.trim(), limit: COPY_LOOKUP_LIMIT }) });
   }
 
-  /** Registra a venda direta, confirmada no ato (SELLER e ADMINISTRATOR). Não envia preço: vale o do exemplar. */
-  registerSale(copyId: number): Observable<SaleRegistration> {
+  /** Lista padrão sem termo (Issue #172): exemplares por finalidade e disponibilidade, ordenados por título e código. */
+  listCopies(filter: CopyListFilter): Observable<StaffCopyLookup[]> {
+    return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, {
+      params: params({ destination: filter.destination, available: filter.available ? 'true' : null, limit: COPY_LOOKUP_LIMIT }),
+    });
+  }
+
+  /** Registra a venda direta, confirmada no ato (SELLER e ADMINISTRATOR). Exige o cliente; não envia preço: vale o do exemplar. */
+  registerSale(clientId: number, copyId: number): Observable<SaleRegistration> {
     const items: SaleItemRequest[] = [{ copy_id: copyId }];
-    return this.http.post<SaleRegistration>('/api/v1/sales/', { items });
+    return this.http.post<SaleRegistration>('/api/v1/sales/', { client_id: clientId, items });
   }
 
   /** Registra o empréstimo direto. Endpoint existente de `/api/v1/loans`, permitido a SELLER e ADMINISTRATOR; o prazo é calculado por ele. */

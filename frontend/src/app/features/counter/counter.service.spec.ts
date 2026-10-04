@@ -38,6 +38,14 @@ describe('CounterService', () => {
     expect(error?.status).toBe(403);
   });
 
+  it('lista clientes ativos sem enviar termo (lista padrão do balcão)', () => {
+    service.searchClients().subscribe();
+    const request = http.expectOne((r) => r.url === '/api/v1/staff/clients');
+    expect(request.request.params.has('q')).toBeFalse();
+    expect(request.request.params.get('limit')).toBe('20');
+    request.flush([]);
+  });
+
   it('busca clientes por termo aparado no endpoint de balcão', () => {
     service.searchClients('  ana  ').subscribe();
     const request = http.expectOne((r) => r.url === '/api/v1/staff/clients');
@@ -174,6 +182,16 @@ describe('CounterService', () => {
       request.flush([]);
     });
 
+    it('lista exemplares sem termo, filtrando por finalidade e disponibilidade', () => {
+      service.listCopies({ destination: 'COMMERCIAL', available: true }).subscribe();
+      const request = http.expectOne((r) => r.url === '/api/v1/staff/copies');
+      expect(request.request.params.has('q')).toBeFalse();
+      expect(request.request.params.get('destination')).toBe('COMMERCIAL');
+      expect(request.request.params.get('available')).toBe('true');
+      expect(request.request.params.get('limit')).toBe('20');
+      request.flush([]);
+    });
+
     it('explica o termo ausente na busca de exemplares', () => {
       let error: ApiError | undefined;
       service.lookupCopies('x').subscribe({ error: (e) => (error = e) });
@@ -183,26 +201,26 @@ describe('CounterService', () => {
   });
 
   describe('venda direta', () => {
-    it('registra a venda em POST /api/v1/sales/ sem enviar preço e sem cliente', () => {
+    it('registra a venda em POST /api/v1/sales/ com o cliente e sem enviar preço', () => {
       let result: unknown;
-      service.registerSale(7).subscribe((value) => (result = value));
+      service.registerSale(3, 7).subscribe((value) => (result = value));
       const request = http.expectOne('/api/v1/sales/');
       expect(request.request.method).toBe('POST');
-      expect(request.request.body).toEqual({ items: [{ copy_id: 7 }] });
-      request.flush({ id: 5, client_id: null, status: 'CONFIRMED', total_amount: '38.90' }, { status: 201, statusText: 'Created' });
+      expect(request.request.body).toEqual({ client_id: 3, items: [{ copy_id: 7 }] });
+      request.flush({ id: 5, client_id: 3, status: 'CONFIRMED', total_amount: '38.90' }, { status: 201, statusText: 'Created' });
       expect(result).toEqual(jasmine.objectContaining({ id: 5, status: 'CONFIRMED' }));
     });
 
     it('propaga o erro de exemplar sem preço cadastrado', () => {
       let error: ApiError | undefined;
-      service.registerSale(7).subscribe({ error: (e) => (error = e) });
+      service.registerSale(3, 7).subscribe({ error: (e) => (error = e) });
       http.expectOne('/api/v1/sales/').flush({ detail: 'x', code: 'copy_without_price' }, { status: 409, statusText: 'Conflict' });
       expect(error?.code).toBe('copy_without_price');
     });
 
     it('propaga o erro de domínio do exemplar didático', () => {
       let error: ApiError | undefined;
-      service.registerSale(7).subscribe({ error: (e) => (error = e) });
+      service.registerSale(3, 7).subscribe({ error: (e) => (error = e) });
       http.expectOne('/api/v1/sales/').flush({ detail: 'Exemplares didáticos não podem ser vendidos.' }, { status: 409, statusText: 'Conflict' });
       expect(error?.status).toBe(409);
       expect(error?.detail).toBe('Exemplares didáticos não podem ser vendidos.');

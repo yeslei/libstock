@@ -24,9 +24,10 @@ const created: LoanRegistration = {
 };
 
 function setup(configure: (service: jasmine.SpyObj<CounterService>) => void = () => undefined) {
-  const service = jasmine.createSpyObj<CounterService>('CounterService', ['searchClients', 'lookupCopies', 'registerLoan']);
+  const service = jasmine.createSpyObj<CounterService>('CounterService', ['searchClients', 'lookupCopies', 'listCopies', 'registerLoan']);
   service.searchClients.and.returnValue(of([client()]));
   service.lookupCopies.and.returnValue(of([copy()]));
+  service.listCopies.and.returnValue(of([copy()]));
   configure(service);
   TestBed.configureTestingModule({
     imports: [CounterLoanCreateComponent],
@@ -75,32 +76,66 @@ function fill(fixture: ComponentFixture<unknown>, root: HTMLElement) {
 }
 
 describe('Balcão: novo empréstimo', () => {
-  it('abre o formulário sem consultar nada e sem permitir revisar', () => {
+  it('abre listando clientes ativos e exemplares didáticos disponíveis, sem permitir revisar', () => {
     const { root, service } = setup();
     expect(root.querySelector('h1')?.textContent).toBe('Novo empréstimo no balcão');
-    expect(service.searchClients).not.toHaveBeenCalled();
+    expect(service.searchClients).toHaveBeenCalledOnceWith(undefined);
+    expect(service.listCopies).toHaveBeenCalledOnceWith({ destination: 'DIDACTIC', available: true });
     expect(service.lookupCopies).not.toHaveBeenCalled();
+    expect(root.textContent).toContain('Maria Silva');
+    expect(root.textContent).toContain('Dom Casmurro');
     expect(button(root, 'Revisar empréstimo').disabled).toBeTrue();
     expect(root.textContent).toContain('Devolução prevista: calculada automaticamente ao registrar');
     expect(root.textContent).not.toContain('15 dias');
     expect(root.textContent).toContain('O prazo é de um mês de calendário');
   });
 
-  it('exige ao menos 2 caracteres para buscar o cliente e o termo para o exemplar', () => {
+  it('exige ao menos 2 caracteres para filtrar o cliente e volta à lista padrão com o filtro vazio', () => {
     const { fixture, root, service } = setup();
     type(fixture, root.querySelector('#loan-client') as HTMLInputElement, 'm');
     submit(fixture, root.querySelector('#loan-client')!.closest('form') as HTMLFormElement);
-    expect(service.searchClients).not.toHaveBeenCalled();
+    expect(service.searchClients).toHaveBeenCalledTimes(1);
     expect(root.querySelector('#loan-client-error')?.textContent).toContain('ao menos 2 caracteres');
+    type(fixture, root.querySelector('#loan-client') as HTMLInputElement, '');
+    submit(fixture, root.querySelector('#loan-client')!.closest('form') as HTMLFormElement);
+    expect(service.searchClients).toHaveBeenCalledTimes(2);
+    expect(service.searchClients.calls.mostRecent().args).toEqual([undefined]);
     submit(fixture, root.querySelector('#loan-copy')!.closest('form') as HTMLFormElement);
     expect(service.lookupCopies).not.toHaveBeenCalled();
-    expect(root.querySelector('#loan-copy-error')?.textContent).toContain('Informe o código do exemplar');
+    expect(service.listCopies).toHaveBeenCalledTimes(2);
+  });
+
+  it('filtra clientes e exemplares pela busca, sem repetir a lista padrão', () => {
+    const { fixture, root, service } = setup();
+    fill(fixture, root);
+    expect(service.searchClients.calls.allArgs()).toEqual([[undefined], ['maria']]);
+    expect(service.lookupCopies).toHaveBeenCalledOnceWith('casmurro');
+    expect(service.listCopies).toHaveBeenCalledTimes(1);
+  });
+
+  it('mostra carregando, vazio, erro e aviso de limite nas listas padrão', () => {
+    const waiting = new Subject<StaffClient[]>();
+    const { fixture, root, service } = setup((s) => {
+      s.searchClients.and.returnValue(waiting);
+      s.listCopies.and.returnValue(throwError(() => ({ detail: 'Falha ao consultar.' })));
+    });
+    expect(root.textContent).toContain('Carregando clientes');
+    waiting.next([]);
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Nenhum cliente ativo cadastrado.');
+    expect(root.textContent).toContain('Falha ao consultar.');
+    service.listCopies.and.returnValue(of(Array.from({ length: 20 }, (_, i) => copy({ id: i + 1, barcode: `D-${i}` }))));
+    click(fixture, button(root, 'Tentar novamente'));
+    expect(root.textContent).toContain('Mostrando os primeiros 20 resultados');
+    service.listCopies.and.returnValue(of([]));
+    submit(fixture, root.querySelector('#loan-copy')!.closest('form') as HTMLFormElement);
+    expect(root.textContent).toContain('Nenhum exemplar didático disponível no momento.');
   });
 
   it('seleciona cliente apto e exemplar didático livre e habilita a revisão', () => {
     const { fixture, root, service } = setup();
     fill(fixture, root);
-    expect(service.searchClients).toHaveBeenCalledOnceWith('maria');
+    expect(service.searchClients).toHaveBeenCalledWith('maria');
     expect(service.lookupCopies).toHaveBeenCalledOnceWith('casmurro');
     expect(root.textContent).toContain('Cliente apto');
     expect(root.textContent).toContain('Conta ativa · sem pendências.');
@@ -131,7 +166,7 @@ describe('Balcão: novo empréstimo', () => {
       ])));
     type(fixture, root.querySelector('#loan-copy') as HTMLInputElement, 'x');
     submit(fixture, root.querySelector('#loan-copy')!.closest('form') as HTMLFormElement);
-    const items = Array.from(root.querySelectorAll('.results li'));
+    const items = Array.from(root.querySelectorAll('[aria-label="Exemplares encontrados"] li'));
     expect(items.map((li) => li.querySelector('button')!.disabled)).toEqual([true, true, true, false]);
     const text = items.map((li) => li.textContent?.replace(/\s+/g, ' '));
     expect(text[0]).toContain('exemplar destinado à venda');

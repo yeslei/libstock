@@ -2,23 +2,40 @@
   <p class="page__crumb">Vendas / Registrar venda</p>
   <h1 id="venda-titulo">Registrar venda</h1>
 
-  <form class="search" role="search" (submit)="search($event)">
-    <label class="sr-only" for="sale-q">Código do exemplar, ISBN ou título</label>
-    <input
-      id="sale-q"
-      type="search"
-      maxlength="100"
-      placeholder="Código do exemplar, ISBN ou título"
-      [value]="term()"
-      [attr.aria-invalid]="missingTerm()"
-      [attr.aria-describedby]="missingTerm() ? 'sale-q-error' : null"
-      (input)="setTerm($event)"
-    />
-    <button class="btn btn--primary" type="submit">Buscar</button>
-  </form>
-  @if (missingTerm()) {
-    <p class="field__error" id="sale-q-error" role="alert">Informe o código do exemplar, o ISBN ou o título.</p>
-  }
+  <div class="block">
+    <h2 class="block__label">Cliente *</h2>
+    @if (client(); as selected) {
+      <div class="selected">
+        <p class="selected__text"><strong>{{ selected.name }}</strong> · {{ selected.email }}</p>
+        <button class="btn" type="button" (click)="client.set(null)">Trocar cliente</button>
+      </div>
+      @if (selected.is_penalized) {
+        <p class="note">Cliente penalizado: a penalidade não bloqueia a venda, pois o pagamento é feito no balcão.</p>
+      }
+    } @else {
+      <app-client-picker inputId="sale-client" mode="sale" (picked)="selectClient($event)" />
+    }
+  </div>
+
+  <div class="block">
+    <h2 class="block__label">Exemplar</h2>
+    <form class="search" role="search" (submit)="search($event)">
+      <label class="sr-only" for="sale-q">Código do exemplar, ISBN ou título</label>
+      <input
+        id="sale-q"
+        type="search"
+        maxlength="100"
+        placeholder="Filtrar por código, ISBN ou título"
+        [value]="term()"
+        (input)="setTerm($event)"
+      />
+      <button class="btn btn--primary" type="submit">Buscar</button>
+    </form>
+    <p class="hint">Exemplares comerciais disponíveis para venda, por título e código. Filtre por código, ISBN ou título.</p>
+    @if (!client()) {
+      <p class="note" role="status">Selecione o cliente para registrar a venda.</p>
+    }
+  </div>
 
   @if (soldId(); as saleId) {
     <app-receipt kind="sale" [id]="saleId" [closable]="true" [focusOnLoad]="true" (closed)="soldId.set(null)" />
@@ -33,13 +50,15 @@
 
   @if (state(); as s) {
     @switch (s.status) {
-      @case ('loading') { <p class="loading" role="status"><app-spinner /> Buscando exemplares…</p> }
+      @case ('loading') { <p class="loading" role="status"><app-spinner /> Carregando exemplares…</p> }
       @case ('error') {
         <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
       }
       @case ('loaded') {
         @if (!s.data.length) {
-          <p class="empty" role="status">Nenhum exemplar encontrado para “{{ searched() }}”. Confira o código, o ISBN ou o título.</p>
+          <p class="empty" role="status">
+            @if (searched()) { Nenhum exemplar encontrado para “{{ searched() }}”. Confira o código, o ISBN ou o título. } @else { Nenhum exemplar comercial disponível para venda no momento. }
+          </p>
         } @else {
           <ul class="results">
             @for (copy of s.data; track copy.id) {
@@ -67,14 +86,14 @@
                         <p class="note note--danger">Sem preço de venda cadastrado, a venda não pode ser registrada.</p>
                       }
                     </div>
-                    <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !canRegister(copy)" (click)="registerSale(copy)">Registrar venda</button>
+                    <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !client() || !canRegister(copy)" (click)="registerSale(copy)">Registrar venda</button>
                   </article>
                 }
               </li>
             }
           </ul>
           @if (s.data.length >= limit) {
-            <p class="note">Mostrando os primeiros {{ limit }} resultados. Refine a busca para localizar outro exemplar.</p>
+            <p class="note">Mostrando os primeiros {{ limit }} resultados. Refine o filtro para localizar outro exemplar.</p>
           }
         }
       }
