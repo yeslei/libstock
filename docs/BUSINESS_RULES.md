@@ -31,7 +31,7 @@ Não substitui a documentação técnica da API nem as migrations.
 - disponibilidade derivada dos exemplares;
 - controle de papéis;
 - persistência de entidades de circulação;
-- vendas: registro da venda e bloqueio de venda de exemplares didáticos implementados; confirmação da venda, atualização do status do exemplar e demais etapas do fluxo ainda dependem de regras específicas.
+- vendas: venda direta confirmada no ato, com exemplar `SOLD` e preço do cadastro (Issue #149), e bloqueio de venda de exemplares didáticos implementados; estorno e cancelamento de venda seguem como funcionalidade planejada.
 
 ### Planejado, mas não disponível
 
@@ -475,12 +475,10 @@ A venda é registrada:
 - vinculada ao funcionário responsável;
 - opcionalmente vinculada a um cliente;
 - contendo um ou mais exemplares;
-- com o preço unitário informado para cada item;
+- com o preço unitário de cada item igual ao `sale_price` cadastrado no exemplar, lido do banco pelo backend;
 - com `total_amount` calculado pelo backend a partir dos itens.
 
-A venda é criada inicialmente com:
-
-- `status = PENDING`.
+Regra aprovada — decisão delegada pelo responsável em 2026-10-03, Issue #147 (decisão 3, implementada na Issue #149): a venda direta é paga no balcão e por isso é confirmada no ato. A venda é criada e confirmada na mesma transação (`status = CONFIRMED`) e cada exemplar passa a `SOLD`, pelo mesmo mecanismo da confirmação de venda V2 (gatilhos de banco `trg_validate_sale_transition` e `trg_apply_sale_copy_state`, que também registram o funcionário na auditoria); não há caminho paralelo. O valor `unit_price` enviado pelo cliente, se houver, é ignorado: o campo permanece opcional no schema apenas por compatibilidade e está descontinuado; o frontend não o envia.
 
 O `employee_id` é obtido a partir do usuário autenticado.
 
@@ -491,7 +489,9 @@ O `employee_id` é obtido a partir do usuário autenticado.
 - não é permitida a criação da venda para exemplar inativo;
 - não é permitida a criação da venda para exemplar que não esteja `AVAILABLE`;
 - não é permitida a criação da venda para exemplar com destinação `DIDACTIC`;
-- a criação da venda e de seus itens ocorre na mesma transação;
+- exemplar comercial sem `sale_price` é recusado com 409 `copy_without_price` (o banco já impede esse estado em exemplares comerciais; a recusa é uma defesa do service);
+- o livro de cada exemplar é travado antes do exemplar (ordem livro → exemplar); duas vendas concorrentes do mesmo exemplar são serializadas: uma é confirmada e a outra recebe 409 de exemplar indisponível;
+- a criação da venda, dos itens, a confirmação e a mudança do exemplar para `SOLD` ocorrem na mesma transação;
 - falha na operação provoca rollback;
 - conflitos de integridade resultam em erro explícito.
 
@@ -499,9 +499,10 @@ O `employee_id` é obtido a partir do usuário autenticado.
 
 - HTTP 201;
 - venda persistida;
-- itens da venda persistidos;
+- itens da venda persistidos com o preço cadastrado no exemplar;
 - `total_amount` calculado pelo backend;
-- `status = PENDING`.
+- `status = CONFIRMED`;
+- exemplares com `status = SOLD`.
 
 #### Erros possíveis
 
@@ -511,14 +512,20 @@ O `employee_id` é obtido a partir do usuário autenticado.
 | Exemplar não encontrado | 404 | Um ou mais exemplares informados não existem ou estão inativos |
 | Exemplar indisponível | 409 | Um ou mais exemplares não estão disponíveis para venda |
 | Exemplar didático | 409 | Exemplar com destinação `DIDACTIC` não pode ser vendido |
+| Obra inativa | 409 | `book_inactive` |
+| Exemplar comercial sem preço | 409 | `copy_without_price` |
 | Falha de integridade | 409 | Não foi possível registrar a venda |
 | Falha de banco | 500 | Não foi possível registrar a venda |
 
 #### Testes
 
-- registro de venda com sucesso;
+- registro de venda com sucesso, venda `CONFIRMED` e exemplar `SOLD`;
 - registro com múltiplos exemplares;
 - cálculo automático do `total_amount`;
+- preço vindo do banco mesmo se outro valor for enviado;
+- exemplar comercial sem preço recusado;
+- concorrência de duas vendas do mesmo exemplar (uma vence, a outra recebe indisponível);
+- auditoria do funcionário na mudança do exemplar;
 - venda sem cliente;
 - cliente inexistente;
 - exemplar inexistente;
@@ -533,12 +540,9 @@ O `employee_id` é obtido a partir do usuário autenticado.
 
 #### Escopo ainda não implementado
 
-Este fluxo não implementa ainda:
+Funcionalidade planejada (não implementada): estorno e cancelamento de venda. Uma venda confirmada é final no banco (`A confirmed sale is final and cannot be cancelled`) e nenhum endpoint a desfaz.
 
-- atualização do status do exemplar para `SOLD` após confirmação da venda;
-- confirmação ou cancelamento da venda.
-
-Essas regras pertencem às implementações específicas correspondentes.
+Dados anteriores: vendas `PENDING` criadas pelo fluxo direto antes da Issue #149 podem existir em bases já em uso. Elas mantêm o exemplar `AVAILABLE` e o impedem de nova venda (venda em andamento). Não há endpoint para confirmá-las ou cancelá-las e nenhuma migration de dados foi feita; o tratamento (confirmar ou cancelar caso a caso) fica como decisão operacional pendente do responsável.
 
 ### Reserva
 
@@ -874,7 +878,7 @@ Estado: `APPROVED` para o recorte de telas e consultas solicitado em 03/10/2026;
 - Regra aprovada: a consulta de pendências do balcão é `GET /api/v1/staff/clients/{id}/pendencies`, somente leitura, com atraso pela regra V2 (calendário de America/Sao_Paulo) e sem sincronizar penalidade.
 - Limitação técnica / decisão pendente: o endpoint V1 `GET /api/v1/clients/{id}/pendencies` permanece como estava (comportamento herdado, não alterado): sincroniza a penalização com regra de atraso por instante e não exige funcionário ativo. A divergência V1/V2 de atraso e de sincronização de penalidade aguarda decisão de unificação; não é classificada como defeito. O balcão não o utiliza.
 - Regra aprovada (indicadores do Painel): `GET /api/v1/staff/dashboard`, somente leitura, mesmo guard de `/staff`. Definições exatas: empréstimos ativos = empréstimos `OPEN`; devoluções hoje = empréstimos com `returned_at` na data atual de America/Sao_Paulo (00:00 inclusive a 00:00 seguinte exclusive); reservas aguardando = reservas de compra `WAITING`; pendências = clientes distintos com empréstimo `OPEN` em atraso pela regra V2 (vencimento antes do início do dia de negócio atual; vencer hoje não é atraso). O cálculo de atraso é o mesmo de `has_overdue_loan`, compartilhado no repository.
-- Decisão pendente (escopo atualizado em 03/10/2026): o empréstimo direto (`POST /api/v1/loans`) e a venda direta (`POST /api/v1/sales`) devem coexistir com os fluxos V2 sob a decisão do responsável de entrega incremental. Suas regras atuais não são alteradas e divergem da V2 (prazo de 15 dias corridos contra um mês de calendário; atraso por instante contra calendário de São Paulo). A unificação exige decisão de negócio. A venda direta foi implementada no balcão (Issue #126, abaixo) e o empréstimo direto também (Issue #136, abaixo).
+- Decisão pendente (escopo atualizado em 03/10/2026): o empréstimo direto (`POST /api/v1/loans`) e a venda direta (`POST /api/v1/sales`) devem coexistir com os fluxos V2 sob a decisão do responsável de entrega incremental. Suas regras divergem da V2 (a venda direta passou a ser confirmada no ato pela Issue #149, ver Venda direta no balcão abaixo; o empréstimo direto segue como estava) (prazo de 15 dias corridos contra um mês de calendário; atraso por instante contra calendário de São Paulo). A unificação exige decisão de negócio. A venda direta foi implementada no balcão (Issue #126, abaixo) e o empréstimo direto também (Issue #136, abaixo).
 - Regra aprovada (Acervo do balcão, Issue #124): as consultas `GET /api/v1/staff/books`, `GET /api/v1/staff/books/{id}` e `GET /api/v1/staff/copies` são somente leitura e usam o guard de `/staff` (`SELLER`/`ADMINISTRATOR`). A obra informa total e contagem por destinação apenas de exemplares ativos e não vendidos; o detalhe lista os exemplares com destinação, status e as situações `free` (livre pela definição comum) e `allocated_for_purchase`. A tela deriva o rótulo do exemplar desses fatos (Disponível, Emprestado, Reservado para venda, Venda em andamento, Vendido, Inativo).
 - Regra aprovada (Acervo do balcão): categoria e inativação de obra usam `PATCH /api/v1/books/{id}`, autorizado no backend a `STOCK_KEEPER`, `MANAGER` e `ADMINISTRATOR`; `SELLER` só lê. A tela mostra as ações apenas a esses papéis (no balcão chega apenas `ADMINISTRATOR`), exige confirmação, bloqueia envio duplicado, anuncia sucesso só após 2xx e recarrega a obra após qualquer resposta. Categoria vazia é enviada como nula.
 - Decisão pendente (Refs #21 e #22): editar e converter (Venda ↔ Empréstimo) exemplar e "destinação da obra" (no modelo a destinação é por exemplar, com um único valor). Não existe `PATCH /copies` nem regra de conversão ou papéis; a tela não oferece essas ações (a inclusão e a exclusão de exemplar foram entregues na Issue #135, abaixo).
@@ -884,9 +888,9 @@ Estado: `APPROVED` para o recorte de telas e consultas solicitado em 03/10/2026;
 - Regra aprovada (Empréstimos ativos e devolução no balcão, Issue #125): `/balcao/emprestimos/ativos` é uma tabela somente leitura de `GET /api/v1/staff/loans`, com atraso pela regra V2 já existente (sem regra nova); o contador "ativos • atrasados" conta os itens listados, e a tela avisa quando o limite de `limit` é atingido. `/balcao/devolucoes` localiza o empréstimo aberto por `q` (código do exemplar ou ISBN, que o backend também aceita com hífens) e registra a devolução por `POST /api/v1/staff/loans/{id}/confirm-return` com confirmação, bloqueio de envio duplicado e sucesso só após 2xx; depois de qualquer resposta a busca é refeita. Nenhuma consulta nova no backend. A frase do rodapé ("Atraso gera pendência do cliente até a devolução ser registrada") reflete a seção 20 e a seção 21 (pendência = empréstimo `OPEN` em atraso) e não cria multa nem penalidade.
 - Limitação técnica: o campo de devolução usa o mesmo `q` da lista de empréstimos, que também casa nome do cliente, e-mail, título e autor; a interface rotula o campo como código do exemplar ou ISBN, mas não restringe a consulta. Um ISBN pode retornar vários empréstimos abertos da mesma obra; o funcionário escolhe o exemplar correto.
 - Decisão pendente: "Fila desta obra" nas solicitações e comprovante de devolução (itens do Figma sem regra ou desenho aprovado neste recorte) seguem fora da interface. O item "Reservas" da sidebar foi entregue na Issue #127 (abaixo).
-- Regra aprovada (Venda direta no balcão, Issue #126): `/balcao/vendas` busca o exemplar por código, ISBN ou título (`GET /api/v1/staff/copies`; a elegibilidade `sellable` e o motivo do bloqueio vêm do backend) e registra a venda por `POST /api/v1/sales/`, já restrito a `SELLER` e `ADMINISTRATOR` (sem ampliação de papéis), sem cliente (`client_id` opcional) e com um item. A tela pede confirmação, bloqueia envio duplicado e só mostra sucesso após 2xx. O backend cria a venda `PENDING` e o exemplar continua `AVAILABLE`: a tela diz "Venda registrada como pendente" e nunca "vendido"/"venda concluída"; depois de qualquer resposta a busca é refeita e o exemplar passa a aparecer como indisponível (venda em andamento). Exemplar didático é bloqueado no cartão e, se o POST for tentado, vale o erro de domínio existente (409, "Exemplares didáticos não podem ser vendidos."). `unit_price` enviado é o `sale_price` do exemplar retornado pelo backend, não editável; sem preço cadastrado a venda não é oferecida. Nenhuma regra, endpoint ou migration nova.
-- Decisão pendente (Refs #126): confirmação e cancelamento da venda direta PENDING. Não há endpoint (a confirmação de venda V2 só atende reservas de compra), e por isso o estado final da referência ("Venda registrada", estoque antes/depois, status "Vendido") não pode ser exibido; também não há comprovante.
-- Decisão pendente (Refs #126): validação do preço no backend. `POST /api/v1/sales/` aceita qualquer `unit_price >= 0` enviado pelo cliente, sem compará-lo ao `sale_price` do exemplar; a tela envia o preço do exemplar, mas a garantia não é do backend. Também pendente: venda para cliente identificado (o endpoint aceita `client_id`, a referência não o mostra) e a possibilidade de duas vendas pendentes do mesmo exemplar, hoje barrada na busca por `free`, mas não pelo endpoint (que só exige `AVAILABLE`).
+- Regra aprovada (Venda direta no balcão, Issue #126; atualizada pela Issue #149): `/balcao/vendas` busca o exemplar por código, ISBN ou título (`GET /api/v1/staff/copies`; a elegibilidade `sellable` e o motivo do bloqueio vêm do backend) e registra a venda por `POST /api/v1/sales/`, restrito a `SELLER` e `ADMINISTRATOR` (sem ampliação de papéis), sem cliente (`client_id` opcional) e com um item. A tela pede confirmação, bloqueia envio duplicado e só mostra sucesso após 2xx. Regra aprovada — decisão delegada pelo responsável em 2026-10-03, Issue #147 (decisão 3): a venda direta é confirmada no ato (pagamento no balcão), o exemplar passa a `SOLD` na mesma transação e o preço de cada item é sempre o `sale_price` cadastrado no exemplar, definido pelo servidor, que ignora o `unit_price` enviado; exemplar comercial sem preço é recusado com 409 `copy_without_price`. A tela envia apenas o exemplar, diz "Venda registrada" com a obra, o exemplar vendido, o total e o número da venda devolvidos pelo backend, e depois refaz a busca (o exemplar passa a aparecer como indisponível). Exemplar didático é bloqueado no cartão e, se o POST for tentado, vale o erro de domínio existente (409, "Exemplares didáticos não podem ser vendidos."); obra inativa recebe 409 `book_inactive`. Nenhuma migration nova.
+- Funcionalidade planejada (Refs #126, #149): estorno e cancelamento de venda confirmada; não há endpoint nem regra aprovada. Também não há comprovante, e a tela ainda não exibe estoque antes e depois (o backend não os devolve).
+- Decisão pendente (Refs #126): venda para cliente identificado (o endpoint aceita `client_id`, a referência não o mostra). A validação do preço e a duplicidade de venda do mesmo exemplar foram resolvidas na Issue #149: o preço vem sempre do exemplar e duas vendas concorrentes do mesmo exemplar são serializadas pelo lock livro → exemplar (uma vence, a outra recebe 409).
 - Regra aprovada (rotas do balcão, Issue #126): as reservas de compra foram movidas de `/balcao/vendas` para `/balcao/reservas` sem alteração funcional, para liberar `/balcao/vendas` à venda direta. O item de menu "Reservas" e o redesenho foram entregues na Issue #127 (abaixo); o atalho "Reservas" em Clientes continua levando a `/balcao/reservas`.
 - Regra aprovada (Reservas de compra no balcão, Issue #127): item "Reservas" na sidebar (após "Vendas") e rotas `/balcao/reservas` (fila por obra) e `/balcao/reservas/:id?cliente=` (atender, confirmar e venda concluída), sem endpoint, regra ou migration novos. A lista usa `GET /api/v1/staff/purchase-reservations` (busca por título, nome, e-mail ou código do exemplar; filtro de cliente vindo de "Clientes") e agrupa por obra no frontend; a posição exibida é a `queue_position` do backend (só reservas aguardando). A destinação usa `POST /api/v1/staff/books/{id}/allocate-purchase` com diálogo de confirmação (apenas a primeira da fila elegível; o bloqueio é explicado e a fila não é saltada).
 - Regra aprovada (Atender reserva): a tela localiza a reserva na mesma consulta (filtrada pelo cliente da URL; não há consulta por id), mostra cliente, situação de elegibilidade, exemplar destinado e `expires_at` somente se persistido, e exige que o código digitado seja igual (após remover espaços nas pontas) ao `allocated_copy_barcode` devolvido pelo backend antes de avançar. A etapa de resumo confirma a venda por `POST /api/v1/staff/purchase-reservations/{id}/confirm-sale`, bloqueia envio duplicado e só mostra "Venda da reserva concluída" após 2xx. O texto "exemplar ficará Vendido e a reserva será concluída" reflete o gatilho de banco já existente (venda confirmada → exemplar `SOLD`, reserva `FULFILLED`, coberto em `test_staff_desk_postgres`). Erros de domínio (`reservation_expired`, `reservation_not_ready`, `client_ineligible` etc.) são exibidos com a mensagem do backend, sem sucesso, e a reserva é recarregada.
@@ -916,7 +920,7 @@ Estado: `APPROVED` para o recorte de telas e consultas solicitado em 03/10/2026;
 - Lacuna do backend (Issue #136): `POST /api/v1/loans/` não verifica a destinação do exemplar (aceita exemplar comercial `AVAILABLE`; a conferência de obra ativa passou a existir na Issue #135, `book_inactive`); a restrição a exemplar didático livre vem apenas da tela. Os 409 de exemplar indisponível e de conflito de integridade não têm código estável (`HTTPException`), e a tela os distingue pelo status HTTP. O gatilho `trg_link_client_loan_request` vincula ao novo empréstimo a solicitação de empréstimo pendente do mesmo cliente e da mesma obra, se existir; não há tela nem regra aprovada sobre esse efeito colateral (decisão pendente).- Fora do escopo: comprovante digital, cancelamento de reservas, notificações e gestão manual de penalidade pela interface.
 - Regra aprovada (Feedback por snackbar e estados de recuperação, Issue #137): componente compartilhado `app-snackbar` com as quatro variantes da referência (sucesso, erro, atenção, informação), hospedado uma única vez no layout do balcão e descartado ao sair dele. Erros usam região `role="alert"` (assertiva); as demais, `role="status"` (educada); as duas regiões existem desde o início para o anúncio funcionar, o foco nunca é movido, há botão "Fechar" e Esc fecha quando o foco está na mensagem. Sucesso e informação sem ação somem após 8 s; erro, atenção e mensagens com ação ficam até o fechamento (a referência não indica tempo; os 8 s são decisão de implementação). Orientação da referência aplicada: sucesso e erro de uma ação vão para o snackbar; bloqueios e decisões (cartões de bloqueio, "Operação bloqueada", tela de venda/empréstimo concluído, fora do prazo) continuam como estado, sem repetir a mesma mensagem no snackbar; confirmação destrutiva continua em diálogo modal.
 - Regra aprovada (feedback nas operações de escrita do balcão, Issue #137): sucesso só após 2xx, com os textos já existentes por operação (retirada, devolução, destinação, categoria, inativação, exclusão de exemplar). Recusa de domínio 4xx usa a mensagem do backend: 409 como atenção e as demais como erro. Falha de rede (status 0) ou 5xx mostra o estado "Não foi possível salvar" (referência 07_2: "A operação não foi concluída… Atualize a consulta antes de repetir a operação para evitar registros duplicados") com "Atualizar consulta" e "Voltar", sem snackbar. A tela nunca reenvia sozinha; como o resultado pode ser incerto, a nova tentativa é manual, depois de atualizar a consulta (a lista é recarregada após qualquer resposta) e novo diálogo de confirmação. Não há idempotência no backend, por isso não existe botão "Tentar novamente" que reenvie a escrita.
-- Divergências da referência (Issue #137): os textos prontos da referência ("Devolução registrada com sucesso.", "Venda registrada com sucesso." etc.) não são usados porque as mensagens atuais descrevem o comportamento real (por exemplo, a venda direta fica pendente e o exemplar não é "vendido"); a variante informação existe no componente, mas nenhuma tela do balcão a usa ainda (a posição na fila é exibida em cartões); a tela de atendimento de reserva, a de inclusão de exemplar e o empréstimo direto mostram o sucesso em estado próprio (referências 02, 03 e 06) e por isso não disparam snackbar; as falhas de carregamento (consultas GET) seguem em alerta com "Tentar novamente", que é seguro por ser leitura.
+- Divergências da referência (Issue #137): os textos prontos da referência ("Devolução registrada com sucesso.", "Venda registrada com sucesso." etc.) não são usados porque as mensagens atuais descrevem o comportamento real (por exemplo, a venda direta usa "Venda registrada" com os dados devolvidos pelo backend, e não o texto genérico); a variante informação existe no componente, mas nenhuma tela do balcão a usa ainda (a posição na fila é exibida em cartões); a tela de atendimento de reserva, a de inclusão de exemplar e o empréstimo direto mostram o sucesso em estado próprio (referências 02, 03 e 06) e por isso não disparam snackbar; as falhas de carregamento (consultas GET) seguem em alerta com "Tentar novamente", que é seguro por ser leitura.
 
 - Regra aprovada (telas do cliente: login, início e categoria, Issue #129): usam somente os endpoints públicos de leitura `/api/v1/catalog/*` (`featured-books`, `genres`, `books`, `genres/{slug}/books`) e a autenticação existente; nenhuma regra de negócio nova. A disponibilidade nos cartões vem do contrato do catálogo: "Empréstimo disponível" (destinação didática livre), "Venda disponível" (comercial livre) e "Esgotado" (sem exemplar livre, US02). A consulta local permanece não configurada.
 - Regra aprovada (busca dentro da categoria, Issue #129): `GET /api/v1/catalog/genres/{slug}/books` aceita o parâmetro opcional `q` (até 100 caracteres), somente leitura e público, que filtra por trecho do título ou do autor (sem diferenciar maiúsculas; `%` e `_` são literais) dentro da categoria, mantendo a paginação e a regra de visibilidade do catálogo (obra ativa com exemplar ativo). Termo em branco equivale a sem filtro. Não altera resposta, schemas nem autorização.
