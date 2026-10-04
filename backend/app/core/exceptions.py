@@ -255,6 +255,15 @@ class ClientPenaltyPersistenceError(ApplicationError):
         )
 
 
+class CopyWithoutPriceError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__(
+            "O exemplar comercial não tem preço de venda cadastrado.",
+            "copy_without_price",
+            409,
+        )
+
+
 class BookInactiveError(ApplicationError):
     def __init__(self) -> None:
         super().__init__(

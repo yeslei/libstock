@@ -8,10 +8,14 @@ from app.models.domain import SaleStatus
 
 class SaleItemCreate(BaseModel):
     copy_id: int = Field(gt=0)
-    unit_price: Decimal = Field(
+    # Descontinuado: o servidor usa sempre o sale_price do exemplar e ignora este
+    # valor. Mantido opcional apenas por compatibilidade com clientes antigos.
+    unit_price: Decimal | None = Field(
+        default=None,
         ge=0,
         max_digits=10,
         decimal_places=2,
+        description="Ignorado: o preço vem do exemplar cadastrado.",
     )
 
 
