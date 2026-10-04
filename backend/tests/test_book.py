@@ -167,7 +167,7 @@ def test_create_book_sem_token_retorna_401():
     assert response.json()["code"] == "invalid_token"
 
 
-@pytest.mark.parametrize("role", ["USER", "SELLER"])
+@pytest.mark.parametrize("role", ["USER"])
 def test_create_book_com_role_insuficiente_retorna_403(role):
     _use_fake_service()
     _authenticate_as(role)
@@ -178,7 +178,7 @@ def test_create_book_com_role_insuficiente_retorna_403(role):
     assert response.json()["code"] == "permission_denied"
 
 
-@pytest.mark.parametrize("role", ["STOCK_KEEPER", "ADMINISTRATOR"])
+@pytest.mark.parametrize("role", ["SELLER", "STOCK_KEEPER", "ADMINISTRATOR"])
 def test_roles_autorizadas_cadastram_obra(role):
     fake = _use_fake_service()
     _authenticate_as(role, user_id=73)

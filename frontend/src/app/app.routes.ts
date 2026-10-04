@@ -136,7 +136,7 @@ export const routes: Routes = [
   {
     path: 'obras/nova',
     canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar obra · LibStock',
     loadComponent: () =>
       import('./features/books/book-create/book-create.component').then(
@@ -146,7 +146,7 @@ export const routes: Routes = [
   {
     path: 'obras/:id/exemplares/novo',
     canActivate: [authGuard, roleGuard],
-    data: { roles: ['STOCK_KEEPER', 'ADMINISTRATOR'] },
+    data: { roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
     title: 'Cadastrar exemplar · LibStock',
     loadComponent: () =>
       import('./features/copies/copy-create/copy-create.component').then(
