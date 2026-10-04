@@ -143,6 +143,21 @@ export const LIST_LIMIT = 50;
 export const CLIENT_SEARCH_LIMIT = 20;
 export const COPY_LOOKUP_LIMIT = 20;
 
+/** Item pedido a `POST /api/v1/sales/`; o preço enviado é o do exemplar retornado pelo backend. */
+export interface SaleItemRequest {
+  readonly copy_id: number;
+  /** Decimal em texto, exatamente como a API o entregou (sem conversão para ponto flutuante). */
+  readonly unit_price: string;
+}
+
+/** Resposta de `POST /api/v1/sales/`: a venda nasce PENDING; nenhum endpoint a confirma ou cancela. */
+export interface SaleRegistration {
+  readonly id: number;
+  readonly client_id: number | null;
+  readonly status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  readonly total_amount: string | number;
+}
+
 export interface CirculationResult {
   readonly id: number;
 }
@@ -201,6 +216,12 @@ export class CounterService {
 
   lookupCopies(q: string): Observable<StaffCopyLookup[]> {
     return this.http.get<StaffCopyLookup[]>(`${STAFF}/copies`, { params: params({ q: q.trim(), limit: COPY_LOOKUP_LIMIT }) });
+  }
+
+  /** Registra a venda direta (PENDING). Endpoint existente de `/api/v1/sales`, permitido a SELLER e ADMINISTRATOR. */
+  registerSale(copyId: number, unitPrice: string | number): Observable<SaleRegistration> {
+    const items: SaleItemRequest[] = [{ copy_id: copyId, unit_price: String(unitPrice) }];
+    return this.http.post<SaleRegistration>('/api/v1/sales/', { items });
   }
 
   listLoans(filter: DeskFilter = {}): Observable<StaffLoan[]> {

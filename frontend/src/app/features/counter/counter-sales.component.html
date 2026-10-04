@@ -1,0 +1,80 @@
+<section class="page" aria-labelledby="venda-titulo">
+  <p class="page__crumb">Vendas / Registrar venda</p>
+  <h1 id="venda-titulo">Registrar venda</h1>
+
+  <form class="search" role="search" (submit)="search($event)">
+    <label class="sr-only" for="sale-q">Código do exemplar, ISBN ou título</label>
+    <input
+      id="sale-q"
+      type="search"
+      maxlength="100"
+      placeholder="Código do exemplar, ISBN ou título"
+      [value]="term()"
+      [attr.aria-invalid]="missingTerm()"
+      [attr.aria-describedby]="missingTerm() ? 'sale-q-error' : null"
+      (input)="setTerm($event)"
+    />
+    <button class="btn btn--primary" type="submit">Buscar</button>
+  </form>
+  @if (missingTerm()) {
+    <p class="field__error" id="sale-q-error" role="alert">Informe o código do exemplar, o ISBN ou o título.</p>
+  }
+
+  <div data-feedback tabindex="-1">
+    @if (flow.feedback(); as f) { <app-alert [message]="f.message" [variant]="f.kind" /> }
+  </div>
+
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') { <p class="loading" role="status"><app-spinner /> Buscando exemplares…</p> }
+      @case ('error') {
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        @if (!s.data.length) {
+          <p class="empty" role="status">Nenhum exemplar encontrado para “{{ searched() }}”. Confira o código, o ISBN ou o título.</p>
+        } @else {
+          <ul class="results">
+            @for (copy of s.data; track copy.id) {
+              <li>
+                @if (copy.sale_block_reason === 'DIDACTIC') {
+                  <article class="card card--danger result" [attr.aria-labelledby]="'copy-' + copy.id">
+                    <h2 [id]="'copy-' + copy.id">{{ copy.book.title }}</h2>
+                    <p class="result__meta">Exemplar {{ copy.barcode }} • Didático</p>
+                    <p class="result__block" role="alert">Venda não permitida. Exemplares didáticos não podem ser vendidos.</p>
+                  </article>
+                } @else if (!copy.sellable) {
+                  <article class="card card--muted result" [attr.aria-labelledby]="'copy-' + copy.id">
+                    <h2 [id]="'copy-' + copy.id">{{ copy.book.title }}</h2>
+                    <p class="result__meta">Exemplar {{ copy.barcode }} • Comercial</p>
+                    <p class="result__block">Indisponível para venda no momento: {{ unavailableReason(copy) }}.</p>
+                  </article>
+                } @else {
+                  <article class="card result result--sellable" [attr.aria-labelledby]="'copy-' + copy.id">
+                    <div>
+                      <h2 [id]="'copy-' + copy.id">{{ copy.book.title }}</h2>
+                      <p class="result__ok">Comercial <span aria-hidden="true">•</span> Disponível para venda</p>
+                      <p class="result__meta">Exemplar {{ copy.barcode }} • {{ copy.free_commercial_copies }} exemplar(es) comercial(is) livre(s) da obra</p>
+                      <p class="result__price">{{ copy.sale_price === null ? 'Preço não cadastrado' : price(copy.sale_price) }}</p>
+                      @if (!canRegister(copy)) {
+                        <p class="note note--danger">Sem preço de venda cadastrado, a venda não pode ser registrada.</p>
+                      }
+                    </div>
+                    <button class="btn btn--primary" type="button" [disabled]="flow.submitting() || !canRegister(copy)" (click)="registerSale(copy)">Registrar venda</button>
+                  </article>
+                }
+              </li>
+            }
+          </ul>
+          @if (s.data.length >= limit) {
+            <p class="note">Mostrando os primeiros {{ limit }} resultados. Refine a busca para localizar outro exemplar.</p>
+          }
+        }
+      }
+    }
+  }
+
+  @if (flow.confirming(); as c) {
+    <app-confirm-dialog [title]="c.title" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="flow.submitting()" (confirmed)="flow.confirm()" (cancelled)="flow.cancel()" />
+  }
+</section>

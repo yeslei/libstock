@@ -1,0 +1,64 @@
+@use 'variables' as *;
+@use './staff-page';
+
+.page__crumb {
+  margin: 0;
+  color: $staff-accent;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.search {
+  margin-bottom: $space-3;
+}
+
+.results {
+  display: grid;
+  gap: 16px;
+  margin: $space-4 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 920px;
+}
+
+.result {
+  p {
+    margin: 10px 0 0;
+    font-size: 13px;
+  }
+
+  &--sellable {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}
+
+.card--muted {
+  background: #fff;
+  color: $staff-muted;
+}
+
+.result__ok {
+  color: $staff-accent;
+}
+
+.result__meta {
+  color: $staff-muted;
+}
+
+.result .result__price {
+  color: $staff-sidebar;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.result__block {
+  color: $error;
+}
+
+.card--muted .result__block {
+  color: $staff-muted;
+}
