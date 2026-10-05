@@ -19,11 +19,12 @@
               routerLinkActive="shell__link--active"
               ariaCurrentWhenActive="page"
               [routerLinkActiveOptions]="{ exact: item.exact }"
-            >{{ item.label }}</a>
+            ><app-staff-icon [name]="item.icon" />{{ item.label }}</a>
           </li>
         }
       </ul>
     </nav>
+    <div class="shell__session"><span>{{ account?.name }}</span><button type="button" (click)="logout()" [disabled]="leaving()">{{ leaving() ? 'Saindo…' : 'Sair' }}</button></div>
   </aside>
 
   <main class="shell__main" id="balcao-conteudo">

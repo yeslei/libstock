@@ -1,19 +1,19 @@
 @use 'variables' as *;
 @use 'mixins' as *;
 :host { display: block; }
-.auth { display: flex; align-items: center; justify-content: center; min-height: calc(100dvh - 76px); padding: $space-10 $space-4; background: white; }
-.auth__shell { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 1040px; min-height: 620px; overflow: hidden; border: 1px solid $client-border; border-radius: 20px; }
-.auth__aside { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 54px; background: $client-green; color: white; }
-.auth__logo { width: 149px; height: 140px; object-fit: contain; border-radius: $radius-sm; background: $creme; margin-bottom: $space-8; }
-.auth__wordmark { font-size: 34px; font-weight: 600; }
-.auth__pitch { max-width: 340px; line-height: 2; }
-.auth__card { display: flex; flex-direction: column; justify-content: center; padding: 54px; background: white; }
+.auth { display: flex; align-items: center; justify-content: center; min-height: 100dvh; padding: $space-6 $space-4; background: white; }
+.auth__shell { display: grid; grid-template-columns: 0.85fr 1.15fr; width: 100%; max-width: 760px; min-height: 0; overflow: hidden; border: 1px solid $client-border; border-radius: 20px; }
+.auth__aside { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 32px; background: $client-green; color: white; }
+.auth__logo { width: 100px; height: 94px; object-fit: contain; border-radius: $radius-sm; background: $creme; margin-bottom: $space-5; }
+.auth__wordmark { font-size: 28px; font-weight: 600; }
+.auth__pitch { max-width: 340px; line-height: 1.6; font-size: 14px; }
+.auth__card { display: flex; flex-direction: column; justify-content: center; padding: 32px; background: white; }
 @media (max-width: 767px) {
-  .auth { min-height: auto; padding-block: $space-6; }
+  .auth { min-height: 100dvh; padding-block: $space-4; }
   .auth__shell { grid-template-columns: 1fr; max-width: 480px; min-height: auto; }
-  .auth__aside { padding: $space-6; }
+  .auth__aside { padding: 20px 24px; }
   .auth__logo { display: none; }
   .auth__wordmark { font-size: 24px; }
   .auth__pitch { font-size: $font-size-sm; }
-  .auth__card { padding: $space-8 $space-6; }
+  .auth__card { padding: 24px; }
 }

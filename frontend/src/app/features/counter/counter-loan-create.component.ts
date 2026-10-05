@@ -1,3 +1,4 @@
+import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -73,6 +74,7 @@ function notLoanableReason(): string {
 })
 export class CounterLoanCreateComponent {
   private readonly service = inject(CounterService);
+  private readonly initialTerm = inject(ActivatedRoute, { optional: true })?.snapshot.queryParamMap.get('q') ?? '';
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly snackbar = inject(SnackbarService);
@@ -89,7 +91,7 @@ export class CounterLoanCreateComponent {
 
   protected readonly step = signal<Step>('form');
   protected readonly client = signal<StaffClient | null>(null);
-  protected readonly copyTerm = signal('');
+  protected readonly copyTerm = signal(this.initialTerm);
   protected readonly copyState = signal<LoadState<readonly StaffCopyLookup[]> | null>(null);
   protected readonly copy = signal<StaffCopyLookup | null>(null);
   protected readonly submitting = signal(false);
@@ -97,7 +99,7 @@ export class CounterLoanCreateComponent {
   protected readonly blocked = signal<Blocked | null>(null);
   protected readonly completed = signal<Completed | null>(null);
   /** Termo do filtro de exemplares aplicado (vazio: lista padrão de didáticos disponíveis), reutilizado ao atualizar. */
-  protected lastCopyTerm = '';
+  protected lastCopyTerm = this.initialTerm;
 
   /** Só é possível revisar com cliente apto (`eligible` do backend) e exemplar didático livre. */
   protected readonly canReview = computed(() => {

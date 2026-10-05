@@ -11,6 +11,7 @@ export interface CopyCreateRequest {
 
 /** Corpo de `PATCH /api/v1/copies/{id}`; o código do exemplar é imutável e não faz parte da edição. */
 export interface CopyUpdateRequest {
+  readonly isActive?: boolean;
   readonly destination?: DestinationType;
   readonly condition?: string | null;
   readonly salePrice?: number | null;

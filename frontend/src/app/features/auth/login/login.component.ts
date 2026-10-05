@@ -134,7 +134,7 @@ export class LoginComponent {
   private redirectTarget(): string {
     const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo');
     // Só caminhos internos: um `redirectTo` absoluto seria um open redirect.
-    return redirectTo?.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/';
+    return redirectTo?.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : this.auth.currentUser?.role_codes.some(role => role !== 'USER') ? '/balcao' : '/';
   }
 
   private focusFirstInvalid(): void {

@@ -1,3 +1,4 @@
+import { DashboardOverview } from './dashboard/dashboard.models';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -110,6 +111,9 @@ export interface StaffCatalogBook {
   readonly total_copies: number;
   readonly didactic_copies: number;
   readonly commercial_copies: number;
+  readonly available_didactic?: number;
+  readonly available_commercial?: number;
+  readonly cover_url?: string | null;
 }
 
 export interface StaffCatalogCopy {
@@ -210,6 +214,8 @@ function params(values: Record<string, string | number | null | undefined>): Htt
 export class CounterService {
   private readonly http = inject(HttpClient);
 
+  getDashboardOverview(): Observable<DashboardOverview> { return this.http.get<DashboardOverview>(`${STAFF}/dashboard/overview`); }
+
   getDashboard(): Observable<StaffDashboard> {
     return this.http.get<StaffDashboard>(`${STAFF}/dashboard`);
   }
@@ -235,8 +241,8 @@ export class CounterService {
     });
   }
 
-  listCatalogBooks(q: string): Observable<StaffCatalogBook[]> {
-    return this.http.get<StaffCatalogBook[]>(`${STAFF}/books`, { params: params({ q: q.trim(), limit: LIST_LIMIT }) });
+  listCatalogBooks(q: string, offset = 0, availability = 'all', limit = LIST_LIMIT): Observable<StaffCatalogBook[]> {
+    return this.http.get<StaffCatalogBook[]>(`${STAFF}/books`, { params: params({ q: q.trim(), limit, ...(offset ? { offset } : {}), ...(availability !== 'all' ? { availability } : {}) }) });
   }
 
   getCatalogBook(bookId: number): Observable<StaffCatalogBookDetail> {

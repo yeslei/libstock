@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
+import { AuthService } from '../../core/services/auth.service';
 import { businessToday } from './business-date';
 import { CounterDashboardComponent } from './counter-dashboard.component';
 import { CounterLoansHomeComponent } from './counter-loans-home.component';
@@ -12,11 +13,12 @@ const client = { id: 3, name: 'Ana', email: 'ana@x.dev', is_active: true, is_pen
 const book = { id: 10, title: 'Dom Casmurro', author: 'Machado', is_active: true };
 
 function setup<T>(component: new () => T, configure: (service: jasmine.SpyObj<CounterService>) => void) {
-  const service = jasmine.createSpyObj<CounterService>('CounterService', ['getDashboard', 'listLoanRequests', 'listLoans']);
+  const service = jasmine.createSpyObj<CounterService>('CounterService', ['getDashboard', 'getDashboardOverview', 'listLoanRequests', 'listLoans']);
+  service.getDashboardOverview.and.returnValue(of({ loans_today: 2, week: [], categories: [], popular: [], recent_loans: [], recent_returns: [] }));
   configure(service);
   TestBed.configureTestingModule({
     imports: [component],
-    providers: [provideRouter([]), { provide: CounterService, useValue: service }],
+    providers: [provideRouter([]), { provide: CounterService, useValue: service }, { provide: AuthService, useValue: { currentUser: { name: 'Vendedor', role_codes: ['SELLER'] }, logout: () => of(undefined) } }],
   });
   const fixture = TestBed.createComponent(component);
   fixture.detectChanges();
@@ -24,45 +26,45 @@ function setup<T>(component: new () => T, configure: (service: jasmine.SpyObj<Co
 }
 
 describe('Balcão: painel', () => {
-  it('mostra os quatro cartões de acesso, na ordem e com os textos do Figma', () => {
+  it('prioriza as ações de circulação no hero e mantém a estrutura editorial', () => {
     const { root } = setup(CounterDashboardComponent, (s) => s.getDashboard.and.returnValue(of(dashboard)));
-    expect(root.querySelector('h1')?.textContent).toBe('Painel');
-    expect(root.textContent).toContain('Acesso rápido às operações da biblioteca.');
-    const cards = Array.from(root.querySelectorAll('a.card--access'));
-    expect(cards.map((c) => c.querySelector('.card__title')?.textContent)).toEqual([
-      'Consultar acervo', 'Registrar devolução', 'Vendas', 'Empréstimo']);
-    expect(cards.map((c) => c.getAttribute('href'))).toEqual(['/balcao/acervo', '/balcao/devolucoes', '/balcao/vendas', '/balcao/emprestimos/novo']);
-    expect(cards[0].textContent).toContain('Buscar obras e disponibilidade');
-    expect(cards[0].textContent).toContain('Acessar');
+    expect(root.querySelector('.global-search')).toBeNull();
+    expect(root.querySelector('.page-heading')).toBeNull();
+    const links = Array.from(root.querySelectorAll('.hero__actions a'));
+    expect(links.map(a => a.getAttribute('href'))).toEqual(['/balcao/emprestimos/novo', '/balcao/devolucoes']);
+    expect(root.querySelector('app-weekly-movement')).not.toBeNull();
+    expect(root.querySelector('app-category-chart')).not.toBeNull();
+    expect(root.textContent).not.toContain('Precisa da sua atenção');
+    expect(root.textContent).toContain('Ainda não há empréstimos registrados');
   });
 
   it('exibe os indicadores vindos do backend', () => {
     const { root } = setup(CounterDashboardComponent, (s) => s.getDashboard.and.returnValue(of(dashboard)));
     const text = (selector: string) => Array.from(root.querySelectorAll(selector)).map((el) => el.textContent?.trim());
-    expect(text('.card--indicator .card__value')).toEqual(['32', '8', '4', '3']);
-    expect(text('.card--indicator .card__label')).toEqual(['Empréstimos ativos', 'Devoluções hoje', 'Reservas aguardando', 'Pendências']);
+    expect(text('app-stat-card strong')).toEqual(['2', '8', '4', '3']);
+    expect(text('app-stat-card .label')).toEqual(['Empréstimos do dia', 'Devoluções do dia', 'Reservas aguardando', 'Pendências']);
   });
 
   it('indica carregamento sem inventar números e depois mostra os valores', () => {
     const pending = new Subject<StaffDashboard>();
     const { fixture, root } = setup(CounterDashboardComponent, (s) => s.getDashboard.and.returnValue(pending));
     expect(root.querySelector('[aria-busy="true"]')).not.toBeNull();
-    expect(root.querySelector('.card__value')?.textContent).toBe('—');
-    pending.next(dashboard);
+    expect(root.querySelector('app-stat-card strong')?.textContent).toBe('—');
+    pending.next(dashboard); pending.complete();
     fixture.detectChanges();
-    expect(root.querySelector('.card__value')?.textContent).toBe('32');
+    expect(root.querySelector('app-stat-card strong')?.textContent).toBe('2');
   });
 
   it('mostra o erro de domínio e permite tentar de novo sem exibir números', () => {
     const { fixture, root, service } = setup(CounterDashboardComponent, (s) =>
       s.getDashboard.and.returnValue(throwError(() => ({ detail: 'Cadastro de funcionário ativo necessário.' }))));
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('Cadastro de funcionário ativo necessário.');
-    expect(root.querySelector('.card__value')?.textContent).toBe('—');
+    expect(root.querySelector('app-stat-card strong')?.textContent).toBe('—');
     service.getDashboard.and.returnValue(of(dashboard));
     (Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Tentar novamente') as HTMLElement).click();
     fixture.detectChanges();
     expect(root.querySelector('[role="alert"]')).toBeNull();
-    expect(root.querySelector('.card__value')?.textContent).toBe('32');
+    expect(root.querySelector('app-stat-card strong')?.textContent).toBe('2');
   });
 });
 
