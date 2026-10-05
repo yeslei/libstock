@@ -1,8 +1,6 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.domain import AuditLog, Book, Client, Copy, Employee, Loan, LoanStatus
-
 from app.models.domain import (
     AuditLog,
     Book,
@@ -19,11 +17,7 @@ class ClientPendencyRepository:
         self.db = db
 
     def find_client_for_update(self, client_id: int) -> Client | None:
-        statement = (
-            select(Client)
-            .where(Client.id == client_id)
-            .with_for_update()
-        )
+        statement = select(Client).where(Client.id == client_id).with_for_update()
         return self.db.scalar(statement)
 
     def list_overdue_loans(self, client_id: int) -> list[dict]:

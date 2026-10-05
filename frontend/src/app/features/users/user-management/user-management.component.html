@@ -76,6 +76,9 @@
                 <td>
                   <div class="actions">
                     <button type="button" (click)="editUser(user.id)">Editar</button>
+                    @if (user.role_codes.includes('USER')) {
+                      <button type="button" (click)="viewPendencies(user.id)">Pendências</button>
+                    }
                     <button
                       type="button"
                       (click)="inactivate(user)"

@@ -63,6 +63,10 @@ export class UserManagementComponent implements OnInit {
     void this.router.navigate(['/gestao/usuarios', userId, 'editar']);
   }
 
+  protected viewPendencies(userId: number): void {
+    void this.router.navigate(['/gestao/clientes', userId, 'pendencias']);
+  }
+
   protected filterByRole(event: Event): void {
     this.selectedRole.set((event.target as HTMLSelectElement).value as RoleCode | '');
     this.loadUsers();

@@ -93,6 +93,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'gestao/clientes/:id/pendencias',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['SELLER', 'ADMINISTRATOR'] },
+    title: 'Pendências do cliente · LibStock',
+    loadComponent: () => import('./features/clients/client-pendency/client-pendency.component').then((m) => m.ClientPendencyComponent),
+  },
+  {
     path: 'gestao/funcionarios',
     canActivate: [authGuard, roleGuard],
     data: { roles: ['ADMINISTRATOR'] },

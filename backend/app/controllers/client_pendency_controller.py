@@ -4,9 +4,9 @@ from app.dependencies.authentication import require_roles
 from app.dependencies.services import get_client_pendency_service
 from app.models.user import User
 from app.schemas.client_pendency_schema import (
+    ClientPenaltyUpdate,
     ClientPendencyResponse,
     ClientValidationResponse,
-    PenaltyUpdateRequest,
 )
 from app.services.client_pendency_service import ClientPendencyService
 
@@ -16,10 +16,7 @@ router = APIRouter(
     tags=["Clientes"],
 )
 
-require_pendency_reader = require_roles(
-    "SELLER",
-    "ADMINISTRATOR",
-)
+require_pendency_reader = require_roles("SELLER", "ADMINISTRATOR")
 
 @router.get(
     "/{client_id}/validation",
@@ -54,7 +51,7 @@ def get_client_pendencies(
 )
 def update_client_penalty(
     client_id: int,
-    payload: PenaltyUpdateRequest,
+    payload: ClientPenaltyUpdate,
     current_user: User = Depends(require_pendency_reader),
     client_pendency_service: ClientPendencyService = Depends(
         get_client_pendency_service
