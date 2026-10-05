@@ -1,3 +1,4 @@
+import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -27,12 +28,13 @@ import { ReceiptComponent } from '../receipts/receipt.component';
 })
 export class CounterReturnsComponent implements OnInit {
   private readonly service = inject(CounterService);
+  private readonly initialTerm = inject(ActivatedRoute, { optional: true })?.snapshot.queryParamMap.get('q') ?? '';
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly searches = new Subject<void>();
 
-  protected readonly term = signal('');
+  protected readonly term = signal(this.initialTerm);
   /** Termo da última busca enviada (vazio = lista padrão); é ele que a recarga reutiliza. */
-  protected readonly searched = signal('');
+  protected readonly searched = signal(this.initialTerm);
   protected readonly limit = LIST_LIMIT;
   /** Empréstimo cuja devolução acabou de ser registrada; abre o comprovante de devolução. */
   protected readonly returnedLoanId = signal<number | null>(null);

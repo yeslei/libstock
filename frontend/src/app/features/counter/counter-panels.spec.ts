@@ -1,3 +1,4 @@
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { snackbarMessage, snackbarVariant } from '../../shared/components/snackbar/snackbar.testing';
 import { Provider, Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -332,7 +333,7 @@ describe('Balcão: controle de pendências', () => {
     const { fixture, root } = setup(CounterClientsPageComponent, (s) => {
       s.searchClients.and.returnValue(of([client()]));
       s.getClientPendencies.and.returnValue(of({ client: client(), overdue_loans: [] }));
-    }, [{ provide: Router, useValue: router }]);
+    }, [{ provide: Router, useValue: router }, { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } }]);
     search(fixture, root, 'ana');
     click(fixture, button(root, 'Empréstimos ativos'));
     expect(TestBed.inject(CounterContext).client()?.id).toBe(3);

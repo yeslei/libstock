@@ -95,3 +95,15 @@ alembic check
 alembic upgrade head
 alembic downgrade -1
 alembic upgrade head
+```
+
+## Preferências de design do usuário
+
+- Não usar rótulos ou frases acima dos títulos dos cabeçalhos.
+- Manter espaço vertical entre avisos e ações de recuperação.
+- Usar caminhos explícitos como `← Acervo / Dom Casmurro`.
+- Estoque apresentado como números com rótulos, sem cards.
+- Toda a linha da obra deve abrir o detalhe com acessibilidade de teclado.
+
+- Vendedor/funcionário, estoquista e administrador usam somente sidebar em todo o fluxo, inclusive na página inicial e na administração de usuários.
+- Evitar excesso de botões e informações simultâneas: priorizar a tarefa principal, agrupar ações secundárias e manter a listagem compacta.

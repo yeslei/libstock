@@ -1,5 +1,5 @@
 export type CopyDestination = 'DIDACTIC' | 'COMMERCIAL';
-export type CopyStatus = 'AVAILABLE';
+export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'SOLD' | 'RESERVED' | 'INACTIVE';
 
 export interface InitialCopyCreateRequest {
   readonly barcode: string;
@@ -64,6 +64,9 @@ export interface BookUpdateRequest {
 }
 
 export interface BookDetail extends BookResponse {
+  readonly publication_year?: number | null;
+  readonly publisher?: string | null;
+  readonly edition?: string | null;
   readonly copies: CopyResponse[];
 }
 

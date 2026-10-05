@@ -1,0 +1,229 @@
+<main class="batch">
+  <nav class="breadcrumb" aria-label="Caminho da página">
+    <a routerLink="/balcao/acervo" queryParamsHandling="preserve">← Acervo</a> /
+    @if (book(); as item) {
+      <a [routerLink]="['/balcao/acervo', item.id]" queryParamsHandling="preserve">{{
+        item.title
+      }}</a>
+      /
+    }
+    <span aria-current="page">Adicionar exemplares</span>
+  </nav>
+  <h1>Adicionar exemplares</h1>
+  <p class="intro">Cadastre vários exemplares da mesma obra sem repetir os dados.</p>
+  @if (loading()) {
+    <p role="status"><app-spinner /> Carregando obra…</p>
+  }
+  @if (error(); as message) {
+    <app-alert [message]="message" variant="error" />
+    @if (!book()) {
+      <button class="retry" type="button" (click)="load()">Tentar novamente</button>
+    }
+  }
+  @if (book(); as item) {
+    <p class="selected-book">
+      <strong>{{ item.title }}</strong> · {{ item.author }}
+    </p>
+    @if (created().length) {
+      <section class="success">
+        <app-alert
+          [message]="created().length + ' exemplar(es) cadastrado(s) com sucesso.'"
+          variant="success"
+        />
+        <p>Todos os exemplares do lote foram salvos.</p>
+        <ul>
+          @for (copy of created(); track copy.id) {
+            <li>{{ copy.barcode }}</li>
+          }
+        </ul>
+        <div class="actions">
+          <a
+            class="button"
+            [routerLink]="['/balcao/acervo', item.id]"
+            queryParamsHandling="preserve"
+            >Voltar para a obra →</a
+          ><button class="secondary" type="button" (click)="anotherBatch()">
+            Adicionar outro lote
+          </button>
+        </div>
+      </section>
+    } @else {
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <section class="common" aria-labelledby="common-heading">
+          <h2 id="common-heading">Dados dos exemplares</h2>
+          <p>Estes dados serão aplicados a todos os exemplares deste lote.</p>
+          <div class="fields">
+            <div class="field">
+              <label for="batch-destination">Destinação</label
+              ><select id="batch-destination" formControlName="destination">
+                <option value="DIDACTIC">Didático · empréstimo</option>
+                <option value="COMMERCIAL">Comercial · venda</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="batch-condition">Condição <span>Opcional</span></label
+              ><input
+                id="batch-condition"
+                formControlName="condition"
+                maxlength="30"
+                placeholder="Ex.: Bom estado"
+              />
+            </div>
+            @if (form.controls.destination.value === 'COMMERCIAL') {
+              <div class="field">
+                <label for="batch-price">Preço por exemplar (R$)</label
+                ><input
+                  id="batch-price"
+                  formControlName="salePrice"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                />
+                @if (form.controls.salePrice.touched && form.controls.salePrice.invalid) {
+                  <p class="field-error">
+                    Informe um preço maior que zero com até duas casas decimais.
+                  </p>
+                }
+              </div>
+            }
+            <div class="field">
+              <label for="batch-date">Data de aquisição <span>Opcional</span></label
+              ><input id="batch-date" formControlName="acquiredAt" type="date" />
+            </div>
+          </div>
+        </section>
+        <section class="code-entry" aria-labelledby="code-heading">
+          <h2 id="code-heading">Códigos dos exemplares</h2>
+          <p>Cada exemplar físico precisa de seu próprio código. O ISBN identifica a obra.</p>
+          <div class="modes" role="group" aria-label="Como adicionar códigos">
+            <button
+              type="button"
+              [class.active]="mode() === 'generate'"
+              [attr.aria-pressed]="mode() === 'generate'"
+              (click)="setMode('generate')"
+              [disabled]="saving()"
+            >
+              Gerar códigos</button
+            ><button
+              type="button"
+              [class.active]="mode() === 'scan'"
+              [attr.aria-pressed]="mode() === 'scan'"
+              (click)="setMode('scan')"
+              [disabled]="saving()"
+            >
+              Ler ou digitar</button
+            ><button
+              type="button"
+              [class.active]="mode() === 'paste'"
+              [attr.aria-pressed]="mode() === 'paste'"
+              (click)="setMode('paste')"
+              [disabled]="saving()"
+            >
+              Colar lista
+            </button>
+          </div>
+          @switch (mode()) {
+            @case ('generate') {
+              <label for="batch-quantity">Quantidade de exemplares</label>
+              <div class="entry">
+                <input
+                  id="batch-quantity"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  [value]="quantity()"
+                  (input)="quantity.set(+$any($event.target).value)"
+                  [disabled]="saving()"
+                /><button type="button" (click)="generate()" [disabled]="saving()">
+                  Preparar códigos
+                </button>
+              </div>
+              <p class="hint">
+                O LibStock cria códigos únicos para exemplares sem etiqueta. Gere até 100 por vez e
+                confira a lista antes de salvar.
+              </p>
+            }
+            @case ('scan') {
+              <label for="scan-code">Código de barras do exemplar</label>
+              <div class="entry">
+                <input
+                  id="scan-code"
+                  type="text"
+                  maxlength="100"
+                  autocomplete="off"
+                  placeholder="Use o leitor ou digite o código"
+                  [value]="scanner()"
+                  (input)="scanner.set($any($event.target).value)"
+                  (keydown.enter)="scan($event)"
+                  [disabled]="saving()"
+                /><button type="button" (click)="scan()" [disabled]="saving()">
+                  Adicionar à lista
+                </button>
+              </div>
+              <p class="hint">
+                Leitores que enviam Enter adicionam o código e deixam o campo pronto para o próximo
+                exemplar.
+              </p>
+            }
+            @case ('paste') {
+              <label for="batch-pasted">Um código por linha</label
+              ><textarea
+                id="batch-pasted"
+                rows="5"
+                placeholder="EX-001&#10;EX-002&#10;EX-003"
+                [value]="pasted()"
+                (input)="pasted.set($any($event.target).value)"
+                [disabled]="saving()"
+              ></textarea
+              ><button type="button" (click)="paste()" [disabled]="saving()">
+                Adicionar lista de códigos
+              </button>
+            }
+          }
+          @if (queueError(); as message) {
+            <p class="field-error" role="alert">{{ message }}</p>
+          }
+          @if (codes().length) {
+            <div class="queue-header">
+              <h3>{{ codes().length }} exemplar(es) para cadastrar</h3>
+              <span>Confira os códigos</span>
+            </div>
+            <ol class="queue">
+              @for (code of codes(); track code; let i = $index) {
+                <li>
+                  <span>{{ code }}</span
+                  ><button
+                    class="remove"
+                    type="button"
+                    (click)="remove(i)"
+                    [disabled]="saving()"
+                    [attr.aria-label]="'Remover código ' + code"
+                  >
+                    Remover
+                  </button>
+                </li>
+              }
+            </ol>
+          }
+        </section>
+        <div class="actions">
+          <button
+            type="submit"
+            [disabled]="saving() || !codes().length || !item.is_active"
+            [attr.aria-busy]="saving()"
+          >
+            {{
+              saving() ? 'Cadastrando…' : 'Cadastrar ' + codes().length + ' exemplar(es)'
+            }}</button
+          ><a
+            class="secondary"
+            [routerLink]="['/balcao/acervo', item.id]"
+            queryParamsHandling="preserve"
+            >Voltar para a obra</a
+          >
+        </div>
+      </form>
+    }
+  }
+</main>

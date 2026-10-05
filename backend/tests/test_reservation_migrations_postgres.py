@@ -134,7 +134,10 @@ def test_waiting_reservation_with_free_copy_is_allowed_only_when_a_queue_exists_
         first, second = make_user(db, 'USER', 'Primeiro'), make_user(db, 'USER', 'Segundo')
         borrower, employee = make_user(db, 'USER', 'Leitor'), db.scalar(select(Employee.id))
         db.commit()
-    now = datetime.now(timezone.utc)
+    # Empréstimo e devolução usam o mesmo relógio do PostgreSQL. O relógio
+    # do host pode estar alguns milissegundos adiantado e violar a constraint.
+    with engine.connect() as conn:
+        now = conn.scalar(text('SELECT clock_timestamp()'))
 
     def lend():
         with Session(engine) as db:

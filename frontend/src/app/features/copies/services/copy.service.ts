@@ -17,6 +17,13 @@ export const COPIES_API = '/api/v1/copies';
 export class CopyService {
   private readonly http = inject(HttpClient);
 
+  createBatch(copies: readonly CopyCreateRequest[]): Observable<CopyResponse[]> {
+    return this.http.post<Parameters<typeof copyResponseFromApi>[0][]>(`${COPIES_API}/batch`, {
+      copies: copies.map(copy => ({ book_id: copy.bookId, barcode: copy.barcode, destination: copy.destination,
+        condition: copy.condition, sale_price: copy.salePrice, acquired_at: copy.acquiredAt })),
+    }).pipe(map(items => items.map(copyResponseFromApi)));
+  }
+
   create(payload: CopyCreateRequest): Observable<CopyResponse> {
     return this.http
       .post<Parameters<typeof copyResponseFromApi>[0]>(`${COPIES_API}/`, {
@@ -33,6 +40,7 @@ export class CopyService {
   /** Edita ou converte exemplar disponível e sem operação; só os campos informados vão no corpo. */
   update(copyId: number, payload: CopyUpdateRequest): Observable<CopyResponse> {
     const body: Record<string, unknown> = {};
+    if (payload.isActive !== undefined) body['is_active'] = payload.isActive;
     if (payload.destination !== undefined) body['destination'] = payload.destination;
     if (payload.condition !== undefined) body['condition'] = payload.condition;
     if (payload.salePrice !== undefined) body['sale_price'] = payload.salePrice;

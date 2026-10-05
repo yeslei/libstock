@@ -1,64 +1,78 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
-import { Subject, catchError, map, of, startWith, switchMap } from 'rxjs';
-
+import { Router, RouterLink } from '@angular/router';
+import { Subject, catchError, forkJoin, map, of, startWith, switchMap } from 'rxjs';
 import { LoadState } from '../../core/models/load-state.model';
+import { AuthService } from '../../core/services/auth.service';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
+import { StaffIconComponent } from '../../shared/components/staff-icon.component';
 import { CounterService, StaffDashboard } from './counter.service';
 import { errorMessage } from './desk-panel';
+import { DashboardOverview } from './dashboard/dashboard.models';
+import { WeeklyMovementComponent } from './dashboard/weekly-movement.component';
+import { CategoryChartComponent } from './dashboard/category-chart.component';
+import { StatCardComponent } from './dashboard/stat-card.component';
+import { RecentMovementsComponent } from './dashboard/recent-movements.component';
 
-interface AccessCard {
-  readonly title: string;
-  readonly description: string;
-  readonly route: string;
-}
-
-interface Indicator {
-  readonly key: keyof StaffDashboard;
-  readonly label: string;
-}
-
-/** Cartões de acesso rápido, na ordem visual do Figma (Funcionário / Painel). */
-const ACCESS: readonly AccessCard[] = [
-  { title: 'Consultar acervo', description: 'Buscar obras e disponibilidade', route: '/balcao/acervo' },
-  { title: 'Registrar devolução', description: 'Dar baixa em um exemplar', route: '/balcao/devolucoes' },
-  { title: 'Vendas', description: 'Venda de acervo comercial', route: '/balcao/vendas' },
-  { title: 'Empréstimo', description: 'Registrar um novo empréstimo', route: '/balcao/emprestimos/novo' },
-];
-
-const INDICATORS: readonly Indicator[] = [
-  { key: 'active_loans', label: 'Empréstimos ativos' },
-  { key: 'returns_today', label: 'Devoluções hoje' },
-  { key: 'waiting_reservations', label: 'Reservas aguardando' },
-  { key: 'pendencies', label: 'Pendências' },
-];
-
+type DashboardData = StaffDashboard & DashboardOverview;
 @Component({
   selector: 'app-counter-dashboard',
   standalone: true,
-  imports: [RouterLink, AlertComponent],
+  imports: [
+    RouterLink,
+    AlertComponent,
+    StaffIconComponent,
+    WeeklyMovementComponent,
+    CategoryChartComponent,
+    StatCardComponent,
+    RecentMovementsComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-dashboard.component.html',
   styleUrl: './counter-dashboard.component.scss',
 })
 export class CounterDashboardComponent implements OnInit {
   private readonly service = inject(CounterService);
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
   private readonly loads = new Subject<void>();
-
-  protected readonly access = ACCESS;
-  protected readonly indicators = INDICATORS;
-  protected readonly state = signal<LoadState<StaffDashboard>>({ status: 'loading' });
-
+  protected readonly account = this.auth.currentUser;
+  protected readonly initials = (this.account?.name ?? 'LibStock')
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join('');
+  protected readonly state = signal<LoadState<DashboardData>>({ status: 'loading' });
+  protected readonly metrics = [
+    { key: 'loans_today', label: 'Empréstimos do dia', note: 'Registrados hoje' },
+    { key: 'returns_today', label: 'Devoluções do dia', note: 'Exemplares devolvidos hoje' },
+    { key: 'waiting_reservations', label: 'Reservas aguardando', note: 'Na fila de compra' },
+    { key: 'pendencies', label: 'Pendências', note: 'Clientes com empréstimos em atraso' },
+  ] as const;
   constructor() {
     this.loads
       .pipe(
         switchMap(() =>
-          this.service.getDashboard().pipe(
-            map((data): LoadState<StaffDashboard> => ({ status: 'loaded', data })),
-            startWith<LoadState<StaffDashboard>>({ status: 'loading' }),
+          forkJoin({
+            counts: this.service.getDashboard(),
+            overview: this.service.getDashboardOverview(),
+          }).pipe(
+            map(
+              ({ counts, overview }): LoadState<DashboardData> => ({
+                status: 'loaded',
+                data: { ...counts, ...overview },
+              }),
+            ),
+            startWith<LoadState<DashboardData>>({ status: 'loading' }),
             catchError((error) =>
-              of<LoadState<StaffDashboard>>({
+              of<LoadState<DashboardData>>({
                 status: 'error',
                 message: errorMessage(error, 'Não foi possível carregar os indicadores do painel.'),
               }),
@@ -69,16 +83,17 @@ export class CounterDashboardComponent implements OnInit {
       )
       .subscribe((state) => this.state.set(state));
   }
-
   ngOnInit(): void {
     this.reload();
   }
-
   protected reload(): void {
     this.loads.next();
   }
-
-  protected value(state: LoadState<StaffDashboard>, key: keyof StaffDashboard): string {
+  protected value(key: (typeof this.metrics)[number]['key']): string {
+    const state = this.state();
     return state.status === 'loaded' ? String(state.data[key]) : '—';
+  }
+  protected logout(): void {
+    this.auth.logout().subscribe(() => void this.router.navigate(['/']));
   }
 }

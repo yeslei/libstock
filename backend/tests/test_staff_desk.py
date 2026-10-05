@@ -351,3 +351,41 @@ def test_dashboard_database_failure_is_500():
     with pytest.raises(ApplicationError) as error:
         service.dashboard(7)
     assert (error.value.status_code, error.value.code) == (500, 'desk_query_error')
+
+
+def test_dashboard_overview_requires_authentication_and_service_role(api):
+    client, fake = api
+    assert client.get('/api/v1/staff/dashboard/overview').status_code == 401
+    for role in ['USER', 'STOCK_KEEPER']:
+        app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=[role])
+        assert client.get('/api/v1/staff/dashboard/overview').status_code == 403
+    fake.dashboard_overview.assert_not_called()
+
+
+def test_dashboard_overview_database_failure_rolls_back():
+    service, repo = make_service()
+    repo.dashboard_overview.side_effect = SQLAlchemyError('query failed')
+    with pytest.raises(ApplicationError) as error:
+        service.dashboard_overview(7)
+    assert (error.value.status_code, error.value.code) == (500, 'desk_query_error')
+    service.db.rollback.assert_called_once()
+
+
+def test_dashboard_overview_checks_employee_before_querying():
+    service, repo = make_service()
+    repo.is_active_employee.return_value = False
+    with pytest.raises(ApplicationError) as error:
+        service.dashboard_overview(7)
+    assert error.value.status_code == 403
+    repo.dashboard_overview.assert_not_called()
+
+
+@pytest.mark.parametrize('role', ['SELLER', 'ADMINISTRATOR'])
+def test_dashboard_overview_returns_explicit_schema(api, role):
+    client, fake = api
+    app.dependency_overrides[get_current_user] = lambda: NS(id=7, role_codes=[role])
+    payload = {'loans_today': 0, 'week': [], 'categories': [], 'popular': [], 'recent_loans': [], 'recent_returns': []}
+    fake.dashboard_overview.return_value = payload
+    response = client.get('/api/v1/staff/dashboard/overview')
+    assert response.status_code == 200 and response.json() == payload
+    fake.dashboard_overview.assert_called_once_with(7)

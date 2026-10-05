@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subject, map, merge, switchMap } from 'rxjs';
@@ -13,15 +21,28 @@ import { BookService } from '../books/services/book.service';
 import { CopyService } from '../copies/services/copy.service';
 import { SaveFailureComponent } from './save-failure.component';
 import { ConfirmDialogComponent } from './confirm-dialog.component';
-import { CopyDestination, CounterService, StaffCatalogBookDetail, StaffCatalogCopy, StaffGenre } from './counter.service';
-import { ActionFlow, copyStatusLabel, destinationLabel, formatPrice, genreLabel, toLoadState } from './desk-flow';
+import {
+  CopyDestination,
+  CounterService,
+  StaffCatalogBookDetail,
+  StaffCatalogCopy,
+  StaffGenre,
+} from './counter.service';
+import {
+  ActionFlow,
+  copyStatusLabel,
+  destinationLabel,
+  formatPrice,
+  genreLabel,
+  toLoadState,
+} from './desk-flow';
 
 /**
  * Issue #169: o estoquista usa o balcão restrito ao cadastro (consulta, nova obra e novo exemplar). Edição e inativação/reativação de obra
  * e edição, conversão e exclusão de exemplar ficam ocultas para ele, embora o backend mantenha as permissões de escrita da matriz da #151.
  */
-const MANAGE_BOOK_ROLES = ['SELLER', 'MANAGER', 'ADMINISTRATOR'];
-const MANAGE_COPY_ROLES = ['SELLER', 'ADMINISTRATOR'];
+const MANAGE_BOOK_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
+const MANAGE_COPY_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
 /** Papéis que o backend autoriza em `POST /api/v1/copies` e que a tela oferece (inclui o estoquista). */
 const ADD_COPY_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
 const CONDITION_MAX = 30;
@@ -70,12 +91,19 @@ const LINK_LABEL: Readonly<Record<OperationLink['type'], string>> = {
 };
 
 function describeLink(link: OperationLink): string {
-  return [link.copy_barcode ? `Exemplar #${link.copy_barcode}` : null, LINK_LABEL[link.type], link.client_name]
+  return [
+    link.copy_barcode ? `Exemplar #${link.copy_barcode}` : null,
+    LINK_LABEL[link.type],
+    link.client_name,
+  ]
     .filter((part): part is string => !!part)
     .join(' · ');
 }
 
-function positiveEntries(values: Readonly<Record<string, number>> | undefined, labels: Readonly<Record<string, string>>): string[] {
+function positiveEntries(
+  values: Readonly<Record<string, number>> | undefined,
+  labels: Readonly<Record<string, string>>,
+): string[] {
   return Object.entries(values ?? {})
     .filter(([key, count]) => count > 0 && key in labels)
     .map(([key, count]) => `${labels[key]}: ${count}`);
@@ -89,10 +117,17 @@ function positiveEntries(values: Readonly<Record<string, number>> | undefined, l
 @Component({
   selector: 'app-counter-catalog-book',
   standalone: true,
-  imports: [SaveFailureComponent, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent, GenrePickerComponent],
+  imports: [
+    SaveFailureComponent,
+    RouterLink,
+    AlertComponent,
+    SpinnerComponent,
+    ConfirmDialogComponent,
+    GenrePickerComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-catalog-book.component.html',
-  styleUrl: './counter-catalog.component.scss',
+  styleUrl: './counter-catalog-book.component.scss',
 })
 export class CounterCatalogBookComponent {
   private readonly counter = inject(CounterService);
@@ -100,14 +135,18 @@ export class CounterCatalogBookComponent {
   private readonly copies = inject(CopyService);
   private readonly reloads = new Subject<void>();
   private readonly route = inject(ActivatedRoute);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private currentId = 0;
 
   protected readonly state = signal<LoadState<StaffCatalogBookDetail>>({ status: 'loading' });
   private readonly roleCodes = inject(TokenStoreService).user?.role_codes ?? [];
   protected readonly canEdit = this.roleCodes.some((role) => MANAGE_BOOK_ROLES.includes(role));
   protected readonly canAddCopy = this.roleCodes.some((role) => ADD_COPY_ROLES.includes(role));
-  protected readonly canDeleteCopy = this.roleCodes.some((role) => MANAGE_COPY_ROLES.includes(role));
+  protected readonly canDeleteCopy = this.roleCodes.some((role) =>
+    MANAGE_COPY_ROLES.includes(role),
+  );
   protected readonly canEditCopy = this.canDeleteCopy;
+  protected readonly selectedCopyId = signal<number | null>(null);
   protected readonly editingCopyId = signal<number | null>(null);
   protected readonly copyDestination = signal<CopyDestination>('DIDACTIC');
   protected readonly copyPrice = signal('');
@@ -120,12 +159,18 @@ export class CounterCatalogBookComponent {
   protected readonly genreIds = computed(() => this.selectedGenres().map((genre) => genre.id));
   protected readonly genreLabel = genreLabel;
   protected readonly flow = new ActionFlow(inject(DestroyRef), (succeeded) => {
-    if (succeeded) this.editingCopyId.set(null);
+    if (succeeded) {
+      this.editingCopyId.set(null);
+      this.selectedCopyId.set(null);
+    }
     this.reload();
   });
+  protected readonly formatPrice = formatPrice;
   protected readonly destinationLabel = destinationLabel;
   protected readonly copyStatusLabel = copyStatusLabel;
-  protected readonly conditionTooLong = computed(() => this.copyCondition().trim().length > CONDITION_MAX);
+  protected readonly conditionTooLong = computed(
+    () => this.copyCondition().trim().length > CONDITION_MAX,
+  );
   protected readonly priceError = computed(() => {
     if (this.copyDestination() !== 'COMMERCIAL') return null;
     const value = this.normalizedPrice();
@@ -142,7 +187,9 @@ export class CounterCatalogBookComponent {
       this.reloads.pipe(map(() => this.currentId)),
     )
       .pipe(
-        switchMap((id) => toLoadState(this.counter.getCatalogBook(id), 'Não foi possível carregar a obra.')),
+        switchMap((id) =>
+          toLoadState(this.counter.getCatalogBook(id), 'Não foi possível carregar a obra.'),
+        ),
         takeUntilDestroyed(inject(DestroyRef)),
       )
       .subscribe((state) => {
@@ -151,12 +198,103 @@ export class CounterCatalogBookComponent {
       });
   }
 
+  protected selectedCopy(book: StaffCatalogBookDetail): StaffCatalogCopy | null {
+    return book.copies.find((copy) => copy.id === this.selectedCopyId()) ?? null;
+  }
+
+  protected selectCopy(copy: StaffCatalogCopy): void {
+    if (!this.canEditCopy || this.flow.submitting()) return;
+    this.editingCopyId.set(null);
+    this.selectedCopyId.set(copy.id);
+    setTimeout(() => {
+      const heading = this.host.nativeElement.querySelector<HTMLElement>('#selected-copy-title');
+      heading?.scrollIntoView({ block: 'nearest' });
+      heading?.focus({ preventScroll: true });
+    });
+  }
+
+  protected closeCopy(): void {
+    if (!this.flow.submitting()) {
+      this.selectedCopyId.set(null);
+      this.editingCopyId.set(null);
+    }
+  }
+
+  protected readonly copyFilter = signal<'all' | 'DIDACTIC' | 'COMMERCIAL' | 'inactive'>('all');
+  protected readonly copyPage = signal(0);
+  protected copyPageCount(book: StaffCatalogBookDetail): number {
+    return Math.max(1, Math.ceil(this.filteredCopies(book).length / 5));
+  }
+  protected currentCopyPage(book: StaffCatalogBookDetail): number {
+    return Math.min(this.copyPage(), this.copyPageCount(book) - 1);
+  }
+  protected pagedCopies(book: StaffCatalogBookDetail): readonly StaffCatalogCopy[] {
+    const start = this.currentCopyPage(book) * 5;
+    return this.filteredCopies(book).slice(start, start + 5);
+  }
+  protected filteredCopies(book: StaffCatalogBookDetail): readonly StaffCatalogCopy[] {
+    const filter = this.copyFilter();
+    return book.copies.filter(
+      (copy) =>
+        filter === 'all' ||
+        (filter === 'inactive' ? !copy.is_active : copy.is_active && copy.destination === filter),
+    );
+  }
+  protected availableCopies(
+    book: StaffCatalogBookDetail,
+    destination: 'DIDACTIC' | 'COMMERCIAL',
+  ): number {
+    return book.is_active
+      ? book.copies.filter((copy) => copy.free && copy.destination === destination).length
+      : 0;
+  }
+  protected inactiveCopies(book: StaffCatalogBookDetail): number {
+    return book.copies.filter((copy) => !copy.is_active).length;
+  }
+  protected borrowedCopies(book: StaffCatalogBookDetail): number {
+    return book.copies.filter((copy) => copy.status === 'BORROWED').length;
+  }
+  protected activityReason(book: StaffCatalogBookDetail, copy: StaffCatalogCopy): string | null {
+    if (copy.is_active && !copy.free)
+      return 'Conclua o empréstimo, a reserva ou a venda antes de inativar.';
+    if (!copy.is_active && !['AVAILABLE', 'INACTIVE'].includes(copy.status))
+      return 'Este exemplar tem uma operação pendente.';
+    if (
+      copy.is_active &&
+      book.is_active &&
+      !book.copies.some((other) => other.id !== copy.id && other.is_active)
+    )
+      return 'Último exemplar ativo: inative a obra para retirar todo o acervo de circulação.';
+    return null;
+  }
+  protected askActivity(book: StaffCatalogBookDetail, copy: StaffCatalogCopy): void {
+    if (!this.canEditCopy || this.activityReason(book, copy)) return;
+    const active = !copy.is_active;
+    this.flow.ask({
+      title: `${active ? 'Reativar' : 'Inativar'} exemplar ${copy.barcode}?`,
+      intro: active
+        ? 'O exemplar voltará a participar da disponibilidade da obra.'
+        : 'O exemplar sairá da disponibilidade. Seu cadastro e histórico serão preservados.',
+      details: [book.title, copy.barcode, destinationLabel(copy.destination)],
+      confirmLabel: active ? 'Reativar exemplar' : 'Inativar exemplar',
+      run: () => this.copies.update(copy.id, { isActive: active }),
+      success: () => `Exemplar ${active ? 'reativado' : 'inativado'} com sucesso.`,
+    });
+  }
+
   protected reload(): void {
     this.reloads.next();
   }
 
   protected startEditing(): void {
     this.editing.set(true);
+  }
+
+  protected cancelEditing(): void {
+    if (this.flow.submitting()) return;
+    const state = this.state();
+    if (state.status === 'loaded') this.selectedGenres.set(state.data.genres);
+    this.editing.set(false);
   }
 
   protected changed(book: StaffCatalogBookDetail): boolean {
@@ -169,10 +307,16 @@ export class CounterCatalogBookComponent {
     if (!this.canEdit || !this.changed(book)) return;
     this.blocked.set(null);
     const ids = this.genreIds();
-    const next = this.selectedGenres().map((genre) => genre.name).join(', ') || null;
+    const next =
+      this.selectedGenres()
+        .map((genre) => genre.name)
+        .join(', ') || null;
     this.flow.ask({
       title: 'Salvar alteração da obra?',
-      details: [`Obra: ${book.title}`, `Categorias: ${genreLabel(book) ?? 'sem categoria'} → ${next ?? 'sem categoria'}`],
+      details: [
+        `Obra: ${book.title}`,
+        `Categorias: ${genreLabel(book) ?? 'sem categoria'} → ${next ?? 'sem categoria'}`,
+      ],
       confirmLabel: 'Salvar alteração',
       run: () => this.books.update(book.id, { genre_ids: ids }),
       success: () => `Categorias de “${book.title}” atualizadas.`,
@@ -188,9 +332,11 @@ export class CounterCatalogBookComponent {
 
   /** Motivo que antecipa o botão "Editar" desabilitado; null quando o backend deve decidir. */
   protected editCopyBlockReason(copy: StaffCatalogCopy): string | null {
-    if (!copy.is_active || copy.status === 'INACTIVE') return 'Exemplar inativo: não pode ser editado.';
+    if (!copy.is_active || copy.status === 'INACTIVE')
+      return 'Exemplar inativo: não pode ser editado.';
     if (copy.allocated_for_purchase) return 'Exemplar reservado para venda: não pode ser editado.';
-    if (!copy.free) return `Exemplar ${copyStatusLabel(copy).toLowerCase()}: só exemplares disponíveis podem ser editados.`;
+    if (!copy.free)
+      return `Exemplar ${copyStatusLabel(copy).toLowerCase()}: só exemplares disponíveis podem ser editados.`;
     return null;
   }
 
@@ -198,9 +344,18 @@ export class CounterCatalogBookComponent {
     if (!this.canEditCopy || this.editCopyBlockReason(copy)) return;
     this.blocked.set(null);
     this.copyDestination.set(copy.destination);
-    this.copyPrice.set(copy.sale_price === null || copy.sale_price === '' ? '' : String(copy.sale_price).replace('.', ','));
+    this.copyPrice.set(
+      copy.sale_price === null || copy.sale_price === ''
+        ? ''
+        : String(copy.sale_price).replace('.', ','),
+    );
     this.copyCondition.set(copy.condition ?? '');
     this.editingCopyId.set(copy.id);
+    setTimeout(() => {
+      const heading = this.host.nativeElement.querySelector<HTMLElement>('#editar-exemplar-titulo');
+      heading?.scrollIntoView({ block: 'center' });
+      heading?.focus({ preventScroll: true });
+    });
   }
 
   protected cancelEditingCopy(): void {
@@ -220,13 +375,22 @@ export class CounterCatalogBookComponent {
   }
 
   /** Só o que mudou vai ao backend; para Empréstimo o preço é removido pelo backend e nunca enviado. */
-  private copyChanges(copy: StaffCatalogCopy): { destination?: CopyDestination; salePrice?: number; condition?: string | null } {
-    const changes: { destination?: CopyDestination; salePrice?: number; condition?: string | null } = {};
+  private copyChanges(copy: StaffCatalogCopy): {
+    destination?: CopyDestination;
+    salePrice?: number;
+    condition?: string | null;
+  } {
+    const changes: {
+      destination?: CopyDestination;
+      salePrice?: number;
+      condition?: string | null;
+    } = {};
     const destination = this.copyDestination();
     if (destination !== copy.destination) changes.destination = destination;
     if (destination === 'COMMERCIAL') {
       const price = Number(this.normalizedPrice());
-      if (destination !== copy.destination || price !== Number(copy.sale_price)) changes.salePrice = price;
+      if (destination !== copy.destination || price !== Number(copy.sale_price))
+        changes.salePrice = price;
     }
     const condition = this.copyCondition().trim() || null;
     if (condition !== (copy.condition ?? null)) changes.condition = condition;
@@ -244,21 +408,37 @@ export class CounterCatalogBookComponent {
   }
 
   protected askSaveCopy(book: StaffCatalogBookDetail, copy: StaffCatalogCopy): void {
-    if (!this.canEditCopy || this.editCopyBlockReason(copy) || this.priceError() || this.conditionTooLong() || !this.copyChanged(copy)) return;
+    if (
+      !this.canEditCopy ||
+      this.editCopyBlockReason(copy) ||
+      this.priceError() ||
+      this.conditionTooLong() ||
+      !this.copyChanged(copy)
+    )
+      return;
     const changes = this.copyChanges(copy);
     const after = changes.destination ?? copy.destination;
     const details = [`Exemplar #${copy.barcode} · ${book.title}`];
-    if (changes.destination) details.push(`Finalidade: ${destinationLabel(copy.destination)} → ${destinationLabel(after)}`);
+    if (changes.destination)
+      details.push(
+        `Finalidade: ${destinationLabel(copy.destination)} → ${destinationLabel(after)}`,
+      );
     if (after === 'COMMERCIAL' && changes.salePrice !== undefined) {
-      details.push(`Preço de venda: ${formatPrice(copy.sale_price)} → ${formatPrice(changes.salePrice)}`);
+      details.push(
+        `Preço de venda: ${formatPrice(copy.sale_price)} → ${formatPrice(changes.salePrice)}`,
+      );
     } else if (changes.destination === 'DIDACTIC') {
       details.push(`Preço de venda: ${formatPrice(copy.sale_price)} → removido`);
     }
-    if (changes.condition !== undefined) details.push(`Condição: ${copy.condition ?? 'não informada'} → ${changes.condition ?? 'não informada'}`);
+    if (changes.condition !== undefined)
+      details.push(
+        `Condição: ${copy.condition ?? 'não informada'} → ${changes.condition ?? 'não informada'}`,
+      );
     this.blocked.set(null);
     this.flow.ask({
       title: `Salvar alterações do exemplar #${copy.barcode}?`,
-      intro: 'O código do exemplar não muda. A edição só é aceita para exemplar disponível, sem reserva destinada nem operação em andamento.',
+      intro:
+        'O código do exemplar não muda. A edição só é aceita para exemplar disponível, sem reserva destinada nem operação em andamento.',
       detailsTitle: 'Confira as alterações',
       details,
       confirmLabel: 'Salvar exemplar',
@@ -273,7 +453,9 @@ export class CounterCatalogBookComponent {
 
   /** Reativar exige ao menos um exemplar ativo; o backend decide e responde 409 `book_without_active_copy`. */
   protected reactivateBlockReason(book: StaffCatalogBookDetail): string | null {
-    return book.copies.some((copy) => copy.is_active) ? null : 'A obra não tem exemplar ativo: não pode ser reativada.';
+    return book.copies.some((copy) => copy.is_active)
+      ? null
+      : 'A obra não tem exemplar ativo: não pode ser reativada.';
   }
 
   protected askReactivate(book: StaffCatalogBookDetail): void {
@@ -281,10 +463,13 @@ export class CounterCatalogBookComponent {
     this.blocked.set(null);
     this.flow.ask({
       title: `Reativar ${book.title}?`,
-      intro: 'A obra volta a aparecer no acervo ativo e passa a aceitar novos exemplares e operações. Os registros anteriores são preservados.',
+      intro:
+        'A obra volta a aparecer no acervo ativo e passa a aceitar novos exemplares e operações. Os registros anteriores são preservados.',
       detailsTitle: 'Situação verificada',
       details: [
-        book.total_copies === 1 ? '1 exemplar vinculado' : `${book.total_copies} exemplares vinculados`,
+        book.total_copies === 1
+          ? '1 exemplar vinculado'
+          : `${book.total_copies} exemplares vinculados`,
         `Exemplares ativos: ${book.copies.filter((copy) => copy.is_active).length}`,
       ],
       confirmLabel: 'Confirmar reativação',
@@ -298,13 +483,19 @@ export class CounterCatalogBookComponent {
     const active = book.copies.filter((copy) => copy.is_active);
     const borrowed = active.filter((copy) => copy.status === 'BORROWED');
     const reserved = active.filter((copy) => copy.allocated_for_purchase);
-    const lines = [book.total_copies === 1 ? '1 exemplar vinculado' : `${book.total_copies} exemplares vinculados`];
+    const lines = [
+      book.total_copies === 1
+        ? '1 exemplar vinculado'
+        : `${book.total_copies} exemplares vinculados`,
+    ];
     if (!borrowed.length && !reserved.length) {
       lines.push('Nenhum exemplar emprestado ou reservado para venda');
       return lines;
     }
-    for (const copy of borrowed) lines.push(`Exemplar ${copy.barcode} emprestado (bloqueia a inativação)`);
-    for (const copy of reserved) lines.push(`Exemplar ${copy.barcode} reservado para venda (bloqueia a inativação)`);
+    for (const copy of borrowed)
+      lines.push(`Exemplar ${copy.barcode} emprestado (bloqueia a inativação)`);
+    for (const copy of reserved)
+      lines.push(`Exemplar ${copy.barcode} reservado para venda (bloqueia a inativação)`);
     return lines;
   }
 
@@ -313,7 +504,8 @@ export class CounterCatalogBookComponent {
     this.blocked.set(null);
     this.flow.ask({
       title: `Inativar ${book.title}?`,
-      intro: 'A obra deixa de aparecer no acervo ativo e não aceita novos exemplares. Os registros anteriores são preservados. A obra pode ser reativada depois, se tiver exemplar ativo. A inativação é bloqueada enquanto houver empréstimo em aberto, solicitação de retirada pendente ou reserva de compra aguardando ou com exemplar destinado.',
+      intro:
+        'A obra deixa de aparecer no acervo ativo e não aceita novos exemplares. Os registros anteriores são preservados. A obra pode ser reativada depois, se tiver exemplar ativo. A inativação é bloqueada enquanto houver empréstimo em aberto, solicitação de retirada pendente ou reserva de compra aguardando ou com exemplar destinado.',
       detailsTitle: 'Situação verificada',
       details: this.deactivationSituation(book),
       confirmLabel: 'Confirmar inativação',
@@ -324,10 +516,18 @@ export class CounterCatalogBookComponent {
   }
 
   /** Motivo exibido junto ao botão desabilitado e em title, para antecipar o botão desabilitado; null quando o backend deve decidir. */
-  protected deleteCopyBlockReason(book: StaffCatalogBookDetail, copy: StaffCatalogCopy): string | null {
-    if (copy.status !== 'AVAILABLE') return `Exemplar ${copyStatusLabel(copy).toLowerCase()}: só exemplares disponíveis podem ser excluídos.`;
+  protected deleteCopyBlockReason(
+    book: StaffCatalogBookDetail,
+    copy: StaffCatalogCopy,
+  ): string | null {
+    if (copy.status !== 'AVAILABLE')
+      return `Exemplar ${copyStatusLabel(copy).toLowerCase()}: só exemplares disponíveis podem ser excluídos.`;
     if (copy.allocated_for_purchase) return 'Exemplar reservado para venda: não pode ser excluído.';
-    if (book.is_active && copy.is_active && !book.copies.some((other) => other.id !== copy.id && other.is_active)) {
+    if (
+      book.is_active &&
+      copy.is_active &&
+      !book.copies.some((other) => other.id !== copy.id && other.is_active)
+    ) {
       return 'Último exemplar ativo da obra: não pode ser excluído.';
     }
     return null;
@@ -363,7 +563,9 @@ export class CounterCatalogBookComponent {
     const failure = error as Partial<ApiError> | null;
     if (failure?.status !== 409) return false;
     const details = (failure.details ?? {}) as BlockDetails;
-    const reasons = (details.reasons ?? []).map((reason) => reason.message).filter((message): message is string => !!message);
+    const reasons = (details.reasons ?? [])
+      .map((reason) => reason.message)
+      .filter((message): message is string => !!message);
     this.blocked.set({
       kind: 'copy',
       title: 'Exclusão bloqueada',
@@ -385,7 +587,10 @@ export class CounterCatalogBookComponent {
       headline: 'Esta obra possui operações ativas',
       note: 'Regularize os vínculos antes de tentar inativar.',
       sectionTitle: 'Vínculos encontrados',
-      lines: [...positiveEntries(details.counts, COUNT_LABEL), ...(details.links ?? []).map(describeLink)],
+      lines: [
+        ...positiveEntries(details.counts, COUNT_LABEL),
+        ...(details.links ?? []).map(describeLink),
+      ],
     });
     return true;
   }

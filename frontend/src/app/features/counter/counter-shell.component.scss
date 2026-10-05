@@ -9,7 +9,7 @@
 .shell {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 76px);
+  min-height: 100dvh;
   background: $staff-bg;
 
   @include from($bp-lg) {
@@ -118,3 +118,15 @@ nav {
     padding: 56px 50px 80px;
   }
 }
+
+@media (min-width: 1024px) { .shell__side { position: sticky; top: 0; height: 100dvh; overflow-y: auto; } }
+.shell__session { padding: 24px 30px; font-size: 13px; border-top: 1px solid rgba(255,255,255,.15); }
+.shell__session button { display: block; margin-top: 12px; min-height: 44px; border: 0; background: transparent; color: white; font: inherit; cursor: pointer; }
+
+.shell__side { background: linear-gradient(160deg, #103d2e, #0d2c22); }
+.shell__brand { font-family: Georgia, 'Times New Roman', serif; font-size: 31px; }
+.shell__link { margin: 4px 12px; border-radius: 12px; padding: 0 20px; gap: 16px; color: #eeeee2; }
+.shell__link--active { background: rgba(222,235,213,.12); box-shadow: inset 0 1px rgba(255,255,255,.04); }
+.shell__link--active::before { left: 0; border-radius: 2px; background: #b7ceaa; }
+.shell__session { margin-top: auto; }
+@media(min-width:1024px) { .shell__side { display:flex; flex-direction:column; } .shell__main { padding-top:24px; padding-right:32px; padding-left:32px; } }

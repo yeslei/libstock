@@ -1058,3 +1058,23 @@ Estado: `PENDING` para unificação dos contratos de circulação.
 
 - Regra aprovada (telas do cliente: detalhes, reservas e empréstimos, Issue #130): usam apenas os endpoints existentes (`GET /catalog/books/{id}`, `POST /loan-requests`, `POST /purchase-requests`, `POST /purchase-reservations`, `GET /loans/me`, `GET /purchase-reservations/me`) sem alterar o backend. A reserva de compra é precedida de confirmação na tela e só é considerada registrada após 2xx; a posição exibida é a devolvida pela API. Erros de domínio mostram a mensagem do backend (`client_ineligible`, `loan_request_duplicate`, `purchase_request_duplicate`, `reservation_duplicate`, `loan_unavailable`, `purchase_unavailable`, `reservation_unavailable`, `purchase_available`). No bloqueio `client_ineligible` a tela lê `GET /loans/me` apenas para listar empréstimos em atraso do cliente autenticado.
 - Divergências da referência (Issue #130): "Retire até <data>" aparece quando a reserva destinada tem `expires_at` (prazo real de 5 dias corridos desde a Issue #150; seção 19). Regra aprovada — decisão delegada pelo responsável em 2026-10-03, Issue #147 (Issue #150): Minhas reservas oferece "Cancelar reserva" (aguardando ou destinada, com confirmação, envio duplo bloqueado, sucesso só após 2xx, snackbar) e, quando `expired`, informa o encerramento do prazo sem oferecer cancelamento. "Situação do cliente: apto — conta ativa e sem pendências" é exibida na confirmação da reserva a partir de `GET /api/v1/me/eligibility` (Issue #153), que também informa a penalidade sem atraso; a consulta local permanece não configurada, sem texto de regra. Imagens e dados são ilustrativos.
+
+## Gestão do acervo — decisão do usuário de 04/10/2026
+
+**Regra aprovada:** vendedor, estoquista e administrador gerenciam obras e exemplares; cliente não possui acesso de escrita. As permissões de circulação continuam restritas aos papéis autorizados nos fluxos existentes.
+
+**Regra aprovada:** ajuste de quantidade ocorre por cadastro e inativação/reativação de exemplares físicos, preservando identidade, histórico e auditoria. `PATCH /copies/{id}` aceita `is_active`; a inativação de exemplar livre muda sua situação para `INACTIVE`, a reativação elegível para `AVAILABLE`. Bloqueios de operação em andamento, último exemplar ativo de obra ativa e último didático livre necessário a solicitações pendentes permanecem obrigatórios. Não se altera o código de barras na edição.
+
+**Funcionalidade planejada:** entrega automatizada de alertas por e-mail (RF08); a interface utiliza os estados e alertas de circulação implementados.
+
+## Painel editorial — definições de apresentação (04/10/2026)
+
+O painel utiliza fatos reais da API. Empréstimos do dia são empréstimos não cancelados registrados no dia de negócio, diferente de empréstimos ativos (indicador anterior, preservado na API). Movimento semanal considera hoje e os seis dias anteriores; ranking considera hoje e os 29 dias anteriores. Reservas no ranking são reservas criadas nesse mesmo intervalo; os totais não indicam a fila atual.
+
+A distribuição visual inclui obras ativas, contando cada obra uma vez. Para obras com múltiplas categorias, a visualização utiliza a primeira em ordem alfabética; obras sem associação entram em “Outros”. Essa escolha serve apenas ao gráfico e não altera o cadastro nem as categorias de busca. O centro mostra obras, não exemplares físicos.
+
+O painel mantém acesso de vendedor e administrador; estoquista continua no acervo conforme a autorização existente. As tabelas recentes contêm dados de clientes e continuam restritas a atendimento. Não há seção “Precisa da sua atenção”, comparações inventadas, avatar fictício nem alerta de notificação simulado.
+
+## Entrada pública — decisão do usuário de 04/10/2026
+
+Página inicial, catálogo e detalhes das obras permanecem acessíveis sem login. A autenticação é solicitada ao iniciar operações protegidas (solicitar empréstimo, compra ou reserva), preservando o caminho de retorno. Funcionários com sessão válida continuam na área com sidebar. A entrada pública não redireciona visitantes ao login.
