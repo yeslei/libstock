@@ -1,6 +1,9 @@
-from sqlalchemy import func, select
+from datetime import datetime
+
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.business_dates import overdue_cutoff
 from app.models.domain import (
     AuditLog,
     Book,
@@ -20,7 +23,12 @@ class ClientPendencyRepository:
         statement = select(Client).where(Client.id == client_id).with_for_update()
         return self.db.scalar(statement)
 
-    def list_overdue_loans(self, client_id: int) -> list[dict]:
+    def list_overdue_loans(
+        self,
+        client_id: int,
+        cutoff: datetime | None = None,
+    ) -> list[dict]:
+        cutoff = cutoff or overdue_cutoff()
         statement = (
             select(
                 Loan.id.label("loan_id"),
@@ -36,7 +44,7 @@ class ClientPendencyRepository:
                 Loan.client_id == client_id,
                 Loan.status == LoanStatus.OPEN,
                 Loan.returned_at.is_(None),
-                Loan.due_date < func.now(),
+                Loan.due_date < cutoff,
             )
             .order_by(Loan.due_date, Loan.id)
         )

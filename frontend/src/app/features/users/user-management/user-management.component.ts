@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 
@@ -32,7 +31,7 @@ const ROLE_LABELS: Readonly<Record<RoleCode, string>> = {
 @Component({
   selector: 'app-user-management',
   standalone: true,
-  imports: [AlertComponent, SpinnerComponent, DatePipe],
+  imports: [AlertComponent, SpinnerComponent],
   templateUrl: './user-management.component.html',
   styleUrl: './user-management.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,6 +60,10 @@ export class UserManagementComponent implements OnInit {
 
   protected editUser(userId: number): void {
     void this.router.navigate(['/gestao/usuarios', userId, 'editar']);
+  }
+
+  protected viewUser(userId: number): void {
+    void this.router.navigate(['/gestao/usuarios', userId]);
   }
 
   protected viewPendencies(userId: number): void {
