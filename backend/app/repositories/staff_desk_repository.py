@@ -55,7 +55,7 @@ class StaffDeskRepository(ClientRequestRepository):
     def search_clients(self, term, cutoff, limit):
         statement = (select(*self._client_columns(cutoff)).select_from(Client)
             .join(Profile, Profile.id == Client.id).join(User, User.id == Client.id)
-            .order_by(User.name, Client.id).limit(limit))
+            .order_by(func.lower(User.name), Client.id).limit(limit))
         if term:
             statement = statement.where(_matches(term, User.name, User.email))
         else:  # lista padrão (sem termo): somente clientes ativos
@@ -157,20 +157,39 @@ class StaffDeskRepository(ClientRequestRepository):
 
     @staticmethod
     def _catalog_term(term):
-        return or_(_matches(term, Book.title, Book.author, Book.isbn), _matches_isbn(term, Book.isbn))
+        return or_(_matches(term, Book.title, Book.author, Book.isbn, Book.genre), _matches_isbn(term, Book.isbn),
+            select(BookGenre.book_id).join(Genre, Genre.id == BookGenre.genre_id).where(
+                BookGenre.book_id == Book.id, _matches(term, Genre.name)).correlate(Book).exists(),
+            select(Copy.id).where(Copy.book_id == Book.id, _matches(term, Copy.barcode)).correlate(Book).exists())
 
-    def catalog_books(self, term, limit):
+    @staticmethod
+    def _availability_columns():
+        free = free_copies_statement().with_only_columns(Copy.book_id, Copy.destination).subquery()
+        def count(destination):
+            return select(func.count()).select_from(free).where(free.c.book_id == Book.id,
+                free.c.destination == destination).correlate(Book).scalar_subquery()
+        return [count(DestinationType.DIDACTIC).label('available_didactic'),
+                count(DestinationType.COMMERCIAL).label('available_commercial')]
+
+    def catalog_books(self, term, limit, *, offset=0, availability="all"):
         """Obras com a contagem de exemplares ativos e não vendidos, por destinação."""
         counted = and_(Copy.is_active.is_(True), Copy.status != CopyStatus.SOLD)
         statement = (select(
                 Book,
                 func.count(case((counted, Copy.id))).label('total_copies'),
                 func.count(case((and_(counted, Copy.destination == DestinationType.DIDACTIC), Copy.id))).label('didactic_copies'),
-                func.count(case((and_(counted, Copy.destination == DestinationType.COMMERCIAL), Copy.id))).label('commercial_copies'))
+                func.count(case((and_(counted, Copy.destination == DestinationType.COMMERCIAL), Copy.id))).label('commercial_copies'),
+                *self._availability_columns())
             .select_from(Book).outerjoin(Copy, Copy.book_id == Book.id).group_by(Book.id))
         if term:
             statement = statement.where(self._catalog_term(term))
-        return self.db.execute(statement.order_by(Book.title, Book.id).limit(limit)).mappings().all()
+        if availability == "inactive":
+            statement = statement.where(Book.is_active.is_(False))
+        elif availability != "all":
+            didactic, commercial = self._availability_columns()
+            condition = didactic > 0 if availability == "loan" else commercial > 0 if availability == "sale" else and_(didactic == 0, commercial == 0)
+            statement = statement.where(Book.is_active.is_(True), condition)
+        return self.db.execute(statement.order_by(func.lower(Book.title), Book.id).offset(offset).limit(limit)).mappings().all()
 
     def book_genres(self, book_ids):
         """Categorias do catálogo (book_genres) por obra, em ordem alfabética (Issue #174)."""
@@ -191,7 +210,8 @@ class StaffDeskRepository(ClientRequestRepository):
                 Book,
                 func.count(case((counted, Copy.id))).label('total_copies'),
                 func.count(case((and_(counted, Copy.destination == DestinationType.DIDACTIC), Copy.id))).label('didactic_copies'),
-                func.count(case((and_(counted, Copy.destination == DestinationType.COMMERCIAL), Copy.id))).label('commercial_copies'))
+                func.count(case((and_(counted, Copy.destination == DestinationType.COMMERCIAL), Copy.id))).label('commercial_copies'),
+                *self._availability_columns())
             .select_from(Book).outerjoin(Copy, Copy.book_id == Book.id).where(Book.id == book_id).group_by(Book.id))
         return self.db.execute(statement).mappings().first()
 
@@ -218,3 +238,43 @@ class StaffDeskRepository(ClientRequestRepository):
         if available is not None:
             statement = statement.where(Copy.id.in_(free_ids) if available else Copy.id.not_in(free_ids))
         return self.db.execute(statement).mappings().all()
+
+    def dashboard_overview(self, cutoff, next_cutoff):
+        """Histórico real; intervalos de calendário em America/Sao_Paulo, sem números de demonstração."""
+        from datetime import timedelta
+        start_week = cutoff - timedelta(days=6)
+        start_month = cutoff - timedelta(days=29)
+        local_date = lambda column: func.date(func.timezone('America/Sao_Paulo', column))
+        loan_day = local_date(Loan.loan_date)
+        return_day = local_date(Loan.returned_at)
+        loan_counts = dict(self.db.execute(select(loan_day, func.count()).where(
+            Loan.loan_date >= start_week, Loan.loan_date < next_cutoff, Loan.status != LoanStatus.CANCELLED
+        ).group_by(loan_day)).all())
+        return_counts = dict(self.db.execute(select(return_day, func.count()).where(
+            Loan.returned_at >= start_week, Loan.returned_at < next_cutoff
+        ).group_by(return_day)).all())
+        category = func.coalesce(select(func.min(Genre.name)).join(BookGenre, BookGenre.genre_id == Genre.id)
+            .where(BookGenre.book_id == Book.id).correlate(Book).scalar_subquery(), 'Outros')
+        categories = [{'name': name, 'count': count} for name, count in self.db.execute(
+            select(category, func.count(Book.id)).where(Book.is_active.is_(True)).group_by(category)
+            .order_by(func.count(Book.id).desc(), category)).all()]
+        reservations = select(func.count(PurchaseReservation.id)).where(PurchaseReservation.book_id == Book.id,
+            PurchaseReservation.created_at >= start_month, PurchaseReservation.created_at < next_cutoff).correlate(Book).scalar_subquery()
+        popular = [dict(row) for row in self.db.execute(select(Book.id, Book.title, Book.author, Book.cover_url,
+            func.count(Loan.id).label('loans'), reservations.label('reservations')).join(Copy, Copy.book_id == Book.id)
+            .join(Loan, Loan.copy_id == Copy.id).where(Loan.loan_date >= start_month, Loan.loan_date < next_cutoff,
+                Loan.status != LoanStatus.CANCELLED).group_by(Book.id).order_by(func.count(Loan.id).desc(), Book.id).limit(5)).mappings()]
+        def recent(returned):
+            column = Loan.returned_at if returned else Loan.loan_date
+            statement = select(Loan.id, Book.id.label('book_id'), Book.title, User.name.label('client'),
+                Loan.loan_date.label('date'), Loan.due_date, Loan.returned_at, Loan.status).join(Copy, Copy.id == Loan.copy_id)
+            statement = statement.join(Book, Book.id == Copy.book_id).join(User, User.id == Loan.client_id)
+            statement = statement.where(Loan.returned_at.is_not(None) if returned else Loan.status != LoanStatus.CANCELLED)
+            return [dict(row, status=row['status'].value) for row in self.db.execute(
+                statement.order_by(column.desc(), Loan.id.desc()).limit(5)).mappings()]
+        return {
+            'loans_today': loan_counts.get(cutoff.date(), 0),
+            'week': [{'date': (start_week + timedelta(days=i)).date(), 'loans': loan_counts.get((start_week + timedelta(days=i)).date(), 0),
+                      'returns': return_counts.get((start_week + timedelta(days=i)).date(), 0)} for i in range(7)],
+            'categories': categories, 'popular': popular, 'recent_loans': recent(False), 'recent_returns': recent(True),
+        }

@@ -106,6 +106,9 @@ class StaffCatalogBook(BaseModel):
     total_copies: int
     didactic_copies: int
     commercial_copies: int
+    available_didactic: int = 0
+    available_commercial: int = 0
+    cover_url: str | None = None
 
 
 class StaffCatalogCopy(BaseModel):
@@ -148,3 +151,43 @@ class StaffCopyLookup(BaseModel):
     free_commercial_copies: int
     sellable: bool
     sale_block_reason: SaleBlock | None
+
+
+class DashboardMovement(BaseModel):
+    date: date
+    loans: int
+    returns: int
+
+
+class DashboardCategory(BaseModel):
+    name: str
+    count: int
+
+
+class DashboardPopularBook(BaseModel):
+    id: int
+    title: str
+    author: str
+    cover_url: str | None
+    loans: int
+    reservations: int
+
+
+class DashboardRecentLoan(BaseModel):
+    id: int
+    book_id: int
+    title: str
+    client: str
+    date: datetime
+    due_date: datetime
+    returned_at: datetime | None
+    status: str
+
+
+class StaffDashboardOverview(BaseModel):
+    loans_today: int
+    week: list[DashboardMovement]
+    categories: list[DashboardCategory]
+    popular: list[DashboardPopularBook]
+    recent_loans: list[DashboardRecentLoan]
+    recent_returns: list[DashboardRecentLoan]

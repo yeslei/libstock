@@ -219,7 +219,7 @@ def test_barcode_is_immutable_and_invalid_payloads_are_rejected(acervo):
     copy_id = add_copy(acervo)
     before = load(acervo, copy_id)
     for payload in ({'barcode': 'OUTRO'}, {}, {'destination': None}, {'sale_price': '-1'}, {'status': 'SOLD'},
-                    {'is_active': False}, {'book_id': 1}, {'condition': 'x' * 31}):
+                    {'is_active': None}, {'book_id': 1}, {'condition': 'x' * 31}):
         assert patch_copy(acervo, copy_id, payload).status_code == 422, payload
     after = load(acervo, copy_id)
     assert (after.barcode, after.status, after.is_active) == (before.barcode, before.status, True)
@@ -342,3 +342,48 @@ def test_database_guard_still_refuses_destination_change_without_an_authorized_a
         with pytest.raises(Exception, match='Changing destination requires'):
             db.execute(text("UPDATE copies SET destination = 'COMMERCIAL', sale_price = 9 WHERE id = :id"), {'id': copy_id})
     assert load(acervo, copy_id).destination == DestinationType.DIDACTIC
+
+# Gestão do estoque: atividade preserva a identidade e o histórico do exemplar.
+@pytest.mark.parametrize('role', ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'])
+def test_copy_activity_round_trip_preserves_identity_and_records_actor(acervo, role):
+    acervo.state.roles = [role]
+    copy_id = add_copy(acervo, condition='Bom')
+    before = load(acervo, copy_id)
+    inactive = patch_copy(acervo, copy_id, {'is_active': False})
+    assert inactive.status_code == 200
+    assert (load(acervo, copy_id).is_active, load(acervo, copy_id).status) == (False, CopyStatus.INACTIVE)
+    active = patch_copy(acervo, copy_id, {'is_active': True})
+    assert active.status_code == 200
+    after = load(acervo, copy_id)
+    assert (after.is_active, after.status, after.barcode, after.condition) == (True, CopyStatus.AVAILABLE, before.barcode, 'Bom')
+    with Session(acervo.engine) as db:
+        entries = db.scalars(select(AuditLog).where(AuditLog.entity_type == 'copies', AuditLog.entity_id == str(copy_id), AuditLog.operation == 'UPDATE')).all()
+        assert len(entries) == 2 and all(entry.employee_id == acervo.seller_id for entry in entries)
+
+
+def test_copy_activity_rejects_client_and_keeps_stock(acervo):
+    copy_id = add_copy(acervo)
+    acervo.state.roles = ['USER']
+    assert patch_copy(acervo, copy_id, {'is_active': False}).status_code == 403
+    assert load(acervo, copy_id).is_active is True
+
+
+def test_activity_cannot_inactivate_borrowed_copy(acervo):
+    copy_id = add_copy(acervo)
+    with Session(acervo.engine) as db:
+        now = datetime.now(timezone.utc)
+        db.add(Loan(client_id=acervo.client_id, copy_id=copy_id, employee_id=acervo.seller_id,
+                    loan_date=now, due_date=now + timedelta(days=30), status=LoanStatus.OPEN))
+        db.commit()
+    assert patch_copy(acervo, copy_id, {'is_active': False}).status_code == 409
+    assert (load(acervo, copy_id).is_active, load(acervo, copy_id).status) == (True, CopyStatus.BORROWED)
+
+
+def test_activity_rejects_last_active_copy_and_rolls_back(acervo):
+    with Session(acervo.engine) as db:
+        ids = list(db.scalars(select(Copy.id).where(Copy.book_id == acervo.book_id)))
+    for copy_id in ids[:-1]:
+        assert patch_copy(acervo, copy_id, {'is_active': False}).status_code == 200
+    response = patch_copy(acervo, ids[-1], {'is_active': False})
+    assert (response.status_code, response.json()['code']) == (409, 'last_active_copy')
+    assert load(acervo, ids[-1]).is_active is True

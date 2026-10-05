@@ -4,7 +4,7 @@ from random import randint
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models.domain import (
@@ -41,7 +41,7 @@ def test_catalog_list_counts_and_searches_by_title_author_and_isbn(desk):  # noq
         assert [b['id'] for b in found] == [book_id], term
     book = found[0]
     assert set(book) == {'id', 'title', 'author', 'isbn', 'genre', 'genres', 'is_active', 'total_copies', 'didactic_copies',
-                         'commercial_copies'}
+                         'commercial_copies', 'available_didactic', 'available_commercial', 'cover_url'}
     assert (book['total_copies'], book['didactic_copies'], book['commercial_copies'], book['genre']) == (2, 1, 1, 'Romance')
     assert http.get(f'{BASE}/books', params={'q': '%%'}).json() == []  # curinga é literal
     assert http.get(f'{BASE}/books', params={'q': 'inexistente-xyz'}).json() == []
@@ -218,3 +218,22 @@ def test_public_genre_search_filters_by_title_or_author_on_postgres(desk):  # no
         app.dependency_overrides.pop(get_catalog_service, None)
         for db in sessions:
             db.close()
+
+
+def test_catalog_filters_stock_and_paginates_without_hiding_books(desk):
+    http, engine, book_id, _, seller_id = desk
+    _, title, _ = tag_book(engine, book_id, seller_id)
+    for availability in ('all', 'loan', 'sale'):
+        response = http.get(f'{BASE}/books', params={'q': title, 'availability': availability})
+        assert response.status_code == 200
+        assert [row['id'] for row in response.json()] == [book_id]
+        assert response.json()[0]['available_didactic'] == 1
+        assert response.json()[0]['available_commercial'] == 1
+    for availability in ('inactive', 'unavailable'):
+        assert http.get(f'{BASE}/books', params={'q': title, 'availability': availability}).json() == []
+    assert http.get(f'{BASE}/books', params={'q': title, 'offset': 1}).json() == []
+    assert http.get(f'{BASE}/books', params={'offset': -1}).status_code == 422
+    assert http.get(f'{BASE}/books', params={'availability': 'OTHER'}).status_code == 422
+    with Session(engine) as db:
+        barcode = db.scalar(select(Copy.barcode).where(Copy.book_id == book_id).limit(1))
+    assert [row['id'] for row in http.get(f'{BASE}/books', params={'q': barcode}).json()] == [book_id]

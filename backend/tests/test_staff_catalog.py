@@ -123,7 +123,7 @@ def test_catalog_list_maps_counts_and_trims_term():
     repo.catalog_books.assert_called_once_with('dom', 50)
     assert result[0].model_dump() == {
         'id': 1, 'title': 'Dom Casmurro', 'author': 'Machado', 'isbn': '9780000000002', 'genre': 'Romance',
-        'genres': [], 'is_active': True, 'total_copies': 4, 'didactic_copies': 3, 'commercial_copies': 1}
+        'genres': [], 'is_active': True, 'total_copies': 4, 'didactic_copies': 3, 'commercial_copies': 1, 'available_didactic': 0, 'available_commercial': 0, 'cover_url': None}
 
 
 def test_catalog_list_and_detail_expose_catalog_genres():

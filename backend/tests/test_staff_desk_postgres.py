@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.controllers.circulation_controller import get_circulation_service
@@ -155,7 +155,7 @@ def test_client_listing_without_term_lists_only_active_clients_ordered_by_name_w
     assert inactive_profile not in ids and inactive_user not in ids and seller_id not in ids
     assert all(c['is_active'] for c in rows)
     assert [c['id'] for c in rows if c['name'].startswith(f'0000 {tag}')] == [first, second]
-    assert [c['name'] for c in rows] == sorted(c['name'] for c in rows)  # ordenação determinística por nome
+    assert [c['name'] for c in rows] == sorted((c['name'] for c in rows), key=str.casefold)  # ordenação determinística por nome
     assert len(http.get(f'{BASE}/clients', params={'limit': 1}).json()) == 1
     assert http.get(f'{BASE}/clients', params={'limit': 101}).status_code == 422
     # Com termo, a busca atual continua enxergando clientes inativos (o balcão os mostra como não aptos).
@@ -390,3 +390,35 @@ def test_dashboard_indicator_definitions_and_sao_paulo_day_edges(desk):
     assert after['active_loans'] - before['active_loans'] == 4
     assert after['pendencies'] - before['pendencies'] == 1  # cliente distinto, apesar de 2 empréstimos atrasados
     assert after['waiting_reservations'] - before['waiting_reservations'] == 1
+
+
+def test_dashboard_overview_uses_real_movement_and_book_counts(desk):
+    http, engine, book_id, client_id, seller_id = desk
+    now = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        copy = didactic_copy(db, book_id)
+        loan = Loan(copy_id=copy.id, client_id=client_id, employee_id=seller_id,
+                    loan_date=now, due_date=now + timedelta(days=14), status=LoanStatus.OPEN)
+        db.add(loan); db.commit()
+        loan_id = loan.id
+    response = http.get(f'{BASE}/dashboard/overview')
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body['week']) == 7
+    assert body['loans_today'] >= 1 and body['week'][-1]['loans'] == body['loans_today']
+    assert any(row['id'] == loan_id and row['book_id'] == book_id for row in body['recent_loans'])
+    assert 0 < len(body['popular']) <= 5
+    assert [row['loans'] for row in body['popular']] == sorted((row['loans'] for row in body['popular']), reverse=True)
+    with Session(engine) as db:
+        total = db.scalar(select(func.count(Book.id)).where(Book.is_active.is_(True)))
+    assert sum(row['count'] for row in body['categories']) == total
+
+
+def test_dashboard_overview_denies_customer_and_inactive_employee(desk):
+    http, engine, _, client_id, seller_id = desk
+    app.dependency_overrides[get_current_user] = lambda: NS(id=client_id, role_codes=['USER'])
+    assert http.get(f'{BASE}/dashboard/overview').status_code == 403
+    app.dependency_overrides[get_current_user] = lambda: NS(id=seller_id, role_codes=['SELLER'])
+    with Session(engine) as db:
+        db.get(Profile, seller_id).is_active = False; db.commit()
+    assert http.get(f'{BASE}/dashboard/overview').status_code == 403
