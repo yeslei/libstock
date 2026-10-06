@@ -84,7 +84,7 @@ describe('Endereços antigos de cadastro (Issue #169)', () => {
   });
   it('/gestao/acervo abre o acervo do balcão', async () => expect(await open('/gestao/acervo')).toBe('/balcao/acervo'));
   it('/gestao/acervo/obras/:id/editar abre o detalhe da obra no balcão', async () => {
-    expect(await open('/gestao/acervo/obras/12/editar')).toBe('/balcao/acervo/12');
+    expect(await open('/gestao/acervo/obras/12/editar')).toBe('/balcao/acervo/12/editar');
   });
   it('o estoquista acessa /balcao/acervo/nova', async () => expect(await open('/balcao/acervo/nova')).toBe('/balcao/acervo/nova'));
 });

@@ -8,7 +8,7 @@ from app.models.user import User
 from app.repositories.staff_desk_repository import StaffDeskRepository
 from app.schemas.staff_desk_schema import (
     StaffCatalogBook, StaffCatalogBookDetail, StaffClient, StaffClientPendencies, StaffCopyLookup, StaffDashboard,
-    StaffLoan, StaffLoanRequest, StaffPurchaseReservation,
+    StaffLoan, StaffLoanRequest, StaffPurchaseReservation, StaffDashboardOverview,
 )
 from app.services.staff_desk_service import StaffDeskService
 
@@ -63,8 +63,10 @@ def list_purchase_reservations(q: Term = None, client_id: ClientFilter = None,
 
 @router.get('/books', response_model=list[StaffCatalogBook])
 def list_catalog_books(q: Term = None, limit: Limit = 50,
+                       offset: Annotated[int, Query(ge=0)] = 0,
+                       availability: Annotated[Literal["all", "loan", "sale", "unavailable", "inactive"], Query()] = "all",
                        user: User = Depends(catalog_reader), service=Depends(get_staff_desk_service)):
-    return service.catalog_books(user.id, q, limit)
+    return service.catalog_books(user.id, q, limit, offset=offset, availability=availability) if offset or availability != "all" else service.catalog_books(user.id, q, limit)
 
 
 @router.get('/books/{book_id}', response_model=StaffCatalogBookDetail)
@@ -78,3 +80,8 @@ def lookup_copies(q: Term = None,
                   destination: DestinationType | None = None, available: bool | None = None, limit: Limit = 20,
                   user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
     return service.copy_lookup(user.id, q, limit, destination=destination, available=available)
+
+
+@router.get('/dashboard/overview', response_model=StaffDashboardOverview)
+def dashboard_overview(user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
+    return service.dashboard_overview(user.id)

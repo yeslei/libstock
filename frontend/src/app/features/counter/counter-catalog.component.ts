@@ -1,6 +1,14 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, switchMap } from 'rxjs';
 
 import { LoadState } from '../../core/models/load-state.model';
@@ -24,18 +32,37 @@ const CREATE_BOOK_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
 })
 export class CounterCatalogComponent implements OnInit {
   private readonly service = inject(CounterService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly loads = new Subject<void>();
 
-  protected readonly term = signal('');
+  protected readonly term = signal(this.route.snapshot.queryParamMap.get('q') ?? '');
+  protected readonly filter = signal(
+    this.route.snapshot.queryParamMap.get('availability') ?? 'all',
+  );
+  protected readonly offset = signal(
+    Math.max(0, Number(this.route.snapshot.queryParamMap.get('offset')) || 0),
+  );
+  protected readonly visibleBooks = computed(() => {
+    const state = this.state();
+    return state.status === 'loaded' ? state.data : [];
+  });
   protected readonly state = signal<LoadState<readonly StaffCatalogBook[]>>({ status: 'loading' });
   protected readonly limit = LIST_LIMIT;
   /** Cadastro de obra só para quem o backend autoriza (SELLER, STOCK_KEEPER, ADMINISTRATOR). */
-  protected readonly canCreate = (inject(TokenStoreService).user?.role_codes ?? []).some((role) => CREATE_BOOK_ROLES.includes(role));
+  protected readonly canCreate = (inject(TokenStoreService).user?.role_codes ?? []).some((role) =>
+    CREATE_BOOK_ROLES.includes(role),
+  );
 
   constructor() {
     this.loads
       .pipe(
-        switchMap(() => toLoadState(this.service.listCatalogBooks(this.term()), 'Não foi possível carregar o acervo.')),
+        switchMap(() =>
+          toLoadState(
+            this.service.listCatalogBooks(this.term(), this.offset(), this.filter(), this.limit),
+            'Não foi possível carregar o acervo.',
+          ),
+        ),
         takeUntilDestroyed(inject(DestroyRef)),
       )
       .subscribe((state) => this.state.set(state));
@@ -55,9 +82,30 @@ export class CounterCatalogComponent implements OnInit {
 
   protected search(event: Event): void {
     event.preventDefault();
-    this.reload();
+    this.offset.set(0);
+    this.apply();
   }
 
+  protected selectFilter(value: string): void {
+    this.filter.set(value);
+    this.offset.set(0);
+    this.apply();
+  }
+  protected page(direction: number): void {
+    this.offset.update((value) => Math.max(0, value + direction * this.limit));
+    this.apply();
+  }
+  private apply(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        q: this.term().trim() || null,
+        availability: this.filter() === 'all' ? null : this.filter(),
+        offset: this.offset() || null,
+      },
+    });
+    this.reload();
+  }
   protected readonly genreLabel = genreLabel;
 
   protected copiesLabel(book: StaffCatalogBook): string {

@@ -143,15 +143,16 @@ class CopyService:
                 raise CopyNotFoundError()
             # Livro antes do exemplar, como nos fluxos de circulação, para
             # serializar com empréstimo, venda e destinação concorrentes.
-            self.repository.lock_book(copy.book_id)
+            book = self.repository.lock_book(copy.book_id)
             copy = self.repository.lock_copy(copy_id)
             if copy is None:
                 raise CopyNotFoundError()
 
             reasons: list[dict] = []
-            if not copy.is_active:
+            reactivating = changes.is_active is True and not copy.is_active
+            if not copy.is_active and not reactivating:
                 reasons.append(INACTIVE_REASON)
-            if copy.status != CopyStatus.AVAILABLE:
+            if copy.status != CopyStatus.AVAILABLE and not (reactivating and copy.status == CopyStatus.INACTIVE):
                 reasons.append(
                     {
                         "code": "copy_not_available",
@@ -165,6 +166,10 @@ class CopyService:
             if reasons:
                 raise CopyUpdateBlockedError(reasons)
 
+            if changes.is_active is False and copy.is_active and book is not None and book.is_active and not self.repository.has_other_active_copy(copy.book_id, copy.id):
+                raise CopyUpdateBlockedError([LAST_ACTIVE_REASON])
+            if changes.is_active is False and copy.destination == DestinationType.DIDACTIC and self.repository.has_pending_loan_request(copy.book_id) and not self.repository.has_other_free_didactic_copy(copy.book_id, copy.id):
+                raise CopyUpdateBlockedError([NEEDED_FOR_REQUESTS_REASON])
             values = self._resolve_update(copy, changes)
             if (
                 values.get("destination") == DestinationType.COMMERCIAL
@@ -199,6 +204,9 @@ class CopyService:
                 raise CopySalePriceNotAllowedError()
             values["sale_price"] = None
         values["destination"] = destination
+        if "is_active" in fields:
+            values["is_active"] = changes.is_active
+            values["status"] = CopyStatus.AVAILABLE if changes.is_active else CopyStatus.INACTIVE
         if "condition" in fields:
             values["condition"] = changes.condition
         if "acquired_at" in fields:

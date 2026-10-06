@@ -31,8 +31,7 @@ export const appConfig: ApplicationConfig = {
     // A ordem importa: o errorInterceptor é o mais externo, então normaliza o
     // erro que sobrar *depois* de o authInterceptor ter tentado o refresh.
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
-    // A vitrine pública renderiza imediatamente. Guards privados aguardam
-    // a recuperação da sessão pelo cookie HttpOnly antes de decidir o acesso.
+    // A restauração acontece em segundo plano; a vitrine pública não depende dela.
     provideAppInitializer(() => { void inject(AuthService).restoreSession(); }),
   ],
 };

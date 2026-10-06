@@ -1,3 +1,4 @@
+import { ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, EventEmitter, Output, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -32,10 +33,11 @@ export class ClientsPanelComponent {
 
   @Output() readonly open = new EventEmitter<ClientNavigation>();
 
-  protected readonly term = signal('');
+  private readonly initialTerm = inject(ActivatedRoute, { optional: true })?.snapshot.queryParamMap.get('q')?.trim() ?? '';
+  protected readonly term = signal(this.initialTerm);
   protected readonly tooShort = signal(false);
   /** Termo aplicado à lista; vazio é a lista padrão de clientes ativos (Issue #172). */
-  protected readonly applied = signal('');
+  protected readonly applied = signal(this.initialTerm);
   protected readonly results = signal<LoadState<readonly StaffClient[]> | null>(null);
   protected readonly selected = signal<StaffClient | null>(null);
   protected readonly pendencies = signal<LoadState<ClientPendencies> | null>(null);
@@ -87,7 +89,8 @@ export class ClientsPanelComponent {
       )
       .subscribe((state) => this.pendencies.set(state));
 
-    this.searches.next('');
+    this.byTerm = this.initialTerm.length >= MIN_SEARCH_LENGTH;
+    this.searches.next(this.initialTerm);
   }
 
   protected setTerm(event: Event): void {

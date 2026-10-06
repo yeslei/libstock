@@ -368,3 +368,5 @@ table {
   gap: 16px;
   margin-top: $space-4;
 }
+
+app-alert + button, app-alert button, app-save-failure button { margin-top: 16px; }

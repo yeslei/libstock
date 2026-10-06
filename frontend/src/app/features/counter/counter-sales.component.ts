@@ -1,3 +1,4 @@
+import { ActivatedRoute } from '@angular/router';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, switchMap } from 'rxjs';
@@ -31,14 +32,15 @@ const SELLABLE_LIST: CopyListFilter = { destination: 'COMMERCIAL', available: tr
 })
 export class CounterSalesComponent {
   private readonly service = inject(CounterService);
+  private readonly initialTerm = inject(ActivatedRoute, { optional: true })?.snapshot.queryParamMap.get('q') ?? '';
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly searches = new Subject<void>();
 
   protected readonly price = formatPrice;
   protected readonly limit = COPY_LOOKUP_LIMIT;
-  protected readonly term = signal('');
+  protected readonly term = signal(this.initialTerm);
   /** Termo do filtro aplicado (vazio: lista padrão de comerciais disponíveis); é ele que a recarga reutiliza. */
-  protected readonly searched = signal('');
+  protected readonly searched = signal(this.initialTerm);
   /** Cliente escolhido; obrigatório para registrar a venda. */
   protected readonly client = signal<StaffClient | null>(null);
   /** Venda recém-registrada; abre o comprovante de venda. */

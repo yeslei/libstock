@@ -151,12 +151,16 @@ class StaffDeskService:
         book = row['Book']
         return dict(id=book.id, title=book.title, author=book.author, isbn=book.isbn, genre=book.genre,
                     genres=(genres or {}).get(book.id, []), is_active=book.is_active, total_copies=row['total_copies'],
-                    didactic_copies=row['didactic_copies'], commercial_copies=row['commercial_copies'])
+                    didactic_copies=row['didactic_copies'], commercial_copies=row['commercial_copies'],
+                    available_didactic=row.get('available_didactic', 0) if book.is_active else 0,
+                    available_commercial=row.get('available_commercial', 0) if book.is_active else 0,
+                    cover_url=getattr(book, 'cover_url', None))
 
-    def catalog_books(self, actor_id, term, limit):
+    def catalog_books(self, actor_id, term, limit, *, offset=0, availability="all"):
         """Acervo somente leitura para o balcão (obras e contagem de exemplares)."""
         self._guard(actor_id)
-        rows = self._read(lambda: self.repository.catalog_books(self._term(term), limit))
+        rows = self._read(lambda: self.repository.catalog_books(self._term(term), limit, offset=offset, availability=availability)
+                          if offset or availability != "all" else self.repository.catalog_books(self._term(term), limit))
         genres = self._read(lambda: self.repository.book_genres([row['Book'].id for row in rows]))
         return [StaffCatalogBook(**self._catalog_book(row, genres)) for row in rows]
 
@@ -204,3 +208,9 @@ class StaffDeskService:
                 free=free, free_commercial_copies=free_counts.get(book.id, 0), sellable=block is None,
                 sale_block_reason=block))
         return result
+
+    def dashboard_overview(self, actor_id):
+        from app.schemas.staff_desk_schema import StaffDashboardOverview
+        today, cutoff = self._guard(actor_id)
+        next_cutoff = datetime.combine(today + timedelta(days=1), time.min, ZONE)
+        return StaffDashboardOverview(**self._read(lambda: self.repository.dashboard_overview(cutoff, next_cutoff)))
