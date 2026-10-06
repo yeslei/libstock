@@ -1,0 +1,255 @@
+import { ActivatedRoute } from '@angular/router';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
+import { Subject, finalize, switchMap } from 'rxjs';
+
+import { ApiError } from '../../core/models/auth.model';
+import { LoadState } from '../../core/models/load-state.model';
+import { AlertComponent } from '../../shared/components/alert/alert.component';
+import { SnackbarService } from '../../shared/components/snackbar/snackbar.service';
+import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
+import { businessToday } from './business-date';
+import { ClientPickerComponent } from './client-picker.component';
+import {
+  COPY_LOOKUP_LIMIT,
+  CopyListFilter,
+  CounterService,
+  LoanRegistration,
+  StaffClient,
+  StaffCopyLookup,
+} from './counter.service';
+import { toLoadState } from './desk-flow';
+import { errorMessage, ineligibleReasons } from './desk-panel';
+import { SaveFailureComponent } from './save-failure.component';
+import { ReceiptComponent } from '../receipts/receipt.component';
+import { isPersistenceFailure, showFailure } from './save-failure';
+
+type Step = 'form' | 'review' | 'done' | 'blocked';
+type BlockKind = 'client' | 'copy';
+
+/** Códigos de domínio do cliente devolvidos por `POST /api/v1/loans/` (BUSINESS_RULES, seção Empréstimo). */
+const CLIENT_BLOCK_CODES: readonly string[] = ['client_not_found', 'client_inactive', 'client_has_pending'];
+
+interface Blocked {
+  readonly kind: BlockKind;
+  readonly message: string;
+  readonly clientName: string;
+}
+
+interface Completed {
+  readonly loan: LoanRegistration;
+  readonly client: StaffClient;
+  readonly copy: StaffCopyLookup;
+}
+
+/** Lista padrão de exemplares do empréstimo direto (Issue #172): didáticos disponíveis. */
+const LOANABLE_LIST: CopyListFilter = { destination: 'DIDACTIC', available: true };
+
+
+/** Exemplar didático livre (mesma definição de disponibilidade da retirada V2) de obra ativa. */
+export function isLoanable(copy: StaffCopyLookup): boolean {
+  return copy.destination === 'DIDACTIC' && copy.free && copy.book.is_active;
+}
+
+/** A lista já traz só didáticos livres; resta a obra inativa, que o backend não exclui. */
+function notLoanableReason(): string {
+  return 'obra inativa';
+}
+
+/**
+ * Complemento 06 (proposta condicional, EAP 1.2.9–1.2.13; incluído por decisão do responsável): empréstimo direto
+ * no balcão, sem solicitação prévia. Cliente por `GET /staff/clients`, exemplar por `GET /staff/copies`
+ * e registro por `POST /api/v1/loans/`. O prazo é calculado pelo backend e a tela só exibe o que ele retorna.
+ * A elegibilidade antecipada usa `eligible` do backend; os erros de domínio reais levam ao estado bloqueado.
+ */
+@Component({
+  selector: 'app-counter-loan-create',
+  standalone: true,
+  imports: [DatePipe, RouterLink, AlertComponent, SaveFailureComponent, SpinnerComponent, ReceiptComponent, ClientPickerComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './counter-loan-create.component.html',
+  styleUrl: './counter-loan-create.component.scss',
+})
+export class CounterLoanCreateComponent {
+  private readonly service = inject(CounterService);
+  private readonly initialTerm = inject(ActivatedRoute, { optional: true })?.snapshot.queryParamMap.get('q') ?? '';
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly snackbar = inject(SnackbarService);
+  private readonly copySearches = new Subject<string>();
+
+  protected readonly ineligibleReasons = ineligibleReasons;
+  protected readonly isLoanable = isLoanable;
+  protected readonly notLoanableReason = notLoanableReason;
+  protected readonly copyLimit = COPY_LOOKUP_LIMIT;
+  protected readonly today = (() => {
+    const [year, month, day] = businessToday().split('-');
+    return `${day}/${month}/${year}`;
+  })();
+
+  protected readonly step = signal<Step>('form');
+  protected readonly client = signal<StaffClient | null>(null);
+  protected readonly copyTerm = signal(this.initialTerm);
+  protected readonly copyState = signal<LoadState<readonly StaffCopyLookup[]> | null>(null);
+  protected readonly copy = signal<StaffCopyLookup | null>(null);
+  protected readonly submitting = signal(false);
+  protected readonly saveFailed = signal(false);
+  protected readonly blocked = signal<Blocked | null>(null);
+  protected readonly completed = signal<Completed | null>(null);
+  /** Termo do filtro de exemplares aplicado (vazio: lista padrão de didáticos disponíveis), reutilizado ao atualizar. */
+  protected lastCopyTerm = this.initialTerm;
+
+  /** Só é possível revisar com cliente apto (`eligible` do backend) e exemplar didático livre. */
+  protected readonly canReview = computed(() => {
+    const client = this.client();
+    const copy = this.copy();
+    return !!client && client.eligible && !!copy && isLoanable(copy);
+  });
+
+  constructor() {
+    this.copySearches
+      .pipe(
+        switchMap((term) =>
+          toLoadState(
+            this.service.listCopies(LOANABLE_LIST, term),
+            'Não foi possível buscar os exemplares. Tente novamente.',
+          ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((state) => this.copyState.set(state));
+    this.reloadCopies();
+  }
+
+  protected selectClient(client: StaffClient): void {
+    this.client.set(client);
+  }
+
+  protected changeClient(): void {
+    this.client.set(null);
+  }
+
+  protected setCopyTerm(event: Event): void {
+    this.copyTerm.set((event.target as HTMLInputElement).value);
+  }
+
+  protected searchCopies(event: Event): void {
+    event.preventDefault();
+    this.lastCopyTerm = this.copyTerm().trim();
+    this.reloadCopies();
+  }
+
+  protected reloadCopies(): void {
+    this.copySearches.next(this.lastCopyTerm);
+  }
+
+  protected selectCopy(copy: StaffCopyLookup): void {
+    if (!isLoanable(copy)) return;
+    this.copy.set(copy);
+    this.copyState.set(null);
+  }
+
+  protected changeCopy(): void {
+    this.copy.set(null);
+    this.reloadCopies();
+  }
+
+  protected review(): void {
+    if (!this.canReview()) return;
+    this.saveFailed.set(false);
+    this.go('review');
+  }
+
+  protected back(): void {
+    if (this.submitting()) return;
+    this.saveFailed.set(false);
+    this.go('form');
+  }
+
+  protected confirm(): void {
+    const client = this.client();
+    const copy = this.copy();
+    if (this.submitting() || !client || !copy || !this.canReview()) return;
+    this.submitting.set(true);
+    this.saveFailed.set(false);
+    this.service
+      .registerLoan(client.id, copy.id)
+      .pipe(
+        finalize(() => this.submitting.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (loan) => {
+          this.completed.set({ loan, client, copy });
+          this.go('done');
+        },
+        error: (error: unknown) => this.fail(error, client),
+      });
+  }
+
+  /** Erros de domínio (cliente, exemplar) levam ao estado bloqueado; falhas inesperadas mantêm a revisão. */
+  private fail(error: unknown, client: StaffClient): void {
+    const { status, code } = (error ?? {}) as Partial<ApiError>;
+    const detail = errorMessage(error, '');
+    if (code && CLIENT_BLOCK_CODES.includes(code)) {
+      this.block('client', detail, client);
+    } else if (status === 404 || status === 409) {
+      this.block('copy', detail || 'O exemplar não está disponível para empréstimo.', client);
+    } else {
+      if (isPersistenceFailure(error)) {
+        this.saveFailed.set(true);
+        this.focusHeading();
+      } else {
+        showFailure(this.snackbar, error, 'Não foi possível registrar o empréstimo. Tente novamente.');
+      }
+    }
+  }
+
+  private block(kind: BlockKind, message: string, client: StaffClient): void {
+    this.blocked.set({
+      kind,
+      message: message || 'O cliente não está apto para empréstimo.',
+      clientName: client.name,
+    });
+    this.go('blocked');
+  }
+
+  /** "Selecionar outro cliente": volta ao formulário sem cliente, mantendo o exemplar. */
+  protected chooseAnotherClient(): void {
+    this.client.set(null);
+    this.blocked.set(null);
+    this.go('form');
+  }
+
+  /** "Atualizar seleção": o exemplar pode ter mudado de situação; a busca é refeita e a escolha descartada. */
+  protected refreshSelection(): void {
+    this.copy.set(null);
+    this.blocked.set(null);
+    this.copyState.set(null);
+    this.reloadCopies();
+    this.go('form');
+  }
+
+  protected reset(): void {
+    this.client.set(null);
+    this.copy.set(null);
+    this.copyTerm.set('');
+    this.lastCopyTerm = '';
+    this.reloadCopies();
+    this.completed.set(null);
+    this.blocked.set(null);
+    this.saveFailed.set(false);
+    this.go('form');
+  }
+
+  private go(step: Step): void {
+    this.step.set(step);
+    this.focusHeading();
+  }
+
+  private focusHeading(): void {
+    queueMicrotask(() => this.host.nativeElement.querySelector<HTMLElement>('h1')?.focus());
+  }
+}

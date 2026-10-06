@@ -9,6 +9,15 @@ export interface CopyCreateRequest {
   readonly acquiredAt: string | null;
 }
 
+/** Corpo de `PATCH /api/v1/copies/{id}`; o código do exemplar é imutável e não faz parte da edição. */
+export interface CopyUpdateRequest {
+  readonly isActive?: boolean;
+  readonly destination?: DestinationType;
+  readonly condition?: string | null;
+  readonly salePrice?: number | null;
+  readonly acquiredAt?: string | null;
+}
+
 export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'SOLD' | 'RESERVED' | 'INACTIVE';
 
 export interface CopyResponse {
@@ -47,4 +56,15 @@ export function copyResponseFromApi(copy: CopyResponseApi): CopyResponse {
     status: copy.status,
     isActive: copy.is_active,
   };
+}
+
+/** Resposta de `DELETE /api/v1/copies/{id}`: o exemplar removido. */
+export interface CopyDeleteResult {
+  readonly id: number;
+  readonly bookId: number;
+  readonly barcode: string;
+}
+
+export function copyDeleteResultFromApi(result: { id: number; book_id: number; barcode: string }): CopyDeleteResult {
+  return { id: result.id, bookId: result.book_id, barcode: result.barcode };
 }

@@ -1,9 +1,12 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { FormControl, Validators } from '@angular/forms';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 
 import { ApiError } from '../../../core/models/auth.model';
+import { SnackbarService } from '../../../shared/components/snackbar/snackbar.service';
+import { Genre } from '../../catalog/models/catalog.model';
+import { CatalogService } from '../../catalog/services/catalog.service';
 import { BookResponse } from '../models/book.model';
 import { BookService } from '../services/book.service';
 import { isbnValidator } from '../validators/isbn.validator';
@@ -12,6 +15,11 @@ import { BookCreateComponent } from './book-create.component';
 describe('BookCreateComponent', () => {
   let fixture: ComponentFixture<BookCreateComponent>;
   let service: jasmine.SpyObj<BookService>;
+  const catalogGenres: Genre[] = [
+    { id: 1, name: 'Ficção', slug: 'ficcao' },
+    { id: 4, name: 'Fantasia', slug: 'fantasia' },
+    { id: 7, name: 'Romance', slug: 'romance' },
+  ];
 
   const response: BookResponse = {
     id: 7,
@@ -42,9 +50,15 @@ describe('BookCreateComponent', () => {
       author: 'Luciano Ramalho',
       genre: 'Tecnologia',
     }));
+    const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['getAllGenres']);
+    catalog.getAllGenres.and.returnValue(of(catalogGenres));
     await TestBed.configureTestingModule({
       imports: [BookCreateComponent],
-      providers: [provideRouter([]), { provide: BookService, useValue: service }],
+      providers: [
+        provideRouter([]),
+        { provide: BookService, useValue: service },
+        { provide: CatalogService, useValue: catalog },
+      ],
     }).compileComponents();
     fixture = TestBed.createComponent(BookCreateComponent);
     fixture.detectChanges();
@@ -98,7 +112,7 @@ describe('BookCreateComponent', () => {
     expect(control.valid).toBeTrue();
   });
 
-  it('consulta, preenche e bloqueia metadados enquanto o ISBN é digitado', fakeAsync(() => {
+  it('consulta e preenche apenas campos vazios, sem bloquear a edição', fakeAsync(() => {
     input('book-isbn', '978-85-7522-553-0');
     tick(451);
     fixture.detectChanges();
@@ -106,8 +120,85 @@ describe('BookCreateComponent', () => {
     expect(service.lookupMetadata).toHaveBeenCalledOnceWith('9788575225530');
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector<HTMLInputElement>('#book-title')?.value).toBe('Python Fluente');
-    expect(root.querySelector<HTMLInputElement>('#book-title')?.disabled).toBeTrue();
-    expect(root.textContent).toContain('bloqueados para evitar inconsistências');
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.disabled).toBeFalse();
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.readOnly).toBeFalse();
+    expect(root.textContent).toContain('Sugestão do Google Books aplicada em campos vazios');
+  }));
+
+  it('não sobrescreve título e autor já digitados com a sugestão externa (Issue #176)', fakeAsync(() => {
+    input('book-title', 'Título do funcionário');
+    input('book-author', 'Autor do funcionário');
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector<HTMLInputElement>('#book-title')?.value).toBe('Título do funcionário');
+    expect(root.querySelector<HTMLInputElement>('#book-author')?.value).toBe('Autor do funcionário');
+    expect(root.textContent).toContain('dados informados foram mantidos');
+  }));
+
+  it('trocar o ISBN descarta a sugestão não editada e aplica a nova (Issue #176)', fakeAsync(() => {
+    service.lookupMetadata.and.returnValues(
+      of({ isbn: 'a', title: 'Título A', author: 'Autor A', genre: null, cover_url: 'https://x/a.jpg' }),
+      of({ isbn: 'b', title: 'Título B', author: 'Autor B', genre: null }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    const value = (id: string) => root.querySelector<HTMLInputElement>(`#${id}`)!.value;
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    expect(value('book-title')).toBe('Título A');
+    expect(value('book-coverUrl')).toBe('https://x/a.jpg');
+    input('book-isbn', '9780306406157');
+    tick(451);
+    fixture.detectChanges();
+    expect(value('book-title')).toBe('Título B');
+    expect(value('book-author')).toBe('Autor B');
+    expect(value('book-coverUrl')).toBe('');
+  }));
+
+  it('trocar o ISBN com falha na consulta não deixa os dados da sugestão anterior', fakeAsync(() => {
+    service.lookupMetadata.and.returnValues(
+      of({ isbn: 'a', title: 'Título A', author: 'Autor A', genre: null }),
+      throwError(() => ({ status: 404, detail: 'x' })),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    input('book-isbn', '9780306406157');
+    tick(451);
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#book-title')!.value).toBe('');
+    expect(root.querySelector<HTMLInputElement>('#book-author')!.value).toBe('');
+  }));
+
+  it('trocar o ISBN preserva o campo editado pelo funcionário', fakeAsync(() => {
+    service.lookupMetadata.and.returnValues(
+      of({ isbn: 'a', title: 'Título A', author: 'Autor A', genre: null }),
+      of({ isbn: 'b', title: 'Título B', author: 'Autor B', genre: null }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    input('book-title', 'Título do funcionário');
+    input('book-isbn', '9780306406157');
+    tick(451);
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('#book-title')!.value).toBe('Título do funcionário');
+    expect(root.querySelector<HTMLInputElement>('#book-author')!.value).toBe('Autor B');
+  }));
+
+  it('não usa a categoria do Google Books como categoria da obra (Issue #176)', fakeAsync(() => {
+    spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    service.create.and.returnValue(of(response));
+    input('book-isbn', '978-85-7522-553-0');
+    tick(451);
+    fixture.detectChanges();
+    submit();
+    expect(service.create.calls.mostRecent().args[0].genre_ids).toEqual([]);
   }));
 
   it('libera o preenchimento manual quando a consulta falha', fakeAsync(() => {
@@ -122,16 +213,39 @@ describe('BookCreateComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Preencha título e autor manualmente');
   }));
 
-  it('aplica os limites de título, autor e gênero', () => {
+  it('aplica os limites de título e autor', () => {
     input('book-isbn', '9788575225530');
     input('book-title', 'T'.repeat(256));
     input('book-author', 'A'.repeat(256));
-    input('book-genre', 'G'.repeat(101));
     submit();
     expect(service.create).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('título pode ter no máximo 255');
     expect(fixture.nativeElement.textContent).toContain('autor pode ter no máximo 255');
-    expect(fixture.nativeElement.textContent).toContain('gênero pode ter no máximo 100');
+  });
+
+  function pick(id: number): void {
+    const box = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(`#book-genre-${id}`)!;
+    box.click();
+    fixture.detectChanges();
+  }
+
+  it('oferece as categorias do catálogo para seleção múltipla (Issue #174)', () => {
+    const boxes = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+    expect(boxes.map((box) => box.id)).toEqual(['book-genre-1', 'book-genre-4', 'book-genre-7']);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Fantasia');
+    expect((fixture.nativeElement as HTMLElement).querySelector('#book-genre[type="text"]')).toBeNull();
+  });
+
+  it('envia as categorias escolhidas em genre_ids, sem usar o texto de gênero', () => {
+    service.create.and.returnValue(of(response));
+    input('book-isbn', '9788575225530');
+    pick(4);
+    pick(7);
+    pick(4);
+    submit();
+    const payload = service.create.calls.mostRecent().args[0];
+    expect(payload.genre_ids).toEqual([7]);
+    expect(payload.genre).toBeUndefined();
   });
 
   it('envia payload normalizado quando o formulário é válido', () => {
@@ -139,13 +253,13 @@ describe('BookCreateComponent', () => {
     input('book-isbn', ' 978-85-7522-553-0 ');
     input('book-title', '  Python Fluente  ');
     input('book-author', ' Luciano Ramalho ');
-    input('book-genre', ' Tecnologia ');
+    pick(1);
     submit();
     expect(service.create).toHaveBeenCalledOnceWith({
       isbn: '9788575225530',
       title: 'Python Fluente',
       author: 'Luciano Ramalho',
-      genre: 'Tecnologia',
+      genre_ids: [1],
       cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
@@ -160,7 +274,7 @@ describe('BookCreateComponent', () => {
     input('book-title', '   ');
     submit();
     expect(service.create).toHaveBeenCalledOnceWith({
-      isbn: '9788575225530', title: null, author: null, genre: null, cover_url: null,
+      isbn: '9788575225530', title: null, author: null, genre_ids: [], cover_url: null,
       initial_copy: {
         barcode: 'EX-0001', destination: 'DIDACTIC', condition: null,
         sale_price: null, acquired_at: null,
@@ -182,17 +296,29 @@ describe('BookCreateComponent', () => {
     expect(service.create).toHaveBeenCalledTimes(1);
   });
 
-  it('exibe os dados efetivamente devolvidos no 201', () => {
+  it('após o 201 avisa o sucesso e abre o detalhe da obra no balcão', () => {
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    const snackbar = spyOn(TestBed.inject(SnackbarService), 'show');
     service.create.and.returnValue(of(response));
     input('book-isbn', '9788575225530');
     submit();
-    const text = fixture.nativeElement.textContent;
-    expect(text).toContain('Obra cadastrada com sucesso.');
-    expect(text).toContain(response.isbn);
-    expect(text).toContain(response.title);
-    expect(text).toContain(response.author);
-    expect(text).toContain(response.genre);
-    expect(text).toContain(response.initial_copy!.barcode);
+    expect(navigate).toHaveBeenCalledOnceWith(['/balcao/acervo', response.id]);
+    expect(snackbar).toHaveBeenCalledOnceWith('Obra “Python Fluente” cadastrada com sucesso.', 'success');
+  });
+
+  it('não navega nem avisa sucesso quando o backend recusa o cadastro', () => {
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    const snackbar = spyOn(TestBed.inject(SnackbarService), 'show');
+    service.create.and.returnValue(throwError(() => ({ status: 409, code: 'duplicate_isbn', detail: 'ISBN já cadastrado.' } as ApiError)));
+    input('book-isbn', '9788575225530');
+    submit();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(snackbar).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('ISBN já cadastrado.');
+  });
+
+  it('oferece o retorno ao acervo do balcão', () => {
+    expect((fixture.nativeElement as HTMLElement).querySelector('a.back')?.getAttribute('href')).toBe('/balcao/acervo');
   });
 
   [
@@ -303,6 +429,31 @@ describe('BookCreateComponent', () => {
     form.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
     expect(service.create.calls.mostRecent().args[0].initial_copy.sale_price).toBe(49.9);
+  });
+
+  it('rejeita preço zero do exemplar comercial na inclusão da obra (Issue #175)', () => {
+    input('book-isbn', '9788575225530');
+    input('book-barcode', 'COM-0');
+    const root = fixture.nativeElement as HTMLElement;
+    const destination = root.querySelector<HTMLSelectElement>('#book-destination')!;
+    destination.value = 'COMMERCIAL';
+    destination.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    input('book-sale-price', '0');
+    root.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+    expect(service.create).not.toHaveBeenCalled();
+    expect(root.textContent).toContain('O preço de venda deve ser maior que zero.');
+  });
+
+  it('mostra a mensagem do 422 de domínio de preço devolvido pelo backend', () => {
+    service.create.and.returnValue(fail({
+      status: 422, code: 'copy_sale_price_required',
+      detail: 'Exemplar destinado à venda exige preço de venda maior que zero.',
+    }));
+    input('book-isbn', '9788575225530');
+    submit();
+    expect(fixture.nativeElement.textContent).toContain('exige preço de venda maior que zero');
   });
 
   it('orienta cadastro manual quando a integração retorna 503', () => {

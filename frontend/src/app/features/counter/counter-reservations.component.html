@@ -1,0 +1,122 @@
+<section class="page" aria-labelledby="reservas-titulo">
+  <p class="page__crumb">LibStock / Reservas de compra</p>
+  <h1 id="reservas-titulo">Reservas de compra</h1>
+  <p class="page__intro">Busque uma obra ou cliente e acompanhe quem aguarda disponibilidade ou retirada.</p>
+
+  <form class="search" role="search" (submit)="search($event)">
+    <div class="search__field">
+      <label for="reservation-q">Buscar reserva</label>
+      <input
+        id="reservation-q"
+        type="search"
+        maxlength="100"
+        placeholder="Título, nome ou e-mail do cliente"
+        [value]="term()"
+        (input)="setTerm($event)"
+      />
+    </div>
+    <button class="btn btn--primary" type="submit">Buscar</button>
+  </form>
+
+  @if (context.client(); as client) {
+    <p class="chip">Cliente: {{ client.name }} <button type="button" (click)="removeClientFilter()">Remover filtro</button></p>
+  }
+
+  @if (flow.saveFailed()) {
+    <app-save-failure>
+      <button class="btn btn--primary" type="button" (click)="reload()">Atualizar consulta</button>
+      <button class="btn" type="button" (click)="flow.saveFailed.set(false)">Voltar</button>
+    </app-save-failure>
+  }
+
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') { <p class="loading" role="status"><app-spinner /> Carregando reservas…</p> }
+      @case ('error') {
+        <app-alert [message]="s.message"><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert>
+      }
+      @case ('loaded') {
+        @if (!s.data.length) {
+          @if (filtered) {
+            <div class="callout" role="status">
+              <p class="callout__title">Nenhuma reserva corresponde à busca</p>
+              <p>Confira o título, nome ou e-mail. Você também pode limpar a busca para consultar todas as reservas.</p>
+            </div>
+            <div class="actions">
+              <button class="btn btn--primary" type="button" (click)="clearSearch()">Limpar busca</button>
+              <a class="btn" routerLink="/balcao/painel">Voltar ao painel</a>
+            </div>
+          } @else {
+            <p class="empty" role="status">Nenhuma reserva de compra em andamento.</p>
+          }
+        } @else {
+          <div class="callout">
+            <p class="callout__title">Fila de compra</p>
+            <p>As posições são exibidas por obra. O exemplar livre é destinado à primeira reserva elegível; clientes inelegíveis mantêm a posição. A destinação dá cinco dias corridos para a retirada.</p>
+          </div>
+          @if (hasExpired()) {
+            <div class="callout callout--danger" role="status">
+              <p class="callout__title">Há reservas com prazo de retirada vencido</p>
+              <p>O exemplar só volta à fila depois que o vencimento é registrado. Registre agora ou ele será registrado na próxima destinação da obra.</p>
+              <div class="actions"><button class="btn btn--primary" type="button" [disabled]="flow.submitting()" (click)="releaseExpired()">Liberar exemplares vencidos</button></div>
+            </div>
+          }
+          @if (s.data.length >= limit) {
+            <p class="note" role="status">Mostrando os primeiros {{ limit }} resultados. Refine a busca para ver os demais.</p>
+          }
+          <ul class="queues">
+            @for (queue of queues(); track queue.bookId) {
+              <li>
+                <article class="card" [attr.aria-labelledby]="'queue-' + queue.bookId">
+                  <h2 [id]="'queue-' + queue.bookId">{{ queue.title }} · Fila de compra</h2>
+                  <ol class="queue">
+                    @for (reservation of queue.entries; track reservation.id) {
+                      <li class="queue__item">
+                        @if (reservation.status === 'NOTIFIED') {
+                          <p>{{ reservation.client.name }} · {{ reservation.expired ? 'Prazo de retirada encerrado' : 'Disponível para retirada' }} · Exemplar {{ reservation.allocated_copy_barcode }}</p>
+                          @if (reservation.expires_at) {
+                            <p class="queue__meta">{{ reservation.expired ? 'Prazo encerrado em' : 'Retirar até' }} {{ reservation.expires_at | date: 'dd/MM/yyyy':'-0300' }}</p>
+                          }
+                          @if (!reservation.client.eligible) {
+                            <p class="note note--danger">Cliente inelegível. A venda não poderá ser confirmada.</p>
+                          }
+                        } @else {
+                          <p>{{ reservation.queue_position }}ª · {{ reservation.client.name }} · Aguardando disponibilidade</p>
+                          @if (reservation.allocation_blocked_reason && reservation.allocation_blocked_reason !== 'NOT_FIRST_ELIGIBLE') {
+                            <p class="note">{{ blockText[reservation.allocation_blocked_reason] }}</p>
+                          }
+                        }
+                      </li>
+                    }
+                  </ol>
+                  <div class="actions">
+                    @for (reservation of queue.entries; track reservation.id) {
+                      @if (reservation.status === 'NOTIFIED') {
+                        <a
+                          class="btn"
+                          [class.btn--primary]="!reservation.expired"
+                          [routerLink]="['/balcao/reservas', reservation.id]"
+                          [queryParams]="{ cliente: reservation.client.id }"
+                        >{{ reservation.expired ? 'Ver reserva de ' + reservation.client.name : 'Atender ' + reservation.client.name }}</a>
+                      } @else if (reservation.can_allocate) {
+                        <button class="btn btn--primary" type="button" [disabled]="flow.submitting()" (click)="allocate(reservation)">Destinar exemplar a {{ reservation.client.name }}</button>
+                      }
+                    }
+                    @for (reservation of queue.entries; track reservation.id) {
+                      <button class="btn btn--danger" type="button" [disabled]="flow.submitting()" (click)="cancel(reservation)">Cancelar reserva de {{ reservation.client.name }}</button>
+                    }
+                    <button class="btn" type="button" (click)="focusSearch()">Consultar outra obra</button>
+                  </div>
+                </article>
+              </li>
+            }
+          </ul>
+        }
+      }
+    }
+  }
+
+  @if (flow.confirming(); as c) {
+    <app-confirm-dialog [title]="c.title" [details]="c.details" [confirmLabel]="c.confirmLabel" [busy]="flow.submitting()" (confirmed)="flow.confirm()" (cancelled)="flow.cancel()" />
+  }
+</section>

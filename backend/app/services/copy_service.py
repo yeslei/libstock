@@ -1,11 +1,64 @@
-from fastapi import HTTPException
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import AuditActorRequiredError
-from app.models.domain import Book
+from app.core.exceptions import (
+    ApplicationError,
+    AuditActorRequiredError,
+    BookNotFoundError,
+    CopyDeletionBlockedError,
+    CopyPersistenceError,
+    DuplicateBarcodeError,
+    CopyDeletionPersistenceError,
+    CopyNotFoundError,
+    CopySalePriceNotAllowedError,
+    CopySalePriceRequiredError,
+    CopyUpdateBlockedError,
+    CopyUpdatePersistenceError,
+    SQLSTATE_COPY_DESTINATION_FORBIDDEN,
+    SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE,
+    EmployeeRecordRequiredError,
+    PermissionDeniedError,
+)
+from decimal import Decimal
+
+from app.models.domain import Book, CopyStatus, DestinationType
 from app.repositories.copy_repository import CopyRepository
-from app.schemas.copy_schema import CopyBatchCreate, CopyCreate
+from app.services.copy_rules import require_commercial_price
+from app.schemas.copy_schema import CopyBatchCreate, CopyCreate, CopyDeleteResponse, CopyUpdate
+
+LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
+FOREIGN_KEY_VIOLATION = "23503"
+HISTORY_REASON = {
+    "code": "copy_has_history",
+    "message": "O exemplar possui histórico de empréstimo, venda, reserva ou solicitação.",
+}
+LAST_ACTIVE_REASON = {
+    "code": "last_active_copy",
+    "message": "É o último exemplar ativo de uma obra ativa.",
+}
+
+ALLOCATED_COPY_MESSAGE = "An allocated copy cannot change book, destination, activity or availability"
+NOT_CONVERTIBLE_REASON = {
+    "code": "copy_not_available",
+    "message": "O exemplar não está disponível para conversão.",
+}
+NEEDED_FOR_REQUESTS_REASON = {
+    "code": "copy_needed_for_requests",
+    "message": "Este é o último exemplar didático livre da obra e há solicitação de retirada pendente.",
+}
+INACTIVE_REASON = {
+    "code": "copy_inactive",
+    "message": "O exemplar está inativo.",
+}
+ALLOCATED_REASON = {
+    "code": "copy_allocated",
+    "message": "O exemplar está destinado a uma reserva de compra.",
+}
+OPERATION_REASON = {
+    "code": "copy_in_operation",
+    "message": "O exemplar está em uma venda em andamento.",
+}
+
 
 class CopyService:
     def __init__(self, repository: CopyRepository, db: Session):
@@ -15,13 +68,14 @@ class CopyService:
     def create_new_copy(self, copy_data: CopyCreate, actor_id: int):
         if not self.repository.is_employee(actor_id):
             raise AuditActorRequiredError()
+        require_commercial_price(copy_data.destination, copy_data.sale_price)
 
         try:
             self.repository.set_audit_actor(actor_id)
 
             book = self.db.get(Book, copy_data.book_id)
             if book is None or not book.is_active:
-                raise HTTPException(status_code=404, detail="Obra não encontrada ou inativa.")
+                raise BookNotFoundError("Obra não encontrada ou inativa.")
 
             copy = self.repository.create_copy(copy_data=copy_data)
             self.db.commit()
@@ -29,19 +83,13 @@ class CopyService:
             return copy
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail="Já existe um exemplar com este código de barras.",
-            ) from exc
-        except HTTPException:
+            raise DuplicateBarcodeError("Já existe um exemplar com este código de barras.") from exc
+        except ApplicationError:
             self.db.rollback()
             raise
-        except Exception:
+        except Exception as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Não foi possível cadastrar o exemplar.",
-            )
+            raise CopyPersistenceError("Não foi possível cadastrar o exemplar.") from exc
 
     def create_copies(
         self,
@@ -50,6 +98,8 @@ class CopyService:
     ):
         if not self.repository.is_employee(actor_id):
             raise AuditActorRequiredError()
+        for item in copies_data.copies:
+            require_commercial_price(item.destination, item.sale_price)
 
         try:
             self.repository.set_audit_actor(actor_id)
@@ -58,10 +108,7 @@ class CopyService:
             book = self.db.get(Book, book_id)
 
             if book is None or not book.is_active:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Obra não encontrada ou inativa.",
-                )
+                raise BookNotFoundError("Obra não encontrada ou inativa.")
 
             copies = self.repository.create_copies(copies_data.copies)
 
@@ -74,18 +121,178 @@ class CopyService:
 
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail="Já existe um exemplar com este código de barras.",
-            ) from exc
+            raise DuplicateBarcodeError("Já existe um exemplar com este código de barras.") from exc
 
-        except HTTPException:
+        except ApplicationError:
             self.db.rollback()
             raise
 
-        except Exception:
+        except Exception as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Não foi possível cadastrar os exemplares.",
-            )
+            raise CopyPersistenceError("Não foi possível cadastrar os exemplares.") from exc
+
+    def update_copy(self, copy_id: int, changes: CopyUpdate, actor_id: int):
+        """Edita ou converte exemplar disponível, ativo e sem operação em andamento (Issue #151)."""
+        try:
+            if not self.repository.is_active_employee(actor_id):
+                raise EmployeeRecordRequiredError()
+            self.repository.set_audit_actor(actor_id)
+
+            copy = self.repository.find_copy(copy_id)
+            if copy is None:
+                raise CopyNotFoundError()
+            # Livro antes do exemplar, como nos fluxos de circulação, para
+            # serializar com empréstimo, venda e destinação concorrentes.
+            book = self.repository.lock_book(copy.book_id)
+            copy = self.repository.lock_copy(copy_id)
+            if copy is None:
+                raise CopyNotFoundError()
+
+            reasons: list[dict] = []
+            reactivating = changes.is_active is True and not copy.is_active
+            if not copy.is_active and not reactivating:
+                reasons.append(INACTIVE_REASON)
+            if copy.status != CopyStatus.AVAILABLE and not (reactivating and copy.status == CopyStatus.INACTIVE):
+                reasons.append(
+                    {
+                        "code": "copy_not_available",
+                        "message": f"O exemplar não está disponível (situação atual: {copy.status.value}).",
+                    }
+                )
+            if self.repository.is_allocated_to_reservation(copy.id):
+                reasons.append(ALLOCATED_REASON)
+            if self.repository.has_open_sale(copy.id):
+                reasons.append(OPERATION_REASON)
+            if reasons:
+                raise CopyUpdateBlockedError(reasons)
+
+            if changes.is_active is False and copy.is_active and book is not None and book.is_active and not self.repository.has_other_active_copy(copy.book_id, copy.id):
+                raise CopyUpdateBlockedError([LAST_ACTIVE_REASON])
+            if changes.is_active is False and copy.destination == DestinationType.DIDACTIC and self.repository.has_pending_loan_request(copy.book_id) and not self.repository.has_other_free_didactic_copy(copy.book_id, copy.id):
+                raise CopyUpdateBlockedError([NEEDED_FOR_REQUESTS_REASON])
+            values = self._resolve_update(copy, changes)
+            if (
+                values.get("destination") == DestinationType.COMMERCIAL
+                and copy.destination == DestinationType.DIDACTIC
+                and self.repository.has_pending_loan_request(copy.book_id)
+                and not self.repository.has_other_free_didactic_copy(copy.book_id, copy.id)
+            ):
+                raise CopyUpdateBlockedError([NEEDED_FOR_REQUESTS_REASON])
+            if values:
+                self.repository.apply_copy_changes(copy, values)
+            self.db.commit()
+            self.db.refresh(copy)
+            return copy
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise self._update_failure(exc) from exc
+
+    @staticmethod
+    def _resolve_update(copy, changes: CopyUpdate) -> dict:
+        fields = changes.model_fields_set
+        destination = changes.destination if "destination" in fields else copy.destination
+        values: dict = {}
+        if destination == DestinationType.COMMERCIAL:
+            price = changes.sale_price if "sale_price" in fields else copy.sale_price
+            require_commercial_price(destination, price)
+            values["sale_price"] = price
+        else:
+            if copy.destination == DestinationType.DIDACTIC and changes.sale_price is not None:
+                raise CopySalePriceNotAllowedError()
+            values["sale_price"] = None
+        values["destination"] = destination
+        if "is_active" in fields:
+            values["is_active"] = changes.is_active
+            values["status"] = CopyStatus.AVAILABLE if changes.is_active else CopyStatus.INACTIVE
+        if "condition" in fields:
+            values["condition"] = changes.condition
+        if "acquired_at" in fields:
+            values["acquired_at"] = changes.acquired_at
+        return {key: value for key, value in values.items() if getattr(copy, key) != value}
+
+    @staticmethod
+    def _update_failure(exc: SQLAlchemyError) -> ApplicationError:
+        orig = getattr(exc, "orig", None)
+        sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+        diag = getattr(orig, "diag", None)
+        constraint = getattr(diag, "constraint_name", None)
+        # Gatilho da migration 0014: SQLSTATE próprio por motivo.
+        if sqlstate == SQLSTATE_COPY_DESTINATION_FORBIDDEN:
+            return PermissionDeniedError()
+        if sqlstate == SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE:
+            return CopyUpdateBlockedError([NOT_CONVERTIBLE_REASON])
+        # Gatilho da migration 0013 (já integrada, sem SQLSTATE próprio): mensagem exata.
+        if getattr(diag, "message_primary", None) == ALLOCATED_COPY_MESSAGE:
+            return CopyUpdateBlockedError([ALLOCATED_REASON])
+        if constraint == "chk_commercial_price":
+            return CopySalePriceRequiredError()
+        if constraint == "chk_didactic_without_sale_price":
+            return CopySalePriceNotAllowedError()
+        return CopyUpdatePersistenceError()
+
+    def delete_copy(self, copy_id: int, actor_id: int) -> CopyDeleteResponse:
+        """Exclui fisicamente um exemplar disponível e sem histórico (Issue #135)."""
+        try:
+            if not self.repository.is_active_employee(actor_id):
+                raise EmployeeRecordRequiredError()
+            self.repository.set_audit_actor(actor_id)
+
+            copy = self.repository.find_copy(copy_id)
+            if copy is None:
+                raise CopyNotFoundError()
+            # Livro antes do exemplar, como nos fluxos de circulação, para
+            # serializar com empréstimo, venda e destinação concorrentes.
+            book = self.repository.lock_book(copy.book_id)
+            copy = self.repository.lock_copy(copy_id)
+            if copy is None:
+                raise CopyNotFoundError()
+
+            reasons: list[dict] = []
+            if copy.status != CopyStatus.AVAILABLE:
+                reasons.append(
+                    {
+                        "code": "copy_not_available",
+                        "message": f"O exemplar não está disponível (situação atual: {copy.status.value}).",
+                    }
+                )
+            history = self.repository.history_counts(copy.id)
+            if any(history.values()):
+                reasons.append(HISTORY_REASON)
+            if (
+                book is not None
+                and book.is_active
+                and copy.is_active
+                and not self.repository.has_other_active_copy(copy.book_id, copy.id)
+            ):
+                reasons.append(LAST_ACTIVE_REASON)
+            if reasons:
+                raise CopyDeletionBlockedError(reasons, history)
+
+            response = CopyDeleteResponse(id=copy.id, book_id=copy.book_id, barcode=copy.barcode)
+            self.repository.delete_copy(copy)
+            self.db.commit()
+            return response
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            # A integridade do banco é a última barreira: qualquer bloqueio não
+            # previsto pela checagem acima continua sendo bloqueio, nunca 500.
+            raise self._blocked_by_database(exc) from exc
+
+    @staticmethod
+    def _blocked_by_database(exc: SQLAlchemyError) -> ApplicationError:
+        orig = getattr(exc, "orig", None)
+        sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+        message = str(orig or exc)
+        if LAST_ACTIVE_COPY_MESSAGE in message:
+            return CopyDeletionBlockedError([LAST_ACTIVE_REASON], {})
+        if isinstance(exc, IntegrityError) and (
+            sqlstate == FOREIGN_KEY_VIOLATION or "foreign key" in message.lower()
+        ):
+            return CopyDeletionBlockedError([HISTORY_REASON], {})
+        return CopyDeletionPersistenceError()

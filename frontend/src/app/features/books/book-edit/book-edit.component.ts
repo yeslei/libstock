@@ -1,3 +1,5 @@
+import { GenrePickerComponent } from '../components/genre-picker/genre-picker.component';
+import { Genre } from '../../catalog/models/catalog.model';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -15,7 +17,13 @@ type EditState = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 @Component({
   selector: 'app-book-edit',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [
+    GenrePickerComponent,
+    ReactiveFormsModule,
+    RouterLink,
+    AlertComponent,
+    SpinnerComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './book-edit.component.html',
   styleUrl: './book-edit.component.scss',
@@ -30,12 +38,22 @@ export class BookEditComponent {
   protected readonly state = signal<EditState>('loading');
   protected readonly message = signal<string | null>(null);
   protected readonly book = signal<BookDetail | null>(null);
+  protected readonly selectedGenres = signal<readonly Genre[]>([]);
+  protected genreIds(): readonly number[] {
+    return this.selectedGenres().map((genre) => genre.id);
+  }
   protected readonly imageFailed = signal(false);
   protected readonly form = this.fb.nonNullable.group({
-    isbn: ['', [Validators.required, isbnValidator]],
-    title: ['', [Validators.required, Validators.maxLength(255)]],
-    author: ['', [Validators.required, Validators.maxLength(255)]],
+    isbn: ['', [isbnValidator]],
+    title: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
+    author: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
     genre: ['', [Validators.maxLength(100)]],
+    publisher: ['', Validators.maxLength(150)],
+    edition: ['', Validators.maxLength(50)],
+    publicationYear: [
+      '',
+      [Validators.min(1000), Validators.max(2100), Validators.pattern(/^\d{4}$/)],
+    ],
     coverUrl: ['', [Validators.pattern(/^https?:\/\/.+/i)]],
   });
 
@@ -45,14 +63,30 @@ export class BookEditComponent {
       this.message.set('O identificador da obra é inválido.');
       return;
     }
-    this.books.get(this.bookId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (book) => {
-        this.book.set(book);
-        this.form.setValue({ isbn: book.isbn ?? '', title: book.title, author: book.author, genre: book.genre ?? '', coverUrl: book.cover_url ?? '' });
-        this.state.set('ready');
-      },
-      error: (error: ApiError) => { this.state.set('error'); this.message.set(error.detail); },
-    });
+    this.books
+      .get(this.bookId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (book) => {
+          this.book.set(book);
+          this.selectedGenres.set(book.genres ?? []);
+          this.form.setValue({
+            isbn: book.isbn ?? '',
+            title: book.title,
+            author: book.author,
+            genre: book.genre ?? '',
+            coverUrl: book.cover_url ?? '',
+            publisher: book.publisher ?? '',
+            edition: book.edition ?? '',
+            publicationYear: String(book.publication_year ?? ''),
+          });
+          this.state.set('ready');
+        },
+        error: (error: ApiError) => {
+          this.state.set('error');
+          this.message.set(error.detail);
+        },
+      });
   }
 
   protected save(): void {
@@ -63,12 +97,31 @@ export class BookEditComponent {
     const value = this.form.getRawValue();
     this.state.set('submitting');
     this.message.set(null);
-    this.books.update(this.bookId, {
-      isbn: value.isbn.trim(), title: value.title.trim(), author: value.author.trim(),
-      genre: value.genre.trim() || null, cover_url: value.coverUrl.trim() || null,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (book) => { this.book.set(book); this.imageFailed.set(false); this.state.set('success'); this.message.set('Obra atualizada com sucesso.'); },
-      error: (error: ApiError) => { this.state.set('error'); this.message.set(error.status === 403 ? 'Você não tem permissão para alterar esta obra.' : error.detail); },
-    });
+    this.books
+      .update(this.bookId, {
+        isbn: value.isbn.trim() || null,
+        title: value.title.trim(),
+        author: value.author.trim(),
+        publisher: value.publisher.trim() || null,
+        edition: value.edition.trim() || null,
+        publication_year: value.publicationYear ? Number(value.publicationYear) : null,
+        genre_ids: this.genreIds(),
+        cover_url: value.coverUrl.trim() || null,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (book) => {
+          this.book.set(book);
+          this.imageFailed.set(false);
+          this.state.set('success');
+          this.message.set('Obra atualizada com sucesso.');
+        },
+        error: (error: ApiError) => {
+          this.state.set('error');
+          this.message.set(
+            error.status === 403 ? 'Você não tem permissão para alterar esta obra.' : error.detail,
+          );
+        },
+      });
   }
 }

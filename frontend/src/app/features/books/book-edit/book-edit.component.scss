@@ -1,9 +1,111 @@
 @use 'variables' as *;
-.edit { width: calc(100% - 2rem); max-width: 720px; margin: 0 auto; padding: $space-8 0; }
-.edit > a { color: $primary; }
-form { display: grid; gap: $space-2; margin-top: $space-5; padding: $space-5; border: 1px solid $border; border-radius: $radius-lg; }
-label { margin-top: $space-2; font-weight: 700; }
-input { min-height: 44px; padding: 0 $space-3; border: 1px solid $border; border-radius: $radius-md; font: inherit; }
-button, .add-copy { display: inline-flex; justify-content: center; align-items: center; min-height: 44px; margin-top: $space-4; padding: 0 $space-4; border: 0; border-radius: $radius-md; background: $primary; color: white; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
-.cover { width: 128px; margin-top: $space-3; aspect-ratio: 2/3; border-radius: $radius-sm; object-fit: cover; }
-.cover--empty { display: grid; place-items: center; background: $bg-subtle; color: $text-muted; }
+.edit {
+  width: 100%;
+  max-width: 720px;
+  margin: 0;
+  padding: 0;
+}
+form {
+  background: white;
+  display: grid;
+  gap: $space-2;
+  margin-top: $space-5;
+  padding: $space-5;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+}
+label {
+  margin-top: $space-2;
+  font-weight: 700;
+}
+input {
+  min-height: 44px;
+  padding: 0 $space-3;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  font: inherit;
+}
+button,
+.add-copy {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+  margin-top: $space-4;
+  padding: 0 $space-4;
+  border: 0;
+  border-radius: $radius-md;
+  background: $primary;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.cover {
+  width: 128px;
+  margin-top: $space-3;
+  aspect-ratio: 2/3;
+  border-radius: $radius-sm;
+  object-fit: cover;
+}
+.cover--empty {
+  display: grid;
+  place-items: center;
+  background: $bg-subtle;
+  color: $text-muted;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+  color: $text-muted;
+  font-size: 14px;
+}
+.breadcrumb a {
+  text-decoration: none;
+}
+.field-error {
+  color: $error;
+  font-size: 12px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: $space-5;
+}
+.form-actions a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  text-align: center;
+  line-height: 1.4;
+  text-decoration: none;
+  border-radius: $radius-md;
+}
+.back-to-book {
+  color: $primary;
+  background: white;
+  border: 1px solid $border;
+}
+.form-actions .add-copy {
+  margin-top: 0;
+  color: white;
+}
+.form-actions a:focus-visible {
+  outline: 2px solid $primary;
+  outline-offset: 3px;
+}
+@media (max-width: 480px) {
+  .form-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

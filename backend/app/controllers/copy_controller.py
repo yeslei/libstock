@@ -1,11 +1,20 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-from app.schemas.copy_schema import CopyBatchCreate, CopyCreate, CopyResponse
+from app.schemas.copy_schema import (
+    CopyBatchCreate,
+    CopyCreate,
+    CopyDeleteResponse,
+    CopyResponse,
+    CopyUpdate,
+)
 from app.services.copy_service import CopyService
 from app.repositories.copy_repository import CopyRepository
 from app.core.database import get_db
 from app.dependencies.authentication import require_roles
 from app.models.user import User
+
+# Acervo administrado também pelo vendedor (Issue #151, decisão 6 de #147).
+COPY_ROLES = ("SELLER", "STOCK_KEEPER", "ADMINISTRATOR")
 
 router = APIRouter(prefix="/api/v1/copies", tags=["Copies"])
 
@@ -22,7 +31,7 @@ def create_copies_batch(
     copies: CopyBatchCreate,
     copy_service: CopyService = Depends(get_copy_service),
     current_user: User = Depends(
-        require_roles("STOCK_KEEPER", "ADMINISTRATOR")
+        require_roles(*COPY_ROLES)
     ),
 ):
     return copy_service.create_copies(
@@ -35,7 +44,28 @@ def create_copy(
     copy: CopyCreate,
     copy_service: CopyService = Depends(get_copy_service),
     current_user: User = Depends(
-        require_roles("STOCK_KEEPER", "ADMINISTRATOR")
+        require_roles(*COPY_ROLES)
     ),
 ):
     return copy_service.create_new_copy(copy_data=copy, actor_id=current_user.id)
+
+
+@router.patch("/{copy_id}", response_model=CopyResponse)
+def update_copy(
+    copy_id: int,
+    changes: CopyUpdate,
+    copy_service: CopyService = Depends(get_copy_service),
+    current_user: User = Depends(require_roles(*COPY_ROLES)),
+):
+    return copy_service.update_copy(copy_id=copy_id, changes=changes, actor_id=current_user.id)
+
+
+@router.delete("/{copy_id}", response_model=CopyDeleteResponse)
+def delete_copy(
+    copy_id: int,
+    copy_service: CopyService = Depends(get_copy_service),
+    current_user: User = Depends(
+        require_roles(*COPY_ROLES)
+    ),
+):
+    return copy_service.delete_copy(copy_id=copy_id, actor_id=current_user.id)

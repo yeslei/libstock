@@ -1,0 +1,120 @@
+@use './staff-page';
+@use 'variables' as *;
+@use 'staff-select';
+
+// Uma única ligação cobre a linha inteira e mantém o acesso por teclado.
+tbody tr {
+  position: relative;
+  cursor: pointer;
+}
+.row-link {
+  text-decoration: none;
+}
+.row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.row-link:focus-visible::after {
+  outline: 2px solid $staff-sidebar;
+  outline-offset: -3px;
+}
+.pagination {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 20px 0;
+}
+.catalog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.catalog-heading h1 {
+  margin: 0;
+}
+.catalog-toolbar {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 28px;
+  align-items: center;
+}
+.catalog-search {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.catalog-toolbar input,
+.catalog-toolbar select {
+  min-height: 44px;
+  border: 1px solid $staff-border;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: white;
+  font: inherit;
+  font-size: 13px;
+  color: $staff-sidebar;
+}
+.catalog-toolbar input {
+  width: 100%;
+  min-width: 0;
+}
+.catalog-toolbar select {
+  max-width: 260px;
+  @include staff-select.arrow;
+}
+.number-column {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.number-column strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+.row-arrow {
+  margin-left: 24px;
+  color: $staff-muted;
+}
+.inactive-label {
+  font-size: 11px;
+  color: $staff-muted;
+  display: block;
+  margin-top: 4px;
+}
+tbody tr:has(.row-link):hover,
+tbody tr:has(.row-link):focus-within {
+  background: #e4eddf;
+  box-shadow: inset 3px 0 $staff-sidebar;
+}
+tbody tr:has(.row-link):hover .row-arrow {
+  color: $staff-sidebar;
+}
+@media (max-width: 680px) {
+  .catalog-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .catalog-toolbar select {
+    max-width: none;
+  }
+  .catalog-heading {
+    margin-bottom: 20px;
+  }
+  .row-arrow {
+    display: none;
+  }
+}
+
+table td {
+  padding: 20px;
+}
+
+.pagination {
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid $staff-border;
+}

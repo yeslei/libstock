@@ -15,3 +15,11 @@ export const ROLE_OPTIONS: readonly RoleOption[] = [
 export function roleLabel(role: string): string {
   return ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
 }
+
+export function rolesLabel(roles: readonly string[]): string {
+  return roles.map(roleLabel).join(', ');
+}
+
+export function isClient(roles: readonly string[]): boolean {
+  return roles.includes('USER');
+}

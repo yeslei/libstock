@@ -1,12 +1,14 @@
 import { capabilitiesFor } from './catalog-capabilities';
 
 describe('capabilitiesFor', () => {
-  it('inclui registerCopy somente para estoque e administração', () => {
-    for (const role of ['STOCK_KEEPER', 'ADMINISTRATOR'] as const) {
-      expect(capabilitiesFor([role]).has('registerCopy')).toBeTrue();
+  it('não oferece cadastro de exemplar na vitrine: ele passou para o balcão (Issue #169)', () => {
+    for (const role of ['USER', 'SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] as const) {
+      expect([...capabilitiesFor([role])]).not.toContain('registerCopy' as never);
     }
-    expect(capabilitiesFor(['SELLER']).has('registerCopy')).toBeFalse();
   });
 
-  it('não inclui registerCopy para USER', () => expect(capabilitiesFor(['USER']).has('registerCopy')).toBeFalse());
+  it('mantém o destaque do catálogo para o administrador', () => {
+    expect(capabilitiesFor(['ADMINISTRATOR']).has('manageCatalog')).toBeTrue();
+    expect(capabilitiesFor(['STOCK_KEEPER']).has('manageCatalog')).toBeFalse();
+  });
 });

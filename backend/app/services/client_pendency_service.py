@@ -13,6 +13,12 @@ from app.core.exceptions import (
 from app.repositories.client_pendency_repository import ClientPendencyRepository
 from app.schemas.client_pendency_schema import (
     ClientPendencyResponse,
+    OverdueLoanResponse,
+    PenaltyAction,
+)
+
+from app.schemas.client_pendency_schema import (
+    ClientPendencyResponse,
     ClientValidationResponse,
     OverdueLoanResponse,
     PenaltyAction,
@@ -158,8 +164,11 @@ class ClientPendencyService:
         )
 
     def validate_client_for_operation(
-        self, client_id: int, *, commit: bool = True
-    ) -> ClientValidationResponse:
+            self,
+                        client_id: int,
+                        *,
+                        commit: bool = True,
+                    ) -> ClientValidationResponse:
         try:
             client = self._get_client(client_id)
 

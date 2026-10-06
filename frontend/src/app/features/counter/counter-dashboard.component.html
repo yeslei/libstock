@@ -1,0 +1,136 @@
+<section class="dash" aria-label="Painel da biblioteca">
+  <div class="topbar">
+    <div class="account-tools">
+      <a class="notifications" routerLink="/balcao/reservas" aria-label="Consultar reservas"
+        ><app-staff-icon name="bell"
+      /></a>
+      <details class="profile">
+        <summary>
+          <span class="avatar">{{ initials }}</span
+          ><span
+            ><strong>{{ account?.name || 'Funcionário' }}</strong
+            ><small>{{
+              account?.role_codes?.includes('ADMINISTRATOR') ? 'Administrador' : 'Funcionário'
+            }}</small></span
+          ><span aria-hidden="true">⌄</span>
+        </summary>
+        <button type="button" (click)="logout()">Sair da conta</button>
+      </details>
+    </div>
+  </div>
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero__copy">
+      <h2 id="hero-title">Livros em movimento,<br />histórias que continuam.</h2>
+      <p>Acompanhe os empréstimos, devoluções e reservas.</p>
+      <div class="hero__actions">
+        <a class="action primary" routerLink="/balcao/emprestimos/novo"
+          ><app-staff-icon name="plus" />Registrar empréstimo</a
+        ><a class="action secondary" routerLink="/balcao/devolucoes"
+          ><app-staff-icon name="return" />Registrar devolução</a
+        >
+      </div>
+    </div>
+    <img
+      class="hero__image"
+      src="/assets/dashboard-banner.png"
+      alt=""
+      width="2508"
+      height="627"
+      fetchpriority="high"
+    />
+  </section>
+  @if (state(); as s) {
+    @if (s.status === 'error') {
+      <div class="dash__feedback">
+        <app-alert [message]="s.message"
+          ><button class="action secondary" type="button" (click)="reload()">
+            Tentar novamente
+          </button></app-alert
+        >
+      </div>
+    }
+    <div class="metrics" aria-label="Indicadores" [attr.aria-busy]="s.status === 'loading'">
+      @for (metric of metrics; track metric.key) {
+        <app-stat-card [value]="value(metric.key)" [label]="metric.label" [note]="metric.note" />
+      }
+    </div>
+    @if (s.status === 'loading') {
+      <p role="status" class="loading">Carregando o movimento da biblioteca…</p>
+    }
+    @if (s.status === 'loaded') {
+      <div class="charts">
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2><app-staff-icon name="chart" />Movimento da semana</h2>
+              <p>Empréstimos e devoluções dos últimos 7 dias.</p>
+            </div>
+            <span class="period">Últimos 7 dias</span>
+          </div>
+          <app-weekly-movement [days]="s.data.week" />
+        </section>
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2><app-staff-icon name="book" />Acervo por categoria</h2>
+              <p>Obras ativas, contadas uma vez por obra.</p>
+            </div>
+          </div>
+          <app-category-chart [categories]="s.data.categories" />
+        </section>
+      </div>
+      <section class="panel popular">
+        <div class="panel-heading">
+          <div>
+            <h2><app-staff-icon name="star" />Mais procurados</h2>
+            <p>Títulos com mais empréstimos nos últimos 30 dias.</p>
+          </div>
+          <a routerLink="/balcao/acervo">Ver acervo →</a>
+        </div>
+        <div class="popular__list">
+          @for (book of s.data.popular; track book.id; let i = $index) {
+            <a class="popular-book" [routerLink]="['/balcao/acervo', book.id]"
+              ><span class="ranking">{{ i + 1 }}</span>
+              @if (book.cover_url) {
+                <img
+                  [src]="book.cover_url"
+                  alt=""
+                  loading="lazy"
+                  (error)="$any($event.target).style.display = 'none'"
+                />
+              } @else {
+                <span class="cover-placeholder"><app-staff-icon name="book" /></span>
+              }
+              <span class="book-details"
+                ><strong>{{ book.title }}</strong
+                ><small>{{ book.author }}</small
+                ><span><app-staff-icon name="book" />{{ book.loans }} empréstimos</span
+                ><span
+                  ><app-staff-icon name="bookmark" />{{ book.reservations }} reservas</span
+                ></span
+              ></a
+            >
+          } @empty {
+            <p class="empty">Ainda não há empréstimos registrados nos últimos 30 dias.</p>
+          }
+        </div>
+      </section>
+      <div class="recent-grid">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Últimos empréstimos</h2>
+            <a routerLink="/balcao/emprestimos/ativos">Ver ativos →</a>
+          </div>
+          <app-recent-movements [items]="s.data.recent_loans" />
+        </section>
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Últimas devoluções</h2>
+            <a routerLink="/balcao/devolucoes">Registrar →</a>
+          </div>
+          <app-recent-movements [items]="s.data.recent_returns" [returns]="true" />
+        </section>
+      </div>
+    }
+  }
+</section>

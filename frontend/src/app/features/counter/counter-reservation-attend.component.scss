@@ -1,0 +1,50 @@
+@use 'variables' as *;
+@use './staff-page';
+
+.page__crumb {
+  margin: 0;
+  color: $staff-muted;
+  font-size: 12px;
+}
+
+.page > h1 {
+  margin-bottom: $space-4;
+}
+
+.feedback {
+  margin: $space-3 0;
+}
+
+.card {
+  margin-bottom: $space-4;
+  max-width: 1000px;
+
+  .line {
+    margin: 12px 0 0;
+    font-size: 13px;
+  }
+}
+
+form {
+  max-width: 760px;
+}
+
+.field {
+  font-size: 13px;
+  color: $staff-sidebar;
+  font-weight: 500;
+
+  input {
+    min-height: 46px;
+  }
+}
+
+.field__hint {
+  color: $staff-muted;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.callout {
+  max-width: 1000px;
+}

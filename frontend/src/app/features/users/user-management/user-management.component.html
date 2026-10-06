@@ -75,9 +75,6 @@
                       @if (user.is_active) {
                         <button type="button" (click)="editUser(user.id)" [attr.aria-label]="'Editar ' + user.name">Editar</button>
                       }
-                      @if (user.role_codes.includes('USER')) {
-                        <button type="button" (click)="viewPendencies(user.id)">Pendências</button>
-                      }
                     </div>
                   </td>
                 </tr>

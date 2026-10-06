@@ -67,6 +67,25 @@ class CatalogBookResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ModalityAvailability(BaseModel):
+    can_reserve: bool = False
+    available: bool | None
+    available_count: int | None
+    configured: bool = True
+    price: Decimal | None = None
+
+
+class BookAvailability(BaseModel):
+    loan: ModalityAvailability
+    sale: ModalityAvailability
+    local_consultation: ModalityAvailability
+
+
+class CatalogBookDetailResponse(CatalogBookResponse):
+    isbn: str | None
+    availability: BookAvailability
+
+
 class CatalogSearchParams(BaseModel):
     title: str | None = None
     author: str | None = None
@@ -93,6 +112,15 @@ class PagedBooksResponse(BaseModel):
     """
 
     genre: GenreResponse
+    items: list[CatalogBookResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class PagedCatalogResponse(BaseModel):
+    """Página do acervo público completo, sem recorte por gênero."""
+
     items: list[CatalogBookResponse]
     total: int
     page: int

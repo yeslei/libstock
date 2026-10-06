@@ -1,0 +1,50 @@
+<section class="home" aria-labelledby="emprestimos-titulo">
+  <h1 id="emprestimos-titulo">Empréstimos</h1>
+  <p class="home__intro">Escolha o que você precisa consultar ou atender.</p>
+  <hr class="home__rule" />
+
+  @if (state(); as s) {
+    @if (s.status === 'error') {
+      <app-alert [message]="s.message">
+        <button class="home__retry" type="button" (click)="reload()">Tentar novamente</button>
+      </app-alert>
+    }
+
+    <div class="home__cards">
+      <article class="card" aria-labelledby="card-solicitacoes">
+        <p class="card__eyebrow">RETIRADAS DE HOJE</p>
+        <h2 id="card-solicitacoes">Solicitações para hoje</h2>
+        <p class="card__text">Atenda clientes que chegaram ao balcão e confirme a retirada respeitando a prioridade da fila.</p>
+        <p class="card__badge" role="status">
+          @switch (s.status) {
+            @case ('loaded') { {{ waitingLabel(s.data) }} }
+            @case ('loading') { Carregando… }
+            @default { Indisponível }
+          }
+        </p>
+        <a class="card__action" routerLink="/balcao/emprestimos/solicitacoes">Ver solicitações →</a>
+      </article>
+
+      <article class="card" aria-labelledby="card-ativos">
+        <p class="card__eyebrow">ACOMPANHAMENTO</p>
+        <h2 id="card-ativos">Empréstimos ativos</h2>
+        <p class="card__text">Consulte empréstimos já retirados, datas previstas de devolução e situações de atraso.</p>
+        <p class="card__badge card__badge--warn" role="status">
+          @switch (s.status) {
+            @case ('loaded') { {{ activeLabel(s.data) }} }
+            @case ('loading') { Carregando… }
+            @default { Indisponível }
+          }
+        </p>
+        <a class="card__action" routerLink="/balcao/emprestimos/ativos">Ver empréstimos →</a>
+      </article>
+
+      <article class="card" aria-labelledby="card-novo">
+        <p class="card__eyebrow">ATENDIMENTO NO BALCÃO</p>
+        <h2 id="card-novo">Novo empréstimo</h2>
+        <p class="card__text">Registre um empréstimo direto, sem solicitação prévia, escolhendo o cliente e um exemplar didático disponível.</p>
+        <a class="card__action card__action--spaced" routerLink="/balcao/emprestimos/novo">Novo empréstimo →</a>
+      </article>
+    </div>
+  }
+</section>

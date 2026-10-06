@@ -14,6 +14,11 @@ from app.schemas.book_schema import (
 )
 from app.services.book_service import BookService
 
+# Acervo administrado também pelo vendedor (Issue #151, decisão 6 de #147).
+BOOK_ROLES = ("SELLER", "STOCK_KEEPER", "ADMINISTRATOR")
+BOOK_UPDATE_ROLES = ("SELLER", "STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+CLIENT_DATA_ROLES = {"ADMINISTRATOR", "SELLER"}
+
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 
 
@@ -21,7 +26,7 @@ router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 async def create_book(
     book_data: BookCreate,
     current_user: User = Depends(
-        require_roles("STOCK_KEEPER", "ADMINISTRATOR")
+        require_roles(*BOOK_ROLES)
     ),
     service: BookService = Depends(get_book_service),
 ) -> BookResponse:
@@ -47,7 +52,7 @@ def get_book_availability(
 @router.get("/metadata/{isbn}", response_model=BookMetadataResponse)
 async def lookup_book_metadata(
     isbn: str,
-    _current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
+    _current_user: User = Depends(require_roles(*BOOK_ROLES)),
     service: BookService = Depends(get_book_service),
 ) -> BookMetadataResponse:
     return await service.lookup_metadata(isbn)
@@ -56,7 +61,7 @@ async def lookup_book_metadata(
 @router.get("/{book_id}", response_model=BookDetailResponse)
 def get_book(
     book_id: int,
-    _current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
+    _current_user: User = Depends(require_roles(*BOOK_ROLES)),
     service: BookService = Depends(get_book_service),
 ) -> BookDetailResponse:
     return service.get_book(book_id)
@@ -67,8 +72,14 @@ def update_book(
     book_id: int,
     changes: BookUpdate,
     current_user: User = Depends(
-        require_roles("STOCK_KEEPER", "MANAGER", "ADMINISTRATOR")
+        require_roles(*BOOK_UPDATE_ROLES)
     ),
     service: BookService = Depends(get_book_service),
 ) -> BookDetailResponse:
-    return service.update_book(book_id, changes, employee_id=current_user.id)
+    return service.update_book(
+        book_id,
+        changes,
+        employee_id=current_user.id,
+        # Dados de cliente só para quem opera o balcão; estoquista/gerente veem tipo, exemplar e contagens.
+        can_view_clients=not set(current_user.role_codes).isdisjoint(CLIENT_DATA_ROLES),
+    )

@@ -1,0 +1,153 @@
+name: Promove release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Tipo de incremento da versao
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promotion-main
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: read
+      statuses: read
+    steps:
+      - name: Cria token da GitHub App
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          # A App precisa conceder estas permissões na instalação; sem elas o
+          # token falha aqui, em vez de quebrar ao abrir ou mesclar o PR.
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - uses: actions/checkout@v4
+        with:
+          ref: integracao
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Calcula versao
+        id: version
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_BUMP: ${{ inputs.bump }}
+        run: python scripts/release/promote.py version --bump "$RELEASE_BUMP"
+
+      - name: Abre PR de integracao para main
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          # Always capture integracao, regardless of the branch used for dispatch.
+          SOURCE_SHA=$(git rev-parse HEAD)
+          existing=$(gh pr list --base main --head integracao --state open --json number --jq 'length')
+          if [ "$existing" != 0 ]; then
+            echo 'Ja existe um PR aberto de integracao para main. Conclua ou feche esse PR antes de promover.' >&2
+            exit 1
+          fi
+          printf '<!-- libstock-release -->\n\nPromove integracao para main pelo merge do PR.\n\nRelease-source: %s\n' "$SOURCE_SHA" > "$RUNNER_TEMP/release-pr.md"
+          echo "GitHub App: $APP_SLUG"
+          # REST em vez de GraphQL: em caso de recusa, o cabeçalho
+          # X-Accepted-GitHub-Permissions informa a permissão que falta.
+          if ! gh api -i --method POST "repos/$GH_REPO/pulls" \
+               -f base=main -f head=integracao -f title="Release $RELEASE_TAG" \
+               -F body=@"$RUNNER_TEMP/release-pr.md" > "$RUNNER_TEMP/pr-response.txt"; then
+            echo 'Falha ao abrir o PR de release. Resposta da API:' >&2
+            grep -iE '^(HTTP|x-accepted-github-permissions|x-github-request-id)' "$RUNNER_TEMP/pr-response.txt" >&2 || true
+            sed -n '/^\r\{0,1\}$/,$p' "$RUNNER_TEMP/pr-response.txt" >&2
+            exit 1
+          fi
+          number=$(sed -n '/^\r\{0,1\}$/,$p' "$RUNNER_TEMP/pr-response.txt" | jq -r '.number')
+          url=$(sed -n '/^\r\{0,1\}$/,$p' "$RUNNER_TEMP/pr-response.txt" | jq -r '.html_url')
+          printf 'number=%s\nsource=%s\n' "$number" "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'PR de promocao: %s\n' "$url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Aguarda a CI existente do PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          for attempt in $(seq 1 60); do
+            count=$(gh pr checks "$PR_NUMBER" --json name --jq '[.[] | select(.name == "Backend (FastAPI)" or .name == "Frontend (Angular)" or .name == "Release helper (local Git)")] | length' || true)
+            if [ "${count:-0}" -ge 3 ]; then break; fi
+            sleep 5
+          done
+          if [ "${count:-0}" -lt 3 ]; then
+            echo 'Os tres jobs da CI nao foram registrados no PR.' >&2
+            exit 1
+          fi
+          gh pr checks "$PR_NUMBER" --watch --interval 10 --fail-fast
+
+      - name: Aprova automaticamente com o GitHub Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          SOURCE_SHA: ${{ steps.pr.outputs.source }}
+        run: gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" -f event=APPROVE -f commit_id="$SOURCE_SHA" -f body='CI aprovada. Promocao automatica autorizada pelo workflow.'
+
+      - name: Habilita merge do PR sem bypass
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          SOURCE_SHA: ${{ steps.pr.outputs.source }}
+        run: gh pr merge "$PR_NUMBER" --merge --auto --match-head-commit "$SOURCE_SHA"
+
+  release:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'integracao' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.body, '<!-- libstock-release -->')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publica tag e GitHub Release no commit integrado
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python scripts/release/promote.py publish --event "$GITHUB_EVENT_PATH"

@@ -1,26 +1,25 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject, DestroyRef, ElementRef, HostListener, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+
 
 import { RoleCode } from '../../../core/models/user.model';
 import { AuthService } from '../../../core/services/auth.service';
 
 interface NavItem {
   readonly label: string;
-  readonly route: string;
+  readonly route?: string;
+  /** Âncora na própria rota; o item não é marcado como ativo (Início já é). */
+  readonly fragment?: string;
   readonly roles?: readonly RoleCode[];
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Início', route: '/' },
-  { label: 'Explorar livros', route: '/explorar' },
-  { label: 'Como funciona', route: '/como-funciona' },
-  { label: 'Meu painel', route: '/painel', roles: ['USER', 'SELLER'] },
-  {
-    label: 'Cadastrar exemplar',
-    route: '/gestao/acervo',
-    roles: ['STOCK_KEEPER', 'ADMINISTRATOR'],
-  },
+  { label: 'Explorar acervo', route: '/acervo' },
+  { label: 'Meus empréstimos', route: '/meus-emprestimos', roles: ['USER'] },
+  { label: 'Minhas reservas', route: '/minhas-reservas', roles: ['USER'] },
+  { label: 'Balcão', route: '/balcao', roles: ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] },
   { label: 'Gestão de usuários', route: '/gestao/usuarios', roles: ['ADMINISTRATOR'] },
 ];
 
@@ -34,9 +33,39 @@ const NAV_ITEMS: readonly NavItem[] = [
 })
 export class AppNavbarComponent {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly accountMenu = viewChild<ElementRef<HTMLDetailsElement>>('accountMenu');
+
+  @HostListener('document:click', ['$event'])
+  protected closeAccountOnOutsideClick(event: MouseEvent): void {
+    const menu = this.accountMenu()?.nativeElement;
+    if (menu && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+  }
+
+  protected readonly query = signal('');
+  protected readonly criterion = signal('title');
+  protected readonly signingOut = signal(false);
+
+  protected search(event: Event): void {
+    event.preventDefault();
+    const q = this.query().trim();
+    if (q) void this.router.navigate(['/'], { queryParams: { q, criterion: this.criterion() } });
+  }
+
+  protected logout(): void {
+    if (this.signingOut()) return;
+    this.signingOut.set(true);
+    this.auth.logout().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.signingOut.set(false);
+      void this.router.navigate(['/']);
+    });
+  }
+
   protected readonly user = toSignal(this.auth.user$, { initialValue: null });
-  protected readonly items = computed(() => {
+  protected readonly items = computed<readonly NavItem[]>(() => {
     const roles = new Set(this.user()?.role_codes ?? []);
-    return NAV_ITEMS.filter((item) => !item.roles || item.roles.some((role) => roles.has(role)));
+    const items = NAV_ITEMS.filter((item) => !item.roles || item.roles.some((role) => roles.has(role)));
+    return items;
   });
 }

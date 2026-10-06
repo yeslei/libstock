@@ -1,0 +1,110 @@
+<section class="page" aria-labelledby="acervo-titulo">
+  <div class="catalog-heading">
+    <h1 id="acervo-titulo">Acervo</h1>
+    @if (canCreate) {
+      <a class="btn btn--primary" routerLink="/balcao/acervo/nova">+ Nova obra</a>
+    }
+  </div>
+  <form class="catalog-toolbar" role="search" (submit)="search($event)">
+    <div class="catalog-search">
+      <label class="sr-only" for="catalog-q"
+        >Buscar por título, autor, categoria, ISBN ou código</label
+      >
+      <input
+        id="catalog-q"
+        type="search"
+        maxlength="100"
+        placeholder="Buscar por título, autor, categoria, ISBN ou código"
+        [value]="term()"
+        (input)="setTerm($event)"
+      />
+    </div>
+    <label class="sr-only" for="catalog-filter">Disponibilidade</label>
+    <select
+      id="catalog-filter"
+      [value]="filter()"
+      (change)="selectFilter($any($event.target).value)"
+    >
+      <option value="all">Todas as obras</option>
+      <option value="loan">Disponíveis para empréstimo</option>
+      <option value="sale">Disponíveis para venda</option>
+      <option value="unavailable">Sem exemplares disponíveis</option>
+      <option value="inactive">Obras inativas</option>
+    </select>
+  </form>
+  @if (state(); as s) {
+    @switch (s.status) {
+      @case ('loading') {
+        <p class="loading" role="status"><app-spinner /> Carregando acervo…</p>
+      }
+      @case ('error') {
+        <app-alert [message]="s.message"
+          ><button class="btn" type="button" (click)="reload()">Tentar novamente</button></app-alert
+        >
+      }
+      @case ('loaded') {
+        @if (!visibleBooks().length) {
+          <p class="empty" role="status">Nenhuma obra encontrada.</p>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">
+                Obras cadastradas
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Obra</th>
+                  <th scope="col">Categoria</th>
+                  <th scope="col" class="number-column">Empréstimo</th>
+                  <th scope="col" class="number-column">Venda</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (book of visibleBooks(); track book.id) {
+                  <tr>
+                    <td>
+                      <a
+                        class="row__title row-link"
+                        [routerLink]="['/balcao/acervo', book.id]"
+                        queryParamsHandling="preserve"
+                        >{{ book.title }}</a
+                      >
+                      <span class="row__sub">{{ book.author }}</span>
+                      @if (!book.is_active) {
+                        <span class="inactive-label">Obra inativa</span>
+                      }
+                    </td>
+                    <td>
+                      @if (genreLabel(book); as label) {
+                        <span class="badge">{{ label }}</span>
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td class="number-column">
+                      <strong>{{ book.is_active ? (book.available_didactic ?? 0) : 0 }}</strong>
+                    </td>
+                    <td class="number-column">
+                      <strong>{{ book.is_active ? (book.available_commercial ?? 0) : 0 }}</strong
+                      ><span class="row-arrow" aria-hidden="true">→</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (offset() || s.data.length >= limit) {
+          <nav class="pagination" aria-label="Páginas do acervo">
+            <button class="btn" type="button" [disabled]="!offset()" (click)="page(-1)">
+              ← Anterior</button
+            ><span>Página {{ offset() / limit + 1 }}</span
+            ><button class="btn" type="button" [disabled]="s.data.length < limit" (click)="page(1)">
+              Próxima página →
+            </button>
+          </nav>
+        }
+      }
+    }
+  }
+</section>
