@@ -45,7 +45,6 @@ class BookResponseTests(unittest.TestCase):
                 "genre": None,
                 "cover_url": None,
                 "is_active": True,
-                "genres": [],
                 "initial_copy": None,
             },
         )
@@ -84,15 +83,7 @@ class BookResponseTests(unittest.TestCase):
 
         self.assertFalse(schema["additionalProperties"])
 
-    def test_commercial_price_rule_is_applied_by_the_service_not_the_schema(self) -> None:
-        # Issue #175: ausente ou zero é 422 `copy_sale_price_required` no service, igual à edição.
-        for price in (None, 0, "0.00"):
-            payload = {"barcode": "COM-1", "destination": "COMMERCIAL"}
-            if price is not None:
-                payload["sale_price"] = price
-            BookCreate.model_validate(
-                {"isbn": "9788575225530", "title": "T", "author": "A", "initial_copy": payload}
-            )
+    def test_commercial_initial_copy_requires_price(self) -> None:
         with self.assertRaises(ValidationError):
             BookCreate.model_validate(
                 {
@@ -102,7 +93,6 @@ class BookResponseTests(unittest.TestCase):
                     "initial_copy": {
                         "barcode": "COM-1",
                         "destination": "COMMERCIAL",
-                        "sale_price": -1,
                     },
                 }
             )

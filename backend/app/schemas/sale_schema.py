@@ -8,20 +8,15 @@ from app.models.domain import SaleStatus
 
 class SaleItemCreate(BaseModel):
     copy_id: int = Field(gt=0)
-    # Descontinuado: o servidor usa sempre o sale_price do exemplar e ignora este
-    # valor. Mantido opcional apenas por compatibilidade com clientes antigos.
-    unit_price: Decimal | None = Field(
-        default=None,
+    unit_price: Decimal = Field(
         ge=0,
         max_digits=10,
         decimal_places=2,
-        description="Ignorado: o preço vem do exemplar cadastrado.",
     )
 
 
 class SaleCreate(BaseModel):
-    # Issue #172: a venda direta identifica o cliente (existente e ativo).
-    client_id: int = Field(gt=0)
+    client_id: int | None = Field(default=None, gt=0)
     items: list[SaleItemCreate] = Field(min_length=1)
 
     model_config = ConfigDict(extra="forbid")

@@ -59,11 +59,6 @@ class FakeUserService:
     def get_by_id(self, user_id: int) -> SimpleNamespace:
         return self._user
 
-    def get_user(self, user_id: int) -> SimpleNamespace:
-        if self.error:
-            raise self.error
-        return self._user
-
     def inactivate_user(self, target_id: int, *, actor_id: int) -> SimpleNamespace:
         self.calls.append((target_id, actor_id))
         if self.error:
@@ -150,26 +145,6 @@ def test_consultar_usuario_inexistente_retorna_404():
 
     assert response.status_code == 404
     assert response.json()["code"] == "user_not_found"
-
-
-def test_consultar_usuario_com_sucesso_nao_expõe_senha():
-    _use_fake_service(user=_make_user(user_id=42, role_codes=["USER"]))
-    _authenticate_as("ADMINISTRATOR")
-
-    response = client.get("/api/v1/users/42")
-
-    assert response.status_code == 200
-    assert response.json()["id"] == 42
-    assert "password_hash" not in response.json()
-
-
-def test_consultar_usuario_sem_token_retorna_401():
-    _use_fake_service()
-
-    response = client.get("/api/v1/users/42")
-
-    assert response.status_code == 401
-    assert response.json()["code"] == "invalid_token"
 
 
 def test_editar_usuario_com_sucesso():
@@ -305,25 +280,6 @@ def test_service_auto_inativacao_lanca_erro():
         service.inactivate_user(7, actor_id=7)
 
     user_repo.find_by_id.assert_not_called()
-    db.commit.assert_not_called()
-
-
-def test_service_consulta_usuario_com_sucesso():
-    service, _db, user_repo, _session_repo = _build_service()
-    target = _make_user(user_id=42)
-    user_repo.get_user_by_id.return_value = target
-
-    assert service.get_user(42) is target
-    user_repo.get_user_by_id.assert_called_once_with(42)
-
-
-def test_service_consulta_usuario_inexistente_lanca_not_found():
-    service, db, user_repo, _session_repo = _build_service()
-    user_repo.get_user_by_id.return_value = None
-
-    with pytest.raises(UserNotFoundError):
-        service.get_user(999)
-
     db.commit.assert_not_called()
 
 

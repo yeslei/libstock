@@ -17,8 +17,6 @@ from app.models.domain import (
     UserRole,
 )
 from app.models.user import User
-from app.models.loan_request import LoanRequest
-from app.models.purchase_request import PurchaseRequest
 from app.models.user_session import UserSession
 
 __all__ = [
@@ -31,8 +29,6 @@ __all__ = [
     "Employee",
     "Genre",
     "Loan",
-    "LoanRequest",
-    "PurchaseRequest",
     "Notification",
     "Profile",
     "PurchaseReservation",

@@ -9,10 +9,7 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
-
-permissions:
-  contents: read
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -24,9 +21,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
 
       - name: Configura Python
         uses: actions/setup-python@v5
@@ -55,9 +49,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
 
       - name: Configura Node
         uses: actions/setup-node@v4
@@ -71,16 +62,3 @@ jobs:
 
       - name: Compila o build de producao
         run: npm run build
-
-  release-tests:
-    name: Release helper (local Git)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: python -m unittest discover -s scripts/release -p 'test_*.py' -v

@@ -23,7 +23,7 @@ class ClientPendencyResponse(BaseModel):
     overdue_loans: list[OverdueLoanResponse] = Field(default_factory=list)
 
 
-class PenaltyUpdateRequest(BaseModel):
+class ClientPenaltyUpdate(BaseModel):
     action: PenaltyAction
     reason: str = Field(min_length=3, max_length=500)
 
@@ -40,3 +40,7 @@ class PenaltyUpdateRequest(BaseModel):
 class ClientValidationResponse(BaseModel):
     client_id: int
     valid: bool
+
+
+# Compatibilidade com o nome usado pelo contrato inicial da feature.
+PenaltyUpdateRequest = ClientPenaltyUpdate

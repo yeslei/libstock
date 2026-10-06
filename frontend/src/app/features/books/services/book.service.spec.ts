@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { BookCreateRequest, BookDetail, BookResponse } from '../models/book.model';
+import { BookCreateRequest, BookResponse } from '../models/book.model';
 import { BOOKS_API, BookService } from './book.service';
 
 describe('BookService', () => {
@@ -37,14 +37,12 @@ describe('BookService', () => {
 
   it('dispara requisicao PATCH para /api/v1/books/:id com os dados parciais', () => {
     const updatePayload = { title: 'Título Atualizado', genre: 'Ficção' };
-    const response: BookDetail = {
+    const response: BookResponse = {
       id: 10,
       isbn: '9788575225530',
       title: 'Título Atualizado',
       author: 'Autor Teste',
       genre: 'Ficção',
-      cover_url: null,
-      copies: [],
       is_active: true,
       initial_copy: null,
     };

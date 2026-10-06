@@ -46,12 +46,3 @@
   font-size: $font-size-xs;
   text-decoration: none;
 }
-
-// Login compacto, mantendo campos e ações com alvos de toque acessíveis.
-:host { gap: 16px; }
-.auth-form { gap: 14px; }
-.auth-footer { padding-top: 12px; }
-#password-recovery-help:empty { display: none; }
-
-.back-home { align-self: flex-start; color: $primary; font-size: 13px; text-decoration: none; padding: 8px 0; }
-.back-home:hover { text-decoration: underline; }

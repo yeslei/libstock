@@ -35,58 +35,6 @@ const MESSAGE_BY_CODE: Readonly<Record<string, string>> = {
   google_books_invalid_response:
     'O Google Books não retornou título e autor válidos para este ISBN.',
   book_persistence_error: 'Não foi possível cadastrar a obra. Tente novamente.',
-  genre_not_found: 'Uma das categorias escolhidas não existe mais no catálogo. Atualize a página e escolha de novo.',
-  // Balcão V2 (circulação e consultas de funcionário).
-  client_required: 'Este usuário não possui cadastro de cliente.',
-  client_ineligible: 'O cliente está inativo, penalizado ou com empréstimo em atraso.',
-  loan_request_not_found: 'A solicitação de empréstimo não foi encontrada. Atualize a lista.',
-  pickup_already_confirmed: 'A retirada desta solicitação já foi confirmada.',
-  loan_unavailable: 'O exemplar escolhido não está mais disponível para retirada.',
-  copy_not_for_loan: 'Somente exemplares didáticos podem ser emprestados. Escolha outro exemplar.',
-  loan_not_found: 'O empréstimo não foi encontrado. Atualize a lista.',
-  loan_already_closed: 'Este empréstimo já foi encerrado.',
-  book_not_found: 'A obra não foi encontrada ou está inativa.',
-  reservation_not_found: 'Reserva não encontrada ou sem fila aguardando. Atualize a lista.',
-  reservation_not_ready: 'Esta reserva ainda não tem exemplar destinado para retirada.',
-  reservation_expired: 'O prazo de retirada desta reserva expirou.',
-  reservation_not_cancellable: 'Esta reserva já foi encerrada e não pode ser cancelada. Atualize a lista.',
-  no_eligible_reservation: 'Nenhuma reserva da fila tem cliente elegível no momento. Nada foi destinado.',
-  pickup_date_after_deadline: 'A data de retirada não pode ultrapassar o prazo de retirada da reserva (5 dias corridos).',
-  copy_reserved: 'Este exemplar está destinado a uma reserva de compra dentro do prazo de retirada. Conclua pela reserva ou aguarde o prazo.',
-  purchase_unavailable: 'Não há exemplar comercial livre para esta operação.',
-  circulation_persistence_error: 'Não foi possível concluir a operação. Nada foi alterado; tente novamente.',
-  search_term_too_short: 'Informe ao menos 2 caracteres para buscar.',
-  search_term_required: 'Informe o código do exemplar, o ISBN ou o título.',
-  desk_query_error: 'Não foi possível consultar o balcão. Tente novamente.',
-  // Exclusão de exemplar e inativação de obra (Issue #135).
-  copy_not_found: 'O exemplar não foi encontrado. Atualize a obra.',
-  copy_not_available: 'Este exemplar não está disponível para esta operação. Atualize a obra.',
-  copy_has_history: 'Este exemplar possui histórico (empréstimo, venda, reserva ou solicitação) e não pode ser excluído.',
-  last_active_copy: 'Este é o último exemplar ativo de uma obra ativa e não pode ser excluído.',
-  copy_delete_persistence_error: 'Não foi possível excluir o exemplar. Nada foi alterado; tente novamente.',
-  copy_without_price: 'Este exemplar comercial não tem preço de venda cadastrado e não pode ser vendido.',
-  book_inactive: 'A obra deste exemplar está inativa e não aceita novas operações.',
-  // Acervo administrado pelo vendedor (Issue #151).
-  book_without_active_copy: 'A obra não pode ser reativada sem ao menos um exemplar ativo.',
-  copy_inactive: 'Este exemplar está inativo e não pode ser usado nesta operação.',
-  copy_allocated: 'Este exemplar está destinado a uma reserva de compra e não pode ser editado.',
-  copy_needed_for_requests: 'Este é o último exemplar didático livre da obra e há solicitação de retirada pendente. Atenda ou cancele a solicitação antes de converter para venda.',
-  copy_in_operation: 'Este exemplar está em uma venda em andamento e não pode ser editado.',
-  copy_sale_price_required: 'Exemplar destinado à venda exige preço de venda maior que zero.',
-  copy_sale_price_not_allowed: 'Exemplar didático não pode ter preço de venda.',
-  copy_update_persistence_error: 'Não foi possível atualizar o exemplar. Nada foi alterado; tente novamente.',
-  // Contrato de erros (Issue #175): venda, empréstimo, exemplar e validação com código estável.
-  validation_error: 'Confira os dados informados e tente novamente.',
-  duplicate_sale_item: 'O mesmo exemplar foi informado mais de uma vez na venda. Remova a repetição.',
-  copy_not_for_sale: 'Exemplares didáticos não podem ser vendidos. Escolha um exemplar comercial.',
-  sale_conflict: 'Não foi possível registrar a venda porque os exemplares mudaram. Atualize e tente novamente.',
-  sale_persistence_error: 'Não foi possível registrar a venda. Nada foi alterado; tente novamente.',
-  loan_conflict: 'Este exemplar já possui um empréstimo em aberto.',
-  loan_persistence_error: 'Não foi possível registrar o empréstimo. Nada foi alterado; tente novamente.',
-  loan_return_conflict: 'Não foi possível registrar a devolução porque o empréstimo mudou. Atualize a lista.',
-  loan_return_persistence_error: 'Não foi possível registrar a devolução. Nada foi alterado; tente novamente.',
-  copy_persistence_error: 'Não foi possível cadastrar o exemplar. Nada foi alterado; tente novamente.',
-  book_has_active_operations: 'Esta obra possui operações em andamento e não pode ser inativada.',
 };
 
 const MESSAGE_BY_STATUS: Readonly<Record<number, string>> = {
@@ -114,13 +62,6 @@ function readCode(body: unknown): string | undefined {
 
   const code = (body as { code: unknown }).code;
   return typeof code === 'string' ? code : undefined;
-}
-
-function readDetails(body: unknown): unknown {
-  if (typeof body !== 'object' || body === null || !('details' in body)) {
-    return undefined;
-  }
-  return (body as { details: unknown }).details ?? undefined;
 }
 
 function readValidationErrors(body: unknown): ApiValidationError[] | undefined {
@@ -166,7 +107,6 @@ function toApiError(error: HttpErrorResponse): ApiError {
     code,
     status: error.status,
     validationErrors: readValidationErrors(error.error),
-    details: readDetails(error.error),
   };
 }
 

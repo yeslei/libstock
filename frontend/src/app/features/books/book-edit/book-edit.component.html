@@ -1,90 +1,22 @@
 <main class="edit">
-  <nav class="breadcrumb" aria-label="Caminho da página">
-    <a routerLink="/balcao/acervo" queryParamsHandling="preserve">← Acervo</a> /
-    @if (book(); as item) {
-      <a [routerLink]="['/balcao/acervo', item.id]" queryParamsHandling="preserve">{{
-        item.title
-      }}</a>
-      /
-    }
-    <span aria-current="page">Editar obra</span>
-  </nav>
+  <a routerLink="/gestao/acervo">← Voltar para a gestão do acervo</a>
   <h1>Editar obra</h1>
-  @if (state() === 'loading') {
-    <p><app-spinner /> Carregando obra…</p>
-  }
-  @if (message(); as text) {
-    <app-alert [message]="text" [variant]="state() === 'success' ? 'success' : 'error'" />
-  }
+  @if (state() === 'loading') { <p><app-spinner /> Carregando obra…</p> }
+  @if (message(); as text) { <app-alert [message]="text" [variant]="state() === 'success' ? 'success' : 'error'" /> }
   @if (book()) {
     <form [formGroup]="form" (ngSubmit)="save()">
       <label for="edit-isbn">ISBN</label><input id="edit-isbn" formControlName="isbn" />
       <label for="edit-title">Título</label><input id="edit-title" formControlName="title" />
       <label for="edit-author">Autor</label><input id="edit-author" formControlName="author" />
-      <app-genre-picker
-        [selected]="genreIds()"
-        (selectedChange)="selectedGenres.set($event)"
-        [disabled]="state() === 'submitting'"
-      />
-      <label for="edit-publisher">Editora</label
-      ><input id="edit-publisher" formControlName="publisher" maxlength="150" />
-      <label for="edit-edition">Edição</label
-      ><input id="edit-edition" formControlName="edition" maxlength="50" />
-      <label for="edit-year">Ano de publicação</label
-      ><input
-        id="edit-year"
-        formControlName="publicationYear"
-        type="number"
-        min="1000"
-        max="2100"
-      />
-      @if (form.controls.publicationYear.touched && form.controls.publicationYear.invalid) {
-        <p class="field-error">Informe um ano entre 1000 e 2100.</p>
-      }
-      @if (form.controls.isbn.touched && form.controls.isbn.invalid) {
-        <p class="field-error">Informe um ISBN válido ou deixe o campo vazio.</p>
-      }
-      @if (
-        (form.controls.title.touched && form.controls.title.invalid) ||
-        (form.controls.author.touched && form.controls.author.invalid)
-      ) {
-        <p class="field-error">Preencha título e autor com até 255 caracteres.</p>
-      }
-      <label for="edit-cover">Link da capa</label
-      ><input
-        id="edit-cover"
-        type="url"
-        formControlName="coverUrl"
-        placeholder="https://exemplo.com/capa.jpg"
-        (input)="imageFailed.set(false)"
-      />
+      <label for="edit-genre">Gênero</label><input id="edit-genre" formControlName="genre" />
+      <label for="edit-cover">Link da capa</label><input id="edit-cover" type="url" formControlName="coverUrl" placeholder="https://exemplo.com/capa.jpg" (input)="imageFailed.set(false)" />
       @if (form.controls.coverUrl.value && form.controls.coverUrl.valid && !imageFailed()) {
-        <img
-          class="cover"
-          [src]="form.controls.coverUrl.value"
-          alt="Prévia da capa"
-          (error)="imageFailed.set(true)"
-        />
+        <img class="cover" [src]="form.controls.coverUrl.value" alt="Prévia da capa" (error)="imageFailed.set(true)" />
       } @else {
         <div class="cover cover--empty" aria-label="Capa indisponível">Sem capa</div>
       }
-      <button type="submit" [disabled]="state() === 'submitting'">
-        {{ state() === 'submitting' ? 'Salvando…' : 'Salvar alterações' }}
-      </button>
+      <button type="submit" [disabled]="state() === 'submitting'">{{ state() === 'submitting' ? 'Salvando…' : 'Salvar alterações' }}</button>
     </form>
-    <nav class="form-actions" aria-label="Navegação da obra">
-      <a
-        class="back-to-book"
-        [routerLink]="['/balcao/acervo', book()!.id]"
-        queryParamsHandling="preserve"
-        >{{ state() === 'success' ? 'Voltar para a obra →' : 'Cancelar e voltar para a obra' }}</a
-      >
-      <a
-        class="add-copy"
-        queryParamsHandling="preserve"
-        [routerLink]="['/balcao/acervo', book()!.id, 'exemplares', 'lote']"
-        >Adicionar exemplares</a
-      >
-    </nav>
+    <a class="add-copy" [routerLink]="['/obras', book()!.id, 'exemplares', 'novo']">Adicionar exemplar</a>
   }
 </main>

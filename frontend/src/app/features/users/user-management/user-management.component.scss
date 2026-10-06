@@ -60,7 +60,8 @@
 
   label { font-weight: 600; }
   input { flex: 1 1 260px; }
-  input, select {
+  input,
+  select {
     min-height: 44px;
     padding: 0 $space-4;
     border: 1px solid $border;
@@ -77,12 +78,19 @@
   color: $text-muted;
 }
 
+.delete-policy {
+  padding: $space-3;
+  border-left: 4px solid $warning;
+  background: $bg-subtle;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
 
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: $space-3; border-bottom: 1px solid $border; text-align: left; vertical-align: middle; }
 th { color: $text-muted; font-size: $font-size-xs; text-transform: uppercase; }
-
+td:first-child span, td:nth-child(2) { color: $text-muted; font-size: $font-size-sm; }
 
 .role-list, .actions { display: flex; flex-wrap: wrap; gap: $space-2; }
 .badge, .status { display: inline-block; padding: $space-1 $space-2; border-radius: 999px; background: $bg-subtle; font-size: $font-size-sm; font-weight: 600; }

@@ -2,20 +2,10 @@ from datetime import datetime
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 RoleCode = Literal["USER", "SELLER", "STOCK_KEEPER", "ADMINISTRATOR"]
-
-
-class UserPasswordReset(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    new_password: SecretStr = Field(min_length=8, max_length=128)
-
-
-class UserPasswordResetResponse(BaseModel):
-    user_id: int
-    message: str
 
 
 class UserCreate(BaseModel):

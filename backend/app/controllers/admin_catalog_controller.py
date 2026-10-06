@@ -50,5 +50,10 @@ def set_book_featured(
         data_in=payload,
         actor_id=current_user.id,
     )
-    # Issue #175: a resposta traz as ofertas reais da obra, como as demais rotas do catálogo.
-    return catalog_service.to_catalog_response(book)
+    return CatalogBookResponse(
+        id=book.id,
+        title=book.title,
+        author=book.author,
+        cover_url=book.cover_url,
+        genres=[link.genre.name for link in book.genres],
+    )

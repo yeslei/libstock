@@ -17,10 +17,6 @@
           <li class="roles__item">{{ role }}</li>
         }
       </ul>
-
-      @if (canUseCounter(user.role_codes)) {
-        <a class="home__counter" routerLink="/balcao">Abrir balcão</a>
-      }
     }
 
     <button class="button" type="button" [disabled]="leaving()" [attr.aria-busy]="leaving()" (click)="logout()">

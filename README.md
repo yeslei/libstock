@@ -30,12 +30,6 @@ versionado exclusivamente pelas migrations Alembic do backend.
 
 Consulte as instruções em [`backend/README.md`](backend/README.md).
 
-## Releases
-
-O pipeline manual promove `integracao` para `main`, valida os commits e publica
-uma tag anotada junto com o merge. Consulte os pré-requisitos, as limitações
-das proteções e o fluxo de deploy em [`docs/RELEASE.md`](docs/RELEASE.md).
-
 ## Status
 
 Backend de autenticação em desenvolvimento. Frontend ainda não iniciado.

@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   DestroyRef,
   ElementRef,
   inject,
@@ -9,17 +8,13 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
 import { catchError, debounceTime, filter, map, of, switchMap, tap } from 'rxjs';
 
 import { ApiError, FormState } from '../../../core/models/auth.model';
 import { AlertComponent } from '../../../shared/components/alert/alert.component';
-import { SnackbarService } from '../../../shared/components/snackbar/snackbar.service';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { fieldError } from '../../../shared/validators/form-errors';
-import { Genre } from '../../catalog/models/catalog.model';
-import { GenrePickerComponent } from '../components/genre-picker/genre-picker.component';
-import { BookCreateRequest, BookMetadata } from '../models/book.model';
+import { BookCreateRequest, BookMetadata, BookResponse } from '../models/book.model';
 import { BookService } from '../services/book.service';
 import { compactIsbn, isbnValidator } from '../validators/isbn.validator';
 
@@ -36,6 +31,10 @@ const AUTHOR_ERRORS = {
   maxlength: 'O autor pode ter no máximo 255 caracteres.',
   server: 'Confira o autor informado.',
 };
+const GENRE_ERRORS = {
+  maxlength: 'O gênero pode ter no máximo 100 caracteres.',
+  server: 'Confira o gênero informado.',
+};
 const BARCODE_ERRORS = {
   required: 'Informe o código de barras do exemplar.',
   maxlength: 'O código de barras pode ter no máximo 100 caracteres.',
@@ -47,18 +46,14 @@ const CONDITION_ERRORS = {
 };
 const PRICE_ERRORS = {
   required: 'Informe o preço do exemplar comercial.',
-  min: 'O preço de venda deve ser maior que zero.',
+  min: 'O preço não pode ser negativo.',
   server: 'Confira o preço informado.',
 };
 
-/**
- * Cadastro de obra com o exemplar inicial, hospedado no layout do balcão (`/balcao/acervo/nova`).
- * Depois do 201, avisa o sucesso e abre o detalhe da obra no balcão.
- */
 @Component({
   selector: 'app-book-create',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AlertComponent, SpinnerComponent, GenrePickerComponent],
+  imports: [ReactiveFormsModule, AlertComponent, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './book-create.component.html',
   styleUrl: './book-create.component.scss',
@@ -68,30 +63,26 @@ export class BookCreateComponent {
   private readonly books = inject(BookService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly router = inject(Router);
-  private readonly snackbar = inject(SnackbarService);
 
   protected readonly form = this.fb.nonNullable.group({
     isbn: ['', [Validators.required, isbnValidator]],
     title: ['', [Validators.maxLength(255)]],
     author: ['', [Validators.maxLength(255)]],
+    genre: ['', [Validators.maxLength(100)]],
     coverUrl: ['', [Validators.pattern(/^https?:\/\/.+/i)]],
     barcode: ['', [Validators.required, Validators.maxLength(100)]],
     destination: ['DIDACTIC' as 'DIDACTIC' | 'COMMERCIAL', [Validators.required]],
     condition: ['', [Validators.maxLength(30)]],
-    salePrice: this.fb.control<number | null>(null, [Validators.min(0.01)]),
+    salePrice: this.fb.control<number | null>(null, [Validators.min(0)]),
     acquiredAt: [''],
   });
-  /** Categorias do catálogo escolhidas (Issue #174); vão em `genre_ids`. */
-  protected readonly selectedGenres = signal<readonly Genre[]>([]);
-  protected readonly genreIds = computed(() => this.selectedGenres().map((genre) => genre.id));
   protected readonly state = signal<FormState>({ status: 'idle' });
   protected readonly submitted = signal(false);
+  protected readonly createdBook = signal<BookResponse | null>(null);
   protected readonly imageFailed = signal(false);
   protected readonly metadataState = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   protected readonly metadataMessage = signal<string | null>(null);
-  /** Campos e valores preenchidos pela sugestão do Google Books (Issue #176). */
-  private suggested: Partial<Record<'title' | 'author' | 'coverUrl', string>> = {};
+  protected readonly metadataLocked = signal(false);
 
   constructor() {
     this.form.controls.isbn.valueChanges
@@ -147,6 +138,10 @@ export class BookCreateComponent {
     return fieldError(this.form.controls.author, AUTHOR_ERRORS, this.submitted());
   }
 
+  protected genreError(): string | null {
+    return fieldError(this.form.controls.genre, GENRE_ERRORS, this.submitted());
+  }
+
   protected barcodeError(): string | null {
     return fieldError(this.form.controls.barcode, BARCODE_ERRORS, this.submitted());
   }
@@ -175,6 +170,7 @@ export class BookCreateComponent {
       return;
     }
     this.submitted.set(true);
+    this.createdBook.set(null);
 
     if (this.form.invalid) {
       this.state.set({ status: 'idle' });
@@ -188,9 +184,11 @@ export class BookCreateComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (book) => {
+          this.createdBook.set(book);
           this.state.set({ status: 'success', message: 'Obra cadastrada com sucesso.' });
-          this.snackbar.show(`Obra “${book.title}” cadastrada com sucesso.`, 'success');
-          void this.router.navigate(['/balcao/acervo', book.id]);
+          this.unlockMetadata(false);
+          this.form.reset();
+          this.submitted.set(false);
         },
         error: (error: ApiError) => this.handleError(error),
       });
@@ -203,7 +201,7 @@ export class BookCreateComponent {
       isbn: compactIsbn(value.isbn),
       title: optional(value.title),
       author: optional(value.author),
-      genre_ids: this.genreIds(),
+      genre: optional(value.genre),
       cover_url: optional(value.coverUrl),
       initial_copy: {
         barcode: value.barcode.trim(),
@@ -215,48 +213,24 @@ export class BookCreateComponent {
     };
   }
 
-  /**
-   * Issue #176: a consulta externa é só uma sugestão. Preenche título e autor apenas quando
-   * estão vazios, nunca bloqueia a edição e nunca define a categoria do acervo.
-   */
   private applyMetadata(metadata: BookMetadata): void {
-    const { title, author, coverUrl } = this.form.controls;
-    const filled: string[] = [];
-    if (!title.value.trim()) {
-      title.setValue(metadata.title);
-      this.suggested['title'] = metadata.title;
-      filled.push('título');
-    }
-    if (!author.value.trim()) {
-      author.setValue(metadata.author);
-      this.suggested['author'] = metadata.author;
-      filled.push('autor');
-    }
-    if (!coverUrl.value.trim() && metadata.cover_url) {
-      coverUrl.setValue(metadata.cover_url);
-      this.suggested['coverUrl'] = metadata.cover_url;
-      filled.push('capa');
-    }
+    this.form.patchValue({ title: metadata.title, author: metadata.author, genre: metadata.genre ?? '' });
+    this.form.controls.title.disable();
+    this.form.controls.author.disable();
+    this.form.controls.genre.disable();
+    this.metadataLocked.set(true);
     this.metadataState.set('loaded');
-    this.metadataMessage.set(
-      filled.length
-        ? `Sugestão do Google Books aplicada em campos vazios (${filled.join(', ')}). Confira antes de salvar.`
-        : 'Os dados informados foram mantidos; o Google Books só preenche campos vazios.',
-    );
+    this.metadataMessage.set('Dados preenchidos pelo Google Books e bloqueados para evitar inconsistências.');
   }
 
-  /**
-   * Ao trocar o ISBN, o que veio da sugestão anterior e não foi editado é descartado (a nova
-   * sugestão, se houver, preenche de novo); campos editados pelo funcionário prevalecem.
-   */
-  private unlockMetadata(): void {
-    for (const field of ['title', 'author', 'coverUrl'] as const) {
-      const control = this.form.controls[field];
-      if (this.suggested[field] !== undefined && control.value === this.suggested[field]) {
-        control.setValue('', { emitEvent: false });
-      }
+  private unlockMetadata(clearLockedValues = true): void {
+    if (this.metadataLocked() && clearLockedValues) {
+      this.form.patchValue({ title: '', author: '', genre: '' }, { emitEvent: false });
     }
-    this.suggested = {};
+    this.form.controls.title.enable({ emitEvent: false });
+    this.form.controls.author.enable({ emitEvent: false });
+    this.form.controls.genre.enable({ emitEvent: false });
+    this.metadataLocked.set(false);
     this.metadataState.set('idle');
     this.metadataMessage.set(null);
   }
@@ -296,7 +270,7 @@ export class BookCreateComponent {
   }
 
   private focusFirstInvalid(): void {
-    const first = (['isbn', 'title', 'author', 'coverUrl', 'barcode', 'destination', 'condition', 'salePrice', 'acquiredAt'] as const).find(
+    const first = (['isbn', 'title', 'author', 'genre', 'coverUrl', 'barcode', 'destination', 'condition', 'salePrice', 'acquiredAt'] as const).find(
       (field) => this.form.controls[field].invalid,
     );
     if (first) {

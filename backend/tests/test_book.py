@@ -167,7 +167,7 @@ def test_create_book_sem_token_retorna_401():
     assert response.json()["code"] == "invalid_token"
 
 
-@pytest.mark.parametrize("role", ["USER"])
+@pytest.mark.parametrize("role", ["USER", "SELLER"])
 def test_create_book_com_role_insuficiente_retorna_403(role):
     _use_fake_service()
     _authenticate_as(role)
@@ -178,7 +178,7 @@ def test_create_book_com_role_insuficiente_retorna_403(role):
     assert response.json()["code"] == "permission_denied"
 
 
-@pytest.mark.parametrize("role", ["SELLER", "STOCK_KEEPER", "ADMINISTRATOR"])
+@pytest.mark.parametrize("role", ["STOCK_KEEPER", "ADMINISTRATOR"])
 def test_roles_autorizadas_cadastram_obra(role):
     fake = _use_fake_service()
     _authenticate_as(role, user_id=73)
@@ -194,7 +194,6 @@ def test_roles_autorizadas_cadastram_obra(role):
         "genre": "Tecnologia",
         "cover_url": None,
         "is_active": True,
-        "genres": [],
         "initial_copy": {
             "id": 2,
             "book_id": 1,
@@ -338,10 +337,9 @@ async def test_dados_ausentes_sao_complementados_sem_mutar_entrada():
         isbn="9788575225530",
         title="Python Fluente",
         author="Luciano Ramalho",
+        genre="Tecnologia",
         initial_copy=_manual_payload()["initial_copy"],
     )
-    # Issue #176: a categoria externa ("Tecnologia") nunca vira categoria do acervo.
-    assert repository.created_with.genre is None
     assert result.title == "Python Fluente"
     db.commit.assert_called_once_with()
     db.refresh.assert_not_called()
@@ -349,132 +347,18 @@ async def test_dados_ausentes_sao_complementados_sem_mutar_entrada():
 
 
 @pytest.mark.anyio
-async def test_dados_informados_prevalecem_sobre_o_google_books():
-    """Issue #176: título, autor e categoria digitados nunca são sobrescritos pela base externa."""
+async def test_google_books_sobrescreve_metadados_manuais_inconsistentes():
     service, _db, repository = _service()
     service.fetch_google_books_data = AsyncMock(
-        return_value={
-            "title": "Título canônico",
-            "author": "Augusto Cury, Editora Saraiva",
-            "genre": "Juvenile Fiction",
-        }
+        return_value={"title": "Título canônico", "author": "Autor canônico"}
     )
     payload = BookCreate(**_manual_payload())
 
     await service.create_book(payload, employee_id=9)
 
-    assert repository.created_with.title == "Python Fluente"
-    assert repository.created_with.author == "Luciano Ramalho"
-    assert repository.created_with.genre == "Tecnologia"
-
-
-@pytest.mark.anyio
-async def test_google_books_preenche_apenas_campos_vazios_e_nunca_categoria():
-    service, _db, repository = _service()
-    service.fetch_google_books_data = AsyncMock(
-        return_value={
-            "title": "Título externo",
-            "author": "Autor externo",
-            "genre": "Brazil",
-            "cover_url": "https://books.example/capa.jpg",
-            "publisher": "Editora Externa",
-            "publication_year": "2015",
-        }
-    )
-    payload = BookCreate(
-        isbn="9788575225530",
-        title="Meu título",
-        publisher="Minha editora",
-        initial_copy=_manual_payload()["initial_copy"],
-    )
-
-    await service.create_book(payload, employee_id=9)
-
-    created = repository.created_with
-    assert created.title == "Meu título"
-    assert created.publisher == "Minha editora"
-    assert created.author == "Autor externo"
-    assert created.cover_url == "https://books.example/capa.jpg"
-    assert created.publication_year == 2015
-    assert created.genre is None
-
-
-@pytest.mark.anyio
-async def test_cadastro_completo_nao_consulta_o_google_books():
-    service, _db, repository = _service()
-    service.fetch_google_books_data = AsyncMock()
-    payload = BookCreate(
-        **_manual_payload(),
-        cover_url="https://exemplo.test/capa.jpg",
-        publisher="Novatec",
-        publication_year=2023,
-    )
-
-    await service.create_book(payload, employee_id=9)
-
-    service.fetch_google_books_data.assert_not_awaited()
-    assert repository.created_with.cover_url == "https://exemplo.test/capa.jpg"
-
-
-@pytest.mark.anyio
-async def test_lookup_metadata_devolve_sugestoes_sem_persistir():
-    service, db, _repository = _service()
-    service.fetch_google_books_data = AsyncMock(
-        return_value={
-            "title": "Python Fluente",
-            "author": "Luciano Ramalho",
-            "genre": "Computers",
-            "cover_url": "https://books.example/c.jpg",
-            "publication_year": "2023",
-        }
-    )
-
-    metadata = await service.lookup_metadata("9788575225530")
-
-    assert metadata.cover_url == "https://books.example/c.jpg"
-    assert metadata.publication_year == 2023
-    db.commit.assert_not_called()
-
-
-@pytest.mark.anyio
-async def test_fetch_google_books_extrai_capa_ano_e_editora(monkeypatch):
-    service, _db, _repository = _service(mock_external=False)
-    payload = {
-        "totalItems": 1,
-        "items": [
-            {
-                "volumeInfo": {
-                    "title": " Título ",
-                    "authors": ["A", " B "],
-                    "categories": ["Ministração"],
-                    "publisher": "Saraiva",
-                    "publishedDate": "2015-03",
-                    "imageLinks": {"thumbnail": "http://books.example/t.jpg"},
-                }
-            }
-        ],
-    }
-
-    class FakeClient:
-        def __init__(self, *, timeout):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *_args):
-            return None
-
-        async def get(self, request_url, **_kwargs):
-            return httpx.Response(200, json=payload, request=httpx.Request("GET", request_url))
-
-    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
-
-    data = await service.fetch_google_books_data("9788575225530")
-
-    assert data["title"] == "Título" and data["author"] == "A, B"
-    assert data["publisher"] == "Saraiva" and data["publication_year"] == "2015"
-    assert data["cover_url"] == "https://books.example/t.jpg"
+    service.fetch_google_books_data.assert_awaited_once_with("9788575225530")
+    assert repository.created_with.title == "Título canônico"
+    assert repository.created_with.author == "Autor canônico"
 
 
 @pytest.mark.anyio

@@ -1,22 +1,9 @@
 class ApplicationError(Exception):
-    def __init__(
-        self,
-        message: str,
-        code: str,
-        status_code: int,
-        details: dict | None = None,
-    ) -> None:
+    def __init__(self, message: str, code: str, status_code: int) -> None:
         super().__init__(message)
         self.message = message
         self.code = code
         self.status_code = status_code
-        # Dados estruturados opcionais (ex.: motivos de um bloqueio de domínio).
-        self.details = details
-
-    @property
-    def detail(self) -> str:
-        """Alias de `message`, no nome do campo `detail` da resposta {detail, code, details?}."""
-        return self.message
 
 
 class DuplicateEmailError(ApplicationError):
@@ -69,8 +56,8 @@ class RefreshTokenReuseError(ApplicationError):
 
 
 class BookNotFoundError(ApplicationError):
-    def __init__(self, message: str = "Livro não encontrado.") -> None:
-        super().__init__(message, "book_not_found", 404)
+    def __init__(self) -> None:
+        super().__init__("Livro não encontrado.", "book_not_found", 404)
 
 
 class DuplicateIsbnError(ApplicationError):
@@ -79,8 +66,8 @@ class DuplicateIsbnError(ApplicationError):
 
 
 class DuplicateBarcodeError(ApplicationError):
-    def __init__(self, message: str = "Código de barras já cadastrado.") -> None:
-        super().__init__(message, "duplicate_barcode", 409)
+    def __init__(self) -> None:
+        super().__init__("Código de barras já cadastrado.", "duplicate_barcode", 409)
 
 
 class EmployeeRecordRequiredError(ApplicationError):
@@ -160,25 +147,9 @@ class DuplicateGenreError(ApplicationError):
         super().__init__("Gênero já cadastrado.", "duplicate_genre", 409)
 
 
-class GenreTextWithGenreIdsError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "O texto `genre` é legado e não alimenta o catálogo: envie só `genre_ids` "
-            "(o texto passa a espelhar os nomes escolhidos).",
-            "genre_text_with_genre_ids",
-            422,
-        )
-
-
 class GenreNotFoundError(ApplicationError):
-    def __init__(self, missing_ids: list[int] | None = None) -> None:
-        # Na associação de categorias à obra (Issue #174), `details.missing_ids` lista os ids inexistentes.
-        super().__init__(
-            "Gênero não encontrado.",
-            "genre_not_found",
-            404,
-            {"missing_ids": missing_ids} if missing_ids else None,
-        )
+    def __init__(self) -> None:
+        super().__init__("Gênero não encontrado.", "genre_not_found", 404)
 
 
 class UserNotFoundError(ApplicationError):
@@ -274,211 +245,3 @@ class ClientPenaltyPersistenceError(ApplicationError):
             "client_penalty_persistence_error",
             500,
         )
-
-
-class CopyWithoutPriceError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "O exemplar comercial não tem preço de venda cadastrado.",
-            "copy_without_price",
-            409,
-        )
-
-
-class BookInactiveError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "A obra do exemplar está inativa e não aceita novas operações.",
-            "book_inactive",
-            409,
-        )
-
-
-class CopyReservedError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "O exemplar está destinado a uma reserva de compra dentro do prazo de retirada.",
-            "copy_reserved",
-            409,
-        )
-
-
-class CopyNotFoundError(ApplicationError):
-    def __init__(self, message: str = "Exemplar não encontrado.") -> None:
-        super().__init__(message, "copy_not_found", 404)
-
-
-class CopyDeletionBlockedError(ApplicationError):
-    """Exclusão de exemplar bloqueada. O código é o do primeiro motivo.
-
-    Os motivos possíveis são `copy_not_available`, `copy_has_history` e
-    `last_active_copy`; todos seguem em `details["reasons"]`.
-    """
-
-    def __init__(self, reasons: list[dict], history: dict[str, int]) -> None:
-        message = "Exclusão bloqueada: " + " ".join(reason["message"] for reason in reasons)
-        super().__init__(
-            message,
-            reasons[0]["code"],
-            409,
-            {"reasons": reasons, "history": history},
-        )
-
-
-class CopyDeletionPersistenceError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "Não foi possível excluir o exemplar. Nada foi alterado.",
-            "copy_delete_persistence_error",
-            500,
-        )
-
-
-class BookHasActiveOperationsError(ApplicationError):
-    def __init__(self, counts: dict[str, int], links: list[dict]) -> None:
-        super().__init__(
-            "A obra possui operações em andamento e não pode ser inativada.",
-            "book_has_active_operations",
-            409,
-            {"counts": counts, "links": links},
-        )
-
-
-class CopyNotForLoanError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Somente exemplares didáticos podem ser emprestados.", "copy_not_for_loan", 409)
-
-
-class BookWithoutActiveCopyError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "A obra não pode ser reativada sem ao menos um exemplar ativo.",
-            "book_without_active_copy",
-            409,
-        )
-
-
-class CopyUpdateBlockedError(ApplicationError):
-    """Edição/conversão de exemplar bloqueada. O código é o do primeiro motivo.
-
-    Os motivos possíveis são `copy_inactive`, `copy_not_available`,
-    `copy_allocated` e `copy_in_operation`; todos seguem em `details["reasons"]`.
-    """
-
-    def __init__(self, reasons: list[dict]) -> None:
-        message = "Edição bloqueada: " + " ".join(reason["message"] for reason in reasons)
-        super().__init__(message, reasons[0]["code"], 409, {"reasons": reasons})
-
-
-class CopySalePriceRequiredError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "Exemplar destinado à venda exige preço de venda maior que zero.",
-            "copy_sale_price_required",
-            422,
-        )
-
-
-class CopySalePriceNotAllowedError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "Exemplar didático não pode ter preço de venda.",
-            "copy_sale_price_not_allowed",
-            422,
-        )
-
-
-class CopyUpdatePersistenceError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "Não foi possível atualizar o exemplar. Nada foi alterado.",
-            "copy_update_persistence_error",
-            500,
-        )
-
-
-# SQLSTATEs próprios do gatilho `guard_copy_integrity` (migration 20261003_0014).
-SQLSTATE_COPY_DESTINATION_FORBIDDEN = "LS001"
-SQLSTATE_COPY_DESTINATION_NOT_AVAILABLE = "LS002"
-
-
-# ---- Erros de /copies/, /sales/ e /loans/ (Issue #175, item 4): `code` estável em todos ----
-
-
-class DuplicateSaleItemError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "A venda não pode repetir o mesmo exemplar nos itens.",
-            "duplicate_sale_item",
-            422,
-        )
-
-
-class CopyInactiveError(ApplicationError):
-    """Exemplar inativo em operação de circulação (404 por compatibilidade com o contrato anterior)."""
-
-    def __init__(self, message: str = "Um ou mais exemplares estão inativos.") -> None:
-        super().__init__(message, "copy_inactive", 404)
-
-
-class CopyNotAvailableError(ApplicationError):
-    def __init__(self, message: str) -> None:
-        super().__init__(message, "copy_not_available", 409)
-
-
-class CopyNotForSaleError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Exemplares didáticos não podem ser vendidos.", "copy_not_for_sale", 409)
-
-
-class SaleConflictError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Não foi possível registrar a venda.", "sale_conflict", 409)
-
-
-class SalePersistenceError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Não foi possível registrar a venda.", "sale_persistence_error", 500)
-
-
-class LoanConflictError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "Não foi possível registrar o empréstimo porque o exemplar já possui um empréstimo em aberto.",
-            "loan_conflict",
-            409,
-        )
-
-
-class LoanPersistenceError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Não foi possível registrar o empréstimo.", "loan_persistence_error", 500)
-
-
-class LoanNotFoundError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Empréstimo não encontrado.", "loan_not_found", 404)
-
-
-class LoanNotOpenError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "Empréstimo não está aberto para devolução.", "loan_already_closed", 409
-        )
-
-
-class LoanReturnConflictError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Não foi possível registrar a devolução.", "loan_return_conflict", 409)
-
-
-class LoanReturnPersistenceError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__(
-            "Não foi possível registrar a devolução.", "loan_return_persistence_error", 500
-        )
-
-
-class CopyPersistenceError(ApplicationError):
-    def __init__(self, message: str = "Não foi possível cadastrar o exemplar.") -> None:
-        super().__init__(message, "copy_persistence_error", 500)

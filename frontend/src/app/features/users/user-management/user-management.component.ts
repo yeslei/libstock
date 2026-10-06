@@ -30,7 +30,6 @@ export class UserManagementComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  /** Busca local por nome ou e-mail: a API só filtra por perfil e CPF não existe no modelo. */
   protected readonly visibleUsers = computed(() => {
     const term = this.term().trim().toLowerCase();
     return term
@@ -54,6 +53,10 @@ export class UserManagementComponent implements OnInit {
     void this.router.navigate(['/gestao/usuarios', userId]);
   }
 
+  protected viewPendencies(userId: number): void {
+    void this.router.navigate(['/gestao/clientes', userId, 'pendencias']);
+  }
+
   protected filterByRole(event: Event): void {
     this.selectedRole.set((event.target as HTMLSelectElement).value as RoleCode | '');
     this.loadUsers();
@@ -67,19 +70,16 @@ export class UserManagementComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     const role = this.selectedRole() || undefined;
-    this.usersApi
-      .list(role)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (users) => {
-          this.users.set(users);
-          this.loading.set(false);
-        },
-        error: (error: ApiError) => {
-          this.users.set([]);
-          this.error.set(error.detail || 'Não foi possível carregar os usuários.');
-          this.loading.set(false);
-        },
-      });
+    this.usersApi.list(role).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (users) => {
+        this.users.set(users);
+        this.loading.set(false);
+      },
+      error: (error: ApiError) => {
+        this.users.set([]);
+        this.error.set(error.detail || 'Não foi possível carregar os usuários.');
+        this.loading.set(false);
+      },
+    });
   }
 }

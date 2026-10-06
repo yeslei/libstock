@@ -12,16 +12,19 @@ export type CatalogCapability =
   | 'transact'
   /** US01/US05 — atendente: registrar venda, empréstimo e devolução. */
   | 'counterService'
+  /** US03 — estoquista: cadastrar obra com a destinação inicial do exemplar. */
+  | 'manageStock'
   /** US04 — gerente/administrador: destaque e conversão de destinação. */
-  | 'manageCatalog';
+  | 'manageCatalog'
+  /** US17 — operação: cadastrar um exemplar de uma obra. */
+  | 'registerCopy';
 
 const CAPABILITIES_BY_ROLE: Record<RoleCode, CatalogCapability[]> = {
   USER: ['transact'],
   SELLER: ['counterService'],
-  // Cadastro de obra e exemplar acontece no balcão (Issue #169), não na vitrine.
-  STOCK_KEEPER: [],
+  STOCK_KEEPER: ['manageStock', 'registerCopy'],
   // "Administrador com controle total das regras de negócio" (SRS, 1.3).
-  ADMINISTRATOR: ['counterService', 'manageCatalog'],
+  ADMINISTRATOR: ['counterService', 'manageStock', 'manageCatalog', 'registerCopy'],
 };
 
 export function capabilitiesFor(roleCodes: readonly RoleCode[]): Set<CatalogCapability> {

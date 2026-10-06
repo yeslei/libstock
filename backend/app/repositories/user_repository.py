@@ -6,7 +6,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
-from app.models.domain import AuditLog, Client, Employee, Profile, Role, UserRole
+from app.models.domain import Client, Employee, Profile, Role, UserRole
 from app.models.user import User
 
 
@@ -29,37 +29,6 @@ class UserRepository:
             .where(User.id == user_id)
         )
         return self.db.scalar(statement)
-
-    def get_user_by_id(self, user_id: int) -> User | None:
-        """Consulta um usuário por identificador, sem aplicar regra de negócio."""
-        return self.find_by_id(user_id)
-
-    def is_active_administrator_employee(self, actor_id: int) -> bool:
-        statement = (
-            select(Employee.id)
-            .join(Profile, Profile.id == Employee.id)
-            .join(User, User.id == Employee.id)
-            .join(Role, Role.id == Employee.role_id)
-            .join(UserRole, (UserRole.user_id == User.id) & (UserRole.role_id == Role.id))
-            .where(Employee.id == actor_id, User.is_active.is_(True),
-                   Profile.is_active.is_(True), Role.code == "ADMINISTRATOR")
-        )
-        return self.db.scalar(statement) is not None
-
-    def find_by_id_for_update(self, user_id: int) -> User | None:
-        return self.db.scalar(select(User).where(User.id == user_id)
-                              .with_for_update().execution_options(populate_existing=True))
-
-    def reset_password(self, user: User, password_hash: str, changed_at: datetime) -> None:
-        user.password_hash = password_hash
-        user.updated_at = changed_at
-        self.db.flush()
-
-    def audit_password_reset(self, target_id: int, actor_id: int) -> None:
-        # Credentials and their hashes must never enter audit payloads.
-        self.db.add(AuditLog(employee_id=actor_id, entity_type="users", entity_id=str(target_id),
-                             operation="PASSWORD_RESET", old_value=None, new_value=None))
-        self.db.flush()
 
     def list_all(self, role_code: str | None = None) -> list[User]:
         statement = select(User).options(

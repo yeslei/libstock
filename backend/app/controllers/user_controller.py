@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.authentication import get_current_user, require_roles
 from app.dependencies.services import get_user_service
@@ -9,8 +9,6 @@ from app.schemas.user_schema import (
     UserInactivateResponse,
     UserResponse,
     UserUpdate,
-    UserPasswordReset,
-    UserPasswordResetResponse,
 )
 from app.services.user_service import UserService
 
@@ -18,16 +16,6 @@ from app.services.user_service import UserService
 router = APIRouter(prefix="/api/v1/users", tags=["Usuários"])
 
 require_administrator = require_roles("ADMINISTRATOR")
-
-
-@router.post("/{user_id}/reset-password", response_model=UserPasswordResetResponse)
-def reset_user_password(
-    payload: UserPasswordReset,
-    user_id: int = Path(ge=1, le=2**31 - 1),
-    current_user: User = Depends(require_administrator),
-    user_service: UserService = Depends(get_user_service),
-) -> UserPasswordResetResponse:
-    return user_service.reset_password(user_id, payload, actor_id=current_user.id)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -50,7 +38,7 @@ def get_user(
     _current_user: User = Depends(require_administrator),
     user_service: UserService = Depends(get_user_service),
 ) -> User:
-    return user_service.get_user(user_id)
+    return user_service.get_admin_user(user_id)
 
 
 @router.patch("/{user_id}", response_model=UserAdminResponse)

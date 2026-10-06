@@ -1,26 +1,16 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.business_dates import loan_due_at
-from app.core.exceptions import (
-    ApplicationError,
-    BookInactiveError,
-    CopyNotAvailableError,
-    CopyNotFoundError,
-    CopyNotForLoanError,
-    LoanConflictError,
-    LoanNotFoundError,
-    LoanNotOpenError,
-    LoanPersistenceError,
-    LoanReturnConflictError,
-    LoanReturnPersistenceError,
-)
-from app.models.domain import CopyStatus, DestinationType, LoanStatus
+from app.models.domain import CopyStatus, LoanStatus
 from app.repositories.loan_repository import LoanRepository
 from app.schemas.loan_schema import LoanCreate, LoanResponse
 from app.services.client_pendency_service import ClientPendencyService
+
+
+LOAN_DURATION_DAYS = 15
 
 
 class LoanService:
@@ -46,24 +36,23 @@ class LoanService:
                 commit=False,
             )
 
-            book = self.repository.lock_book_for_copy(loan_data.copy_id)
             copy = self.repository.find_copy_for_loan(loan_data.copy_id)
 
             if copy is None:
-                raise CopyNotFoundError("Exemplar não encontrado ou inativo.")
-
-            if book is None or not book.is_active:
-                raise BookInactiveError()
+                raise HTTPException(
+                    status_code=404,
+                    detail="Exemplar não encontrado ou inativo.",
+                )
 
             if copy.status != CopyStatus.AVAILABLE:
-                raise CopyNotAvailableError("Exemplar não está disponível para empréstimo.")
+                raise HTTPException(
+                    status_code=409,
+                    detail="Exemplar não está disponível para empréstimo.",
+                )
 
-            if copy.destination != DestinationType.DIDACTIC:
-                raise CopyNotForLoanError()
-
-            # Regra aprovada: vence um mês de calendário depois (America/Sao_Paulo).
+            # Regra de negócio: empréstimos possuem prazo de 15 dias corridos.
             loan_date = datetime.now(timezone.utc)
-            due_date = loan_due_at(loan_date)
+            due_date = loan_date + timedelta(days=LOAN_DURATION_DAYS)
 
             loan = self.repository.create_loan(
                 loan_data,
@@ -77,17 +66,26 @@ class LoanService:
 
             return LoanResponse.model_validate(loan)
 
-        except ApplicationError:
+        except HTTPException:
             self.db.rollback()
             raise
 
         except IntegrityError as exc:
             self.db.rollback()
-            raise LoanConflictError() from exc
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Não foi possível registrar o empréstimo porque "
+                    "o exemplar já possui um empréstimo em aberto."
+                ),
+            ) from exc
 
         except SQLAlchemyError as exc:
             self.db.rollback()
-            raise LoanPersistenceError() from exc
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível registrar o empréstimo.",
+            ) from exc
 
     def register_return(
         self,
@@ -97,15 +95,24 @@ class LoanService:
             loan = self.repository.find_loan_for_return(loan_id)
 
             if loan is None:
-                raise LoanNotFoundError()
+                raise HTTPException(
+                    status_code=404,
+                    detail="Empréstimo não encontrado.",
+                )
 
             if loan.status != LoanStatus.OPEN:
-                raise LoanNotOpenError()
+                raise HTTPException(
+                    status_code=409,
+                    detail="Empréstimo não está aberto para devolução.",
+                )
 
             copy = self.repository.find_copy_for_return(loan.copy_id)
 
             if copy is None:
-                raise CopyNotFoundError("Exemplar vinculado ao empréstimo não encontrado.")
+                raise HTTPException(
+                    status_code=404,
+                    detail="Exemplar vinculado ao empréstimo não encontrado.",
+                )
 
             returned_at = datetime.now(timezone.utc)
 
@@ -120,14 +127,20 @@ class LoanService:
 
             return LoanResponse.model_validate(loan)
 
-        except ApplicationError:
+        except HTTPException:
             self.db.rollback()
             raise
 
         except IntegrityError as exc:
             self.db.rollback()
-            raise LoanReturnConflictError() from exc
+            raise HTTPException(
+                status_code=409,
+                detail="Não foi possível registrar a devolução.",
+            ) from exc
 
         except SQLAlchemyError as exc:
             self.db.rollback()
-            raise LoanReturnPersistenceError() from exc
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível registrar a devolução.",
+            ) from exc

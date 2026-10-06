@@ -1,7 +1,7 @@
 import { AsyncPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 
 import { AuthService } from '../../core/services/auth.service';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
@@ -13,7 +13,7 @@ import { SpinnerComponent } from '../../shared/components/spinner/spinner.compon
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [AsyncPipe, RouterLink, SpinnerComponent],
+  imports: [AsyncPipe, SpinnerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
@@ -25,10 +25,6 @@ export class HomeComponent {
 
   protected readonly user$ = this.auth.user$;
   protected readonly leaving = signal(false);
-
-  protected canUseCounter(roles: readonly string[]): boolean {
-    return roles.includes('SELLER') || roles.includes('STOCK_KEEPER') || roles.includes('ADMINISTRATOR');
-  }
 
   protected logout(): void {
     if (this.leaving()) {

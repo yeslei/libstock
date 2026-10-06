@@ -351,14 +351,12 @@ class PurchaseReservation(Base):
         Index("uq_active_reservation_book_queue", "book_id", "queue_position", unique=True, postgresql_where=text("status IN ('WAITING', 'NOTIFIED')")),
         Index("idx_reservations_book_status", "book_id", "status"),
         Index("idx_reservations_client", "client_id"),
-        Index("uq_notified_reservation_copy", "allocated_copy_id", unique=True, postgresql_where=text("status = 'NOTIFIED'")),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     book_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("books.id", ondelete="RESTRICT"), nullable=False)
     client_id: Mapped[int] = mapped_column(Integer, ForeignKey("clients.id", ondelete="RESTRICT"), nullable=False)
     fulfilled_copy_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("copies.id", ondelete="RESTRICT"))
-    allocated_copy_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("copies.id", ondelete="RESTRICT"))
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     queue_position: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[ReservationStatus] = mapped_column(SqlEnum(ReservationStatus, name="reservation_status"), nullable=False, server_default=ReservationStatus.WAITING.value)
