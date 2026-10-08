@@ -528,3 +528,25 @@ def test_get_current_user_com_usuario_inativo_lanca_user_inactive_error():
     with patch("app.dependencies.authentication.decode_access_token", return_value=1):
         with pytest.raises(UserInactiveError):
             _get_current_user(credentials=mock_creds, user_service=mock_service)
+
+
+@pytest.mark.parametrize('endpoint', ['/api/v1/users', '/api/v1/users/42'])
+def test_consulta_administrativa_preserva_email_legado_sem_falhar(endpoint):
+    user = _make_user(user_id=42)
+    user.email = 'cadastro@test.invalid'
+    _use_fake_service(user=user)
+    _authenticate_as('ADMINISTRATOR')
+    response = client.get(endpoint)
+    assert response.status_code == 200
+    body = response.json()
+    record = body[0] if isinstance(body, list) else body
+    assert record['email'] == user.email
+    assert 'password_hash' not in record
+
+
+def test_edicao_continua_rejeitando_email_com_dominio_reservado():
+    _use_fake_service()
+    _authenticate_as('ADMINISTRATOR')
+    response = client.patch('/api/v1/users/42', json={'email': 'cadastro@test.invalid'})
+    assert response.status_code == 422
+    assert response.json()['code'] == 'validation_error'

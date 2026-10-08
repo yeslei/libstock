@@ -57,3 +57,53 @@
 .queue__meta {
   color: $staff-muted;
 }
+
+.queue-card {
+  border-bottom: 1px solid $staff-border;
+  padding: 16px 0;
+}
+
+.queue-card__summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+
+  &::-webkit-details-marker { display: none; }
+  &:focus-visible { outline: 2px solid $staff-accent; outline-offset: 4px; }
+  h2 { flex: 1 1 16rem; font-size: 16px; }
+}
+
+.queue-card__count { color: $staff-muted; font-size: 13px; }
+.queue-card__toggle { color: $staff-accent; font-size: 13px; font-weight: 600; }
+.queue-card[open] .queue-card__toggle { font-size: 0; }
+.queue-card[open] .queue-card__toggle::after { content: 'Fechar fila'; font-size: 13px; }
+
+.queue__item {
+  padding: 16px 0;
+  border-top: 1px solid $staff-border;
+}
+
+.queue__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.queue__more {
+  summary {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    color: $staff-muted;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  summary:focus-visible { outline: 2px solid $staff-accent; outline-offset: 3px; }
+  .btn { margin-top: 8px; }
+}
