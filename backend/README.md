@@ -296,3 +296,8 @@ Hash, revogação das sessões de refresh existentes e auditoria `PASSWORD_RESET
 ### Painel editorial
 
 `GET /api/v1/staff/dashboard/overview` (vendedor e administrador, funcionário ativo) retorna empréstimos do dia, sete dias de movimento, categorias das obras ativas, cinco títulos mais emprestados nos últimos 30 dias e cinco empréstimos/devoluções recentes. Datas de agregação usam `America/Sao_Paulo`; empréstimos cancelados são excluídos. O endpoint existente `/dashboard` mantém seu contrato. Nenhum indicador utiliza dados de demonstração.
+
+
+### Compatibilidade dos e-mails nas respostas de usuários
+
+`GET /api/v1/users`, `GET /api/v1/users/{id}`, `/users/me` e respostas de inativação preservam o e-mail persistido como string, inclusive cadastros legados com domínio reservado. Isso evita erro 500 na serialização da listagem. Cadastro e atualização continuam exigindo e-mail válido, com erro 422 para domínio reservado.

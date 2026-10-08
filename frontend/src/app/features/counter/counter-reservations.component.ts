@@ -108,14 +108,14 @@ export class CounterReservationsComponent {
   protected allocate(reservation: StaffPurchaseReservation): void {
     if (!reservation.can_allocate) return;
     this.flow.ask({
-      title: 'Destinar exemplar?',
+      title: 'Separar exemplar para retirada?',
       details: [
         `Obra: ${reservation.book.title}`,
         `Primeira reserva elegível da fila: ${reservation.client.name} (${reservation.client.email})`,
         `Exemplares comerciais livres: ${reservation.free_commercial_copies}`,
         'Um exemplar comercial livre ficará destinado a este cliente e indisponível para outros, com cinco dias corridos para a retirada.',
       ],
-      confirmLabel: 'Destinar exemplar',
+      confirmLabel: 'Separar exemplar',
       run: () => this.service.allocatePurchase(reservation.book.id),
       success: () => `Exemplar destinado a ${reservation.client.name} para “${reservation.book.title}”.`,
     });

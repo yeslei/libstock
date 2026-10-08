@@ -35,7 +35,7 @@ class UserCreate(BaseModel):
 class UserResponse(BaseModel):
     id: int
     name: str
-    email: EmailStr
+    email: str
     role_codes: list[str]
     created_at: datetime
 
@@ -45,7 +45,7 @@ class UserResponse(BaseModel):
 class UserInactivateResponse(BaseModel):
     id: int
     name: str
-    email: EmailStr
+    email: str
     is_active: bool
     updated_at: datetime
 
@@ -55,7 +55,7 @@ class UserInactivateResponse(BaseModel):
 class UserAdminResponse(BaseModel):
     id: int
     name: str
-    email: EmailStr
+    email: str
     role_codes: list[RoleCode]
     is_active: bool
     created_at: datetime

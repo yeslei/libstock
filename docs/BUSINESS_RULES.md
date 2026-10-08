@@ -1078,3 +1078,10 @@ O painel mantém acesso de vendedor e administrador; estoquista continua no acer
 ## Entrada pública — decisão do usuário de 04/10/2026
 
 Página inicial, catálogo e detalhes das obras permanecem acessíveis sem login. A autenticação é solicitada ao iniciar operações protegidas (solicitar empréstimo, compra ou reserva), preservando o caminho de retorno. Funcionários com sessão válida continuam na área com sidebar. A entrada pública não redireciona visitantes ao login.
+
+
+## Correção de usuários e apresentação de reservas — 08/10/2026
+
+**Defeito confirmado:** a consulta administrativa retornava HTTP 500 ao serializar cadastros existentes com e-mail em domínio reservado. A resposta preserva o e-mail persistido como texto; criação e alteração continuam validando `EmailStr`. Compatibilidade de leitura, sem alteração das regras de cadastro ou dos dados existentes.
+
+**Correção de apresentação:** a fila de cada obra fica recolhida inicialmente e pode ser expandida por teclado. Ações aparecem junto ao cliente; cancelamento fica em “Mais ações”. “Separar exemplar” é o novo rótulo de destinação, preservando a regra aprovada de primeiro cliente elegível e cinco dias corridos para retirada.

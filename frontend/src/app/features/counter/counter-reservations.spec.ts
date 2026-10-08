@@ -87,6 +87,24 @@ describe('Fila de reservas (agrupamento)', () => {
 });
 
 describe('Balcão: lista de reservas de compra', () => {
+  it('mantém uma fila expansível por obra e agrupa o cancelamento junto ao cliente', () => {
+    const { root } = create(CounterReservationsComponent, (s) => s.listPurchaseReservations.and.returnValue(of([
+      waiting(), notified(), waiting({ id: 33, queue_position: 2, can_allocate: false }),
+    ])));
+    const queue = root.querySelector<HTMLDetailsElement>('.queue-card')!;
+    expect(root.querySelectorAll('.queue-card').length).toBe(1);
+    expect(queue.open).toBeFalse();
+    expect(queue.querySelector('summary')?.textContent).toContain('3 reservas');
+    queue.open = true;
+    expect(queue.querySelectorAll('.queue__item').length).toBe(3);
+    const waitingRow = Array.from(queue.querySelectorAll('.queue__item')).find(r => r.textContent?.includes('Ana Santos'))!;
+    expect(waitingRow.querySelector('.btn--primary')?.textContent).toContain('Separar exemplar para Ana Santos');
+    const secondary = waitingRow.querySelector<HTMLDetailsElement>('.queue__more')!;
+    expect(secondary.open).toBeFalse();
+    expect(secondary.querySelector('button')?.textContent).toContain('Cancelar reserva de Ana Santos');
+    expect(root.textContent).not.toContain('Consultar outra obra');
+  });
+
   const dialog = (root: HTMLElement) => root.querySelector('dialog');
 
   it('mostra a fila por obra com posições, exemplar destinado e o prazo persistido', () => {
@@ -122,7 +140,7 @@ describe('Balcão: lista de reservas de compra', () => {
       s.listPurchaseReservations.and.returnValue(of([waiting()]));
       s.allocatePurchase.and.returnValue(response);
     });
-    press(fixture, button(root, 'Destinar exemplar a Ana Santos'));
+    press(fixture, button(root, 'Separar exemplar para Ana Santos'));
     expect(service.allocatePurchase).not.toHaveBeenCalled();
     const confirmButton = dialog(root)!.querySelector('.confirm__submit') as HTMLButtonElement;
     press(fixture, confirmButton);
@@ -141,7 +159,7 @@ describe('Balcão: lista de reservas de compra', () => {
       s.listPurchaseReservations.and.returnValue(of([waiting()]));
       s.allocatePurchase.and.returnValue(throwError(() => ({ detail: 'Não há exemplar comercial livre para esta operação.', code: 'purchase_unavailable', status: 409 })));
     });
-    press(fixture, button(root, 'Destinar exemplar a Ana Santos'));
+    press(fixture, button(root, 'Separar exemplar para Ana Santos'));
     press(fixture, dialog(root)!.querySelector('.confirm__submit') as HTMLElement);
     expect(snackbarMessage()).toContain('Não há exemplar comercial livre');
     expect(snackbarMessage()).not.toContain('Exemplar destinado');
@@ -154,7 +172,7 @@ describe('Balcão: lista de reservas de compra', () => {
       waiting({ id: 33, queue_position: 2, can_allocate: false, allocation_blocked_reason: 'NOT_FIRST_ELIGIBLE' }),
     ])));
     expect(root.textContent).toContain('Mantém a posição na fila');
-    expect(root.textContent).not.toContain('Destinar exemplar a');
+    expect(root.textContent).not.toContain('Separar exemplar para');
   });
 
   it('mostra "Nenhuma reserva encontrada" para busca vazia e limpa a busca', () => {
@@ -406,8 +424,8 @@ describe('Reservas de compra: cancelamento, prazo e expiração (Issue #150)', (
       waiting({ id: 33, queue_position: 2 }),
     ])));
     expect(root.textContent).toContain('1ª · Bia Lima');
-    expect(root.textContent).not.toContain('Destinar exemplar a Bia Lima');
-    expect(root.textContent).toContain('Destinar exemplar a Ana Santos');
+    expect(root.textContent).not.toContain('Separar exemplar para Bia Lima');
+    expect(root.textContent).toContain('Separar exemplar para Ana Santos');
   });
 
   it('oferece liberar exemplares vencidos somente quando há reserva vencida e mostra a quantidade após o 2xx', () => {
