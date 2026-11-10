@@ -2,6 +2,7 @@ services:
   - type: web
     name: libstock-api
     runtime: python
+    plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -9,6 +10,16 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: MAIL_TRANSPORT
+        value: brevo
+      - key: NOTIFICATION_DELIVERY_IN_API
+        value: true
+      - key: NOTIFICATION_DELIVERY_INTERVAL_SECONDS
+        value: 30
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false
       - key: GOOGLE_BOOKS_API_KEY
         sync: false
       - key: DATABASE_URL

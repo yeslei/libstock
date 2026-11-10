@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.core.mail import BrevoMailSender, MailConfigurationError, MailDeliveryError, OutgoingMail, create_mail_sender
@@ -76,3 +77,11 @@ def test_invalid_legacy_input_is_rejected_before_network(overrides):
 def test_missing_configuration_does_not_claim_queue(overrides):
     with pytest.raises(MailConfigurationError):
         create_mail_sender(settings(**overrides))
+
+
+@pytest.mark.parametrize("overrides", [{"mail_transport": "other"}, {"mail_timeout_seconds": 0},
+    {"mail_timeout_seconds": 31}, {"notification_delivery_interval_seconds": 4},
+    {"notification_delivery_interval_seconds": 61}, {"mail_from_email": "not-an-email"}])
+def test_delivery_settings_validate_transport_addresses_and_bounds(overrides):
+    with pytest.raises(ValidationError):
+        settings(**overrides)
