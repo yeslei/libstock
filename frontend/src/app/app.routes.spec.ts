@@ -26,6 +26,19 @@ describe('Perfil do cliente (Issue #46)', () => {
   }
 });
 
+describe('Notificações do cliente (Issue #42)', () => {
+  for (const role of ['USER', 'SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] as const) {
+    it(`notificações exigem papel USER: ${role}`, async () => {
+      TestBed.configureTestingModule({ providers: [provideRouter(withStubs(routes)),
+        { provide: AuthService, useValue: { restoreSession: () => Promise.resolve() } }] });
+      TestBed.inject(TokenStoreService).setSession('t', { id: 1, name: 'Cliente', email: 'client@example.com', role_codes: [role], created_at: '' });
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/notificacoes');
+      expect(router.url).toBe(role === 'USER' ? '/notificacoes' : role === 'STOCK_KEEPER' ? '/balcao/acervo' : '/balcao/painel');
+    });
+  }
+});
+
 /** Mantém caminhos, guards e dados reais das rotas, trocando apenas o carregamento dos componentes. */
 function withStubs(items: Route[]): Route[] {
   return items.map(({ loadComponent: _component, loadChildren: _children, ...rest }) => {

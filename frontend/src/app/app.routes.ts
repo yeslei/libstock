@@ -16,6 +16,13 @@ const SERVICE_DESK_ONLY: Pick<Route, 'canActivate' | 'data'> = {
 
 export const routes: Routes = [
   {
+    path: 'notificacoes',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['USER'] },
+    title: 'Notificações · LibStock',
+    loadComponent: () => import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent),
+  },
+  {
     path: 'perfil',
     canActivate: [authGuard, roleGuard],
     data: { roles: ['USER'] },

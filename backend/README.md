@@ -11,6 +11,8 @@
 
 Aplicar a migration `20261109_0018` antes de iniciar esta versão. Tanto a solicitação de compra já disponível quanto a destinação da fila criam uma notificação `RESERVATION_AVAILABLE` na mesma transação, com unicidade por tipo/reserva. Não há backfill ou envio histórico.
 
+O cliente acessa `/notificacoes` pelo menu da conta: lista compacta com canal, data, estado e paginação. Ações de leitura só aparecem para mensagens entregues; resultados incertos exigem nova consulta antes de outra gravação. Links levam às preferências em `/perfil` e à situação atual em `/minhas-reservas`.
+
 - `GET /api/v1/me/notifications?limit=20&before_id=123`: Bearer `USER`, cadastro de cliente e usuário/perfil ativos. Página `{items, next_before_id}`, ordem decrescente de id, `limit` de 1 a 100 e cursor opcional positivo. Itens: `id`, `reservation_id`, `type`, `channel`, `subject`, `message`, `status`, `created_at`, `sent_at`, `read_at`. Sem identidades ou e-mails de terceiros.
 - `PATCH /api/v1/me/notifications/{id}/read`: mesmo acesso, sem corpo; marca mensagem própria `SENT` como `READ`, preservando a primeira leitura em repetições. 404 `notification_not_found` para inexistente ou alheia; 409 `notification_not_delivered` para `PENDING`/`FAILED`; 422 `validation_error` para parâmetros inválidos; 500 `notification_persistence_error` com rollback. Consulta: 500 `notification_read_error`; falhas do cadastro seguem os códigos da preferência. 401/403 para sessão, papel ou cadastro inválidos.
 - `IN_APP` é entregue na persistência (`SENT`); `EMAIL` é enfileirado (`PENDING`). A caixa apresenta também e-mails pendentes ou com envio não confirmado, sem fabricar entrega ao marcar leitura.

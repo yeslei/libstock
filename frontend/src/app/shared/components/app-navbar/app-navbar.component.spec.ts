@@ -30,6 +30,7 @@ describe('AppNavbarComponent', () => {
       user$.next({ id: 1, name: 'Conta', email: 'client@example.com', role_codes: [role], created_at: '' });
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('a[href="/perfil"]') !== null).withContext(role).toBe(role === 'USER');
+      expect(fixture.nativeElement.querySelector('a[href="/notificacoes"]') !== null).withContext(role).toBe(role === 'USER');
     }
   });
 

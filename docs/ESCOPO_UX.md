@@ -1,5 +1,15 @@
 # Escopo UX da V1 do LibStock — revisado por papéis e regras de negócio
 
+## Incremento de notificações — Issues #46 e #42, 09/11/2026
+
+O menu da conta do cliente inclui “Meu perfil” (`/perfil`) e “Notificações” (`/notificacoes`), com autenticação e papel `USER`. Funcionários continuam no layout com sidebar e não recebem atalhos de cliente quando não possuem esse papel.
+
+O perfil mostra o e-mail cadastrado somente para consulta e permite escolher um único canal: “No aplicativo” (padrão existente) ou “Por e-mail”. Uma mensagem de sucesso aparece somente após persistência. Não se permite editar o e-mail nessa tela. Selecionar “No aplicativo” desativa novos envios por e-mail.
+
+A caixa apresenta uma lista compacta e paginada de mensagens próprias, com assunto, canal, data, conteúdo e estado. Mensagem no aplicativo entregue aparece “Não lida”; e-mail pendente, “Aguardando envio”; e-mail aceito pelo serviço, “Enviado”; envio ambíguo ou suprimido, “Envio não confirmado”; leitura registrada, “Lida”. O texto de e-mail enviado não promete entrega na caixa postal. Nenhum detalhe de configuração SMTP é exibido no fluxo do cliente.
+
+“Marcar como lida” aparece apenas para mensagens entregues e bloqueia envio duplicado. Falha de rede ou erro de servidor exige atualizar a consulta antes de outra gravação; a reconciliação reinicia a primeira página e descarta a lista antiga. A tela inclui carregamento, lista vazia, recuperação de erro, “Carregar mais”, link para preferências e acesso a “Minhas reservas” para conferir disponibilidade atual. Avisos têm espaço antes da ação de recuperação e os títulos não recebem rótulos acima.
+
 ## 1. Objetivo da V1
 
 A V1 do LibStock deve entregar o núcleo funcional de autenticação, consulta e gestão de acervos, respeitando a separação entre obra bibliográfica e exemplar físico.
