@@ -26,6 +26,7 @@ from app.controllers.loan_controller import router as loan_router
 from app.controllers.sale_controller import router as sale_router
 from app.controllers.receipt_controller import router as receipt_router
 from app.controllers.notification_preference_controller import router as notification_preference_router
+from app.controllers.notification_controller import router as notification_router
 
 
 settings = get_settings()
@@ -118,3 +119,4 @@ app.include_router(loan_router)
 app.include_router(sale_router)
 app.include_router(receipt_router)
 app.include_router(notification_preference_router)
+app.include_router(notification_router)

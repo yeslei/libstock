@@ -379,10 +379,15 @@ class Notification(Base):
             name="chk_notification_state",
         ),
         Index("idx_notifications_user_status", "user_id", "status"),
+        Index("uq_notification_reservation_event", "type", "reservation_id", unique=True,
+              postgresql_where=text("reservation_id IS NOT NULL")),
+        Index("idx_notifications_pending_email", "id",
+              postgresql_where=text("status = 'PENDING' AND channel = 'EMAIL'")),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("profiles.id", ondelete="RESTRICT"), nullable=False)
+    reservation_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("purchase_reservations.id", ondelete="RESTRICT"))
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     channel: Mapped[NotificationChannel] = mapped_column(SqlEnum(NotificationChannel, name="notification_channel"), nullable=False)
     subject: Mapped[str | None] = mapped_column(String(255))

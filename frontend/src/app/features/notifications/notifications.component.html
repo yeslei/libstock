@@ -1,0 +1,39 @@
+<main class="notifications">
+  <header class="heading">
+    <h1>Notificações</h1>
+    <p>Acompanhe os avisos sobre suas reservas.</p>
+    <a routerLink="/perfil">Preferências de notificação</a>
+  </header>
+  @if (error()) {
+    <app-alert [message]="error()" />
+    <div class="recovery"><button type="button" (click)="load()" [disabled]="loading() || reading() !== null">Atualizar consulta</button></div>
+  }
+  @if (success()) { <app-alert variant="success" [message]="success()" /> }
+  @if (loading()) { <p class="loading" role="status"><app-spinner /> Consultando notificações…</p> }
+  @if (items().length) {
+    <ul class="notification-list" aria-label="Suas notificações">
+      @for (item of items(); track item.id) {
+        <li class="notification" [class.notification--unread]="item.status === 'SENT'">
+          <div class="notification-heading"><h2>{{ item.subject || 'Aviso do LibStock' }}</h2><span class="status">{{ statusLabel(item) }}</span></div>
+          <p class="meta">{{ item.channel === 'EMAIL' ? 'E-mail' : 'No aplicativo' }} · {{ item.created_at | date: 'dd/MM/yyyy HH:mm' : '-0300' }}</p>
+          <p class="message">{{ item.message }}</p>
+          @if (item.channel === 'EMAIL' && item.status === 'SENT') {
+            <p class="guidance">O e-mail foi enviado. A entrega na caixa postal depende do serviço de e-mail.</p>
+          }
+          @if (item.status === 'FAILED') {
+            <p class="guidance">Confira a situação atual em Minhas reservas.</p>
+          }
+          @if (item.status === 'SENT') {
+            <button type="button" (click)="markRead(item)" [disabled]="reading() !== null || loading() || requiresRefresh()" [attr.aria-busy]="reading() === item.id" [attr.aria-label]="'Marcar como lida: ' + (item.subject || 'Aviso do LibStock')">{{ reading() === item.id ? 'Salvando…' : 'Marcar como lida' }}</button>
+          }
+        </li>
+      }
+    </ul>
+  } @else if (loaded() && !loading()) {
+    <p class="empty" role="status">Você ainda não possui notificações.</p>
+  }
+  @if (nextBeforeId() !== null) {
+    <div class="pagination"><button type="button" (click)="load(true)" [disabled]="loading() || reading() !== null || requiresRefresh()">Carregar mais</button></div>
+  }
+  <a class="back" routerLink="/minhas-reservas">Ver Minhas reservas</a>
+</main>

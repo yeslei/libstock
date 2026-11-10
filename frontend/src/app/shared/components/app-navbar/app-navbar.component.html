@@ -37,6 +37,7 @@
             <a routerLink="/painel" (click)="accountMenu.open = false">Minha conta</a>
             @if (account.role_codes.includes('USER')) {
               <a routerLink="/perfil" (click)="accountMenu.open = false">Meu perfil</a>
+              <a routerLink="/notificacoes" (click)="accountMenu.open = false">Notificações</a>
             }
             <a routerLink="/como-funciona" (click)="accountMenu.open = false">Como funciona</a>
             <button type="button" (click)="logout(); accountMenu.open = false" [disabled]="signingOut()">{{ signingOut() ? 'Saindo…' : 'Sair' }}</button>
