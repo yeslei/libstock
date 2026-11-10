@@ -8,6 +8,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     google_books_api_key: str | None = None
+    mail_transport: Literal["smtp", "brevo"] = "smtp"
+    brevo_api_key: SecretStr | None = None
+    mail_from_email: EmailStr | None = None
+    mail_timeout_seconds: int = Field(default=10, ge=1, le=30)
+    notification_delivery_in_api: bool = False
+    notification_delivery_interval_seconds: int = Field(default=30, ge=5, le=60)
     smtp_host: str | None = None
     smtp_port: int = Field(default=587, ge=1, le=65535)
     smtp_security: Literal["starttls", "ssl"] = "starttls"
@@ -16,7 +22,8 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     smtp_from_email: EmailStr | None = None
 
-    @field_validator("smtp_host", "smtp_username", "smtp_password", "smtp_from_email", mode="before")
+    @field_validator("smtp_host", "smtp_username", "smtp_password", "smtp_from_email",
+                     "brevo_api_key", "mail_from_email", mode="before")
     @classmethod
     def empty_smtp_setting_is_none(cls, value: object) -> object:
         return None if value == "" else value

@@ -27,6 +27,7 @@ from app.controllers.sale_controller import router as sale_router
 from app.controllers.receipt_controller import router as receipt_router
 from app.controllers.notification_preference_controller import router as notification_preference_router
 from app.controllers.notification_controller import router as notification_router
+from app.services.notification_lifecycle import notification_lifespan
 
 
 settings = get_settings()
@@ -37,6 +38,7 @@ settings = get_settings()
 _documentacao_publica = settings.app_env != "production"
 
 app = FastAPI(
+    lifespan=notification_lifespan,
     title="LibStock API",
     version="0.1.0",
     description="API para gestão de acervos e circulação de livros.",

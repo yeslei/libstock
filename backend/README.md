@@ -17,7 +17,38 @@ O cliente acessa `/notificacoes` pelo menu da conta: lista compacta com canal, d
 - `PATCH /api/v1/me/notifications/{id}/read`: mesmo acesso, sem corpo; marca mensagem própria `SENT` como `READ`, preservando a primeira leitura em repetições. 404 `notification_not_found` para inexistente ou alheia; 409 `notification_not_delivered` para `PENDING`/`FAILED`; 422 `validation_error` para parâmetros inválidos; 500 `notification_persistence_error` com rollback. Consulta: 500 `notification_read_error`; falhas do cadastro seguem os códigos da preferência. 401/403 para sessão, papel ou cadastro inválidos.
 - `IN_APP` é entregue na persistência (`SENT`); `EMAIL` é enfileirado (`PENDING`). A caixa apresenta também e-mails pendentes ou com envio não confirmado, sem fabricar entrega ao marcar leitura.
 
-### Worker de envio por SMTP
+### Envio no Render gratuito (Issue #190)
+
+O `render.yaml` mantém apenas a API no plano `free`, com transporte Brevo por HTTPS e processamento da fila no próprio processo. Não é necessário criar Background Worker, cron pago ou workflow do GitHub Actions. SMTP nas portas 465/587 não funciona no Web Service Free do Render.
+
+No Render, abra o serviço da API → **Environment** e configure:
+
+| Variável | Valor |
+| --- | --- |
+| `MAIL_TRANSPORT` | `brevo` |
+| `BREVO_API_KEY` | Chave da API da sua conta Brevo Free (secret) |
+| `MAIL_FROM_EMAIL` | Remetente cadastrado e verificado no Brevo |
+| `NOTIFICATION_DELIVERY_IN_API` | `true` |
+| `NOTIFICATION_DELIVERY_INTERVAL_SECONDS` | `30` |
+| `MAIL_TIMEOUT_SECONDS` | `10` (opcional; 1–30 segundos) |
+
+Crie uma conta **Free** no Brevo, conclua a ativação transacional e verifique o remetente antes de gerar a chave da API. A documentação consultada em 09/11/2026 informa 300 e-mails/dia no plano gratuito, sem cartão. Não habilite upgrades ou créditos pagos para este cenário. O código não contrata serviços nem compra créditos. Se a cota for excedida ou a conta não estiver aprovada, o envio pode ser recusado; não há fallback pago.
+
+Não é obrigatório comprar domínio para configurar o código. Contudo, um endereço de provedor público não pode ser autenticado por você: o Brevo informa que pode substituir temporariamente o remetente por um domínio seu. Essa política e a aprovação dependem do provedor; não se promete identidade própria ou entregabilidade permanente sem domínio autenticado. Nunca use um domínio de terceiros como se fosse seu.
+
+Faça deploy da versão integrada em **main** (ou da branch configurada no serviço). O comando de início existente aplica `alembic upgrade head`; nenhuma migration nova foi criada nesta adaptação. Não substitua o start command do servidor HTTP pelo worker.
+
+Enquanto a API estiver acordada, ela verifica a fila a cada intervalo e processa **uma mensagem por ciclo**, fora do event loop HTTP, usando uma sessão própria. Ao suspender por inatividade, o Render interrompe o processamento; as mensagens ficam no PostgreSQL e a fila volta a ser consultada ao acordar. Não há garantia de horário exato ou entrega imediata nesse plano, nem pings de keep-alive artificiais. Na inicialização, configuração de envio ausente mantém a API disponível e não consome a fila. A preferência do cliente continua sendo obrigatória (`EMAIL`).
+
+Falha ou resposta ambígua da API de e-mail permanece `FAILED`, sem reenvio automático, inclusive recusas por cota. Confira o provedor antes de qualquer conciliação manual. `SENT` significa aceitação pelo provedor, não confirmação de entrega ao destinatário. O desligamento coordenado aguarda a tentativa em curso; encerramentos forçados continuam sujeitos à política de resultado incerto. A hospedagem gratuita pode suspender por seus próprios limites; confirme o plano e o uso no painel do provedor.
+
+Validação operacional: com uma conta aprovada e remetente verificado, configure um cliente de teste com preferência `EMAIL`, crie uma **nova** destinação e confira `PENDING → SENT` e a caixa de entrada. Sem chave/remetente não é possível validar entrega real; testes automatizados usam HTTP simulado e não enviam mensagens. Não reenvie mensagens históricas `FAILED` para fazer esse teste.
+
+Referências: [Render Free](https://render.com/docs/free), [Brevo Free](https://www.brevo.com/products/transactional-email/), [API de envio](https://developers.brevo.com/reference/send-transac-email) e [política de remetentes](https://help.brevo.com/hc/en-us/articles/14925263522578-Comply-with-Gmail-Yahoo-and-Microsoft-s-requirements-for-email-senders).
+
+### Worker separado e SMTP (opcionais)
+
+O worker CLI continua disponível para execução local ou em infraestrutura que você já possua. `MAIL_TRANSPORT=brevo` também funciona nele. Não o execute junto do modo interno na mesma instalação sem necessidade; os locks evitam duplicidade, mas não aumentam a cota do provedor.
 
 No ambiente do backend, configure as variáveis de `backend/.env.example` por secrets do provedor: `SMTP_HOST`, `SMTP_FROM_EMAIL`, `SMTP_PORT` (587 por padrão), `SMTP_SECURITY` (`starttls` ou `ssl`), `SMTP_TIMEOUT_SECONDS` (1–60, padrão 10), e, se necessário, `SMTP_USERNAME` e `SMTP_PASSWORD` juntos. Para SMTP com TLS desde a conexão, selecione `ssl` e a porta indicada pelo provedor, normalmente 465. Não há modo SMTP sem TLS nem desativação da verificação de certificados.
 

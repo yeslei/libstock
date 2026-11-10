@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from pydantic import ValidationError
 
 from app.core.config import get_settings
-from app.core.mail import MailConfigurationError, SmtpMailSender
+from app.core.mail import MailConfigurationError, create_mail_sender
 from app.services.notification_dispatcher import NotificationDispatcher
 
 
@@ -29,7 +29,7 @@ def main(argv=None) -> int:
         parser.error("limit deve ser 1–1000 e interval deve ser 1–60 segundos")
     try:
         # Validate transport before querying or consuming the queue.
-        sender = SmtpMailSender(get_settings())
+        sender = create_mail_sender(get_settings())
         from app.core.database import SessionLocal
         run(NotificationDispatcher(SessionLocal, sender), limit=args.limit, watch=args.watch, interval=args.interval)
     except MailConfigurationError as exc:

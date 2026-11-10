@@ -1,5 +1,15 @@
 # Regras de negócio do LibStock
 
+## Execução gratuita das notificações — Issue #190, 09/11/2026
+
+**Regra aprovada pelo responsável:** manter a infraestrutura desta entrega em planos gratuitos, sem criar worker pago, aumentar orçamento ou contratar serviços. O transporte adicional é a API HTTPS do Brevo; SMTP continua opcional para outros ambientes. Nenhuma regra de reserva, elegibilidade, canal, unicidade ou autorização é alterada.
+
+**Decisão técnica:** o processamento pode ser habilitado no lifespan da API existente (`NOTIFICATION_DELIVERY_IN_API=true`), sem rota pública de disparo. Executa uma mensagem por ciclo em thread própria, fora do event loop HTTP, a cada intervalo configurado; preserva os mesmos locks, validações, claim persistido antes do efeito externo e política de uma tentativa. O encerramento normal aguarda a tentativa em andamento. Configuração ausente não inicia o consumidor nem impede o acesso à API.
+
+**Limitação técnica:** Render Free suspende a aplicação por inatividade e limita recursos. Durante a suspensão a fila não é processada; permanece no PostgreSQL e é consultada ao acordar. Não há prazo de entrega garantido nem keep-alive artificial. O plano gratuito do provedor de e-mail tem cota e requer aprovação da conta/remetente; erro de cota ou envio ambíguo mantém `FAILED`, sem retry automático ou fallback pago. `SENT` confirma aceitação pelo provedor, não entrega final. O código não garante gratuidade se o operador contratar outro plano ou exceder limites externos.
+
+**Configuração operacional pendente:** conta Brevo Free, chave de API e remetente verificado devem ser configurados pelo responsável no Render. Um remetente de domínio público pode ser substituído pelo domínio do provedor conforme política externa; não se presume propriedade de domínio nem entrega real a partir dos testes simulados. Sem nova migration ou envio retroativo de mensagens.
+
 ## Preferência de notificações — Issue #46, 09/11/2026
 
 **Regra aprovada por decisão delegada pelo responsável:** o cliente autenticado escolhe um único canal, `IN_APP` (no aplicativo, padrão existente) ou `EMAIL` (e-mail cadastrado em `users.email`). A escolha é feita em `/perfil`; voltar para `IN_APP` desativa o envio de novos e-mails. Não há endereço alternativo nem mudança do e-mail por esta operação. A preferência usa a estrutura persistente existente, sem migration adicional.

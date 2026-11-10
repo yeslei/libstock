@@ -2,14 +2,14 @@ from datetime import datetime, timezone
 from email.errors import MessageError
 import smtplib
 
-from app.core.mail import OutgoingMail
+from app.core.mail import MailDeliveryError, OutgoingMail
 from app.models.domain import NotificationChannel, NotificationStatus, ReservationStatus
 from app.repositories.notification_preference_repository import NotificationPreferenceRepository
 from app.repositories.notification_repository import NotificationRepository
 
 
 class NotificationDispatcher:
-    """At-most-once SMTP attempt; uncertainty is retained as FAILED for reconciliation."""
+    """At-most-once delivery attempt; uncertainty stays FAILED for reconciliation."""
     def __init__(self, session_factory, sender):
         self.session_factory = session_factory
         self.sender = sender
@@ -58,7 +58,7 @@ class NotificationDispatcher:
                 continue
             try:
                 self.sender.send(mail)
-            except (OSError, smtplib.SMTPException, ValueError, MessageError):
+            except (OSError, smtplib.SMTPException, ValueError, MessageError, MailDeliveryError):
                 result["unconfirmed"] += 1
                 continue
             with self.session_factory() as db:

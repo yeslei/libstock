@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.domain import NotificationChannel as Channel, NotificationStatus as Status, ReservationStatus
+from app.core.mail import MailDeliveryError
 from app.services.notification_dispatcher import NotificationDispatcher
 
 
@@ -46,9 +47,11 @@ def test_claim_is_committed_before_send_and_success_is_recorded(dispatch):
     assert item.status == Status.SENT and db.commit.call_count == 2
 
 
-def test_ambiguous_smtp_failure_is_not_retried(dispatch):
+@pytest.mark.parametrize("failure", [smtplib.SMTPServerDisconnected("connection lost after DATA"),
+                                     MailDeliveryError("O provedor não confirmou o envio.")])
+def test_ambiguous_delivery_failure_is_not_retried(dispatch, failure):
     target, _, sender, _, _, _, _, _, item = dispatch
-    sender.send.side_effect = smtplib.SMTPServerDisconnected("connection lost after DATA")
+    sender.send.side_effect = failure
     assert target.dispatch_batch()["unconfirmed"] == 1
     assert item.status == Status.FAILED
     assert target.dispatch_batch()["examined"] == 0
