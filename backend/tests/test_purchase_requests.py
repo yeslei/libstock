@@ -21,7 +21,8 @@ def purchase(setup_service, monkeypatch):
     monkeypatch.setattr('app.services.purchase_request_service.business_today', lambda: date(2026, 10, 3))
     repo.has_waiting_queue = Mock(return_value=False)
     repo.has_queueable_commercial_copy = Mock(return_value=True)
-    return PurchaseRequestService(db, repo), db, repo
+    repo.create.return_value.reservation_id = 12
+    return PurchaseRequestService(db, repo, notifications=Mock()), db, repo
 
 
 def test_purchase_success_persists_authenticated_client(purchase):
@@ -31,6 +32,17 @@ def test_purchase_success_persists_authenticated_client(purchase):
     assert repo.create.call_args.args == (7, 10, date(2026, 10, 3), 10)
     db.commit.assert_called_once()
     assert response.status == 'PENDING'
+    service.notifications.enqueue_availability.assert_called_once_with(12)
+
+
+def test_notification_failure_aborts_purchase(purchase):
+    service, db, _ = purchase
+    service.notifications.enqueue_availability.side_effect = SQLAlchemyError('failed outbox')
+    with pytest.raises(ApplicationError) as error:
+        service.create(PurchaseRequestCreate(book_id=10, pickup_date=date(2026, 10, 3)), client_id=7)
+    assert error.value.code == 'purchase_request_persistence_error'
+    db.rollback.assert_called_once()
+    db.commit.assert_not_called()
 
 
 @pytest.mark.parametrize('case,status,code', [

@@ -6,6 +6,7 @@ from app.core.exceptions import ApplicationError, BookNotFoundError
 from app.models.domain import CopyStatus, DestinationType, LoanStatus, ReservationStatus, SaleStatus
 from app.repositories.circulation_repository import CirculationRepository
 from app.services.client_eligibility import is_client_locked_eligible, require_eligible_client
+from app.services.notification_service import NotificationService
 
 
 def transactional(operation):
@@ -25,9 +26,10 @@ def transactional(operation):
 
 
 class CirculationService:
-    def __init__(self, db, repository: CirculationRepository):
+    def __init__(self, db, repository: CirculationRepository, notifications=None):
         self.db = db
         self.repository = repository
+        self.notifications = notifications if notifications is not None else NotificationService(db)
 
     def validate_client(self, client_id):
         require_eligible_client(self.repository, client_id, business_today())
@@ -94,6 +96,7 @@ class CirculationService:
         reservation.notified_at = now
         reservation.expires_at = reservation_pickup_deadline(now)
         self.repository.flush()
+        self.notifications.enqueue_availability(reservation.id)
         return {'id': reservation.id}
 
     @transactional
