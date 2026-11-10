@@ -5,7 +5,36 @@
 - `GET /api/v1/me/notification-preferences`: retorna `{channel: "IN_APP" | "EMAIL", email: string}` do cliente autenticado; `email` é o endereço cadastrado, somente leitura.
 - `PATCH /api/v1/me/notification-preferences`: recebe somente `{channel: "IN_APP" | "EMAIL"}` e retorna o estado persistido no mesmo formato. `IN_APP` é o padrão existente e desativa novos envios por e-mail; `EMAIL` seleciona o endereço cadastrado. Alteração auditada, transacional e serializada com lock; atualizar para o mesmo canal não gera nova auditoria específica.
 - Ambas exigem Bearer e papel `USER`. 401 sem sessão; 403 `permission_denied`, `user_inactive`, `client_required` (sem cadastro de cliente) ou `client_inactive` (perfil/usuário inativo); 422 `validation_error` para canal inválido, nulo, ausente ou campos adicionais. Falha de consulta: 500 `notification_preference_read_error`; falha de gravação: 500 `notification_preference_persistence_error`, com rollback. Não há criação de entidade ou conflito de unicidade neste contrato.
-- O cliente acessa o formulário em `/perfil`, pelo menu da conta. A preferência não envia mensagem por si só: o envio ativo e a caixa de notificações pertencem à Issue #42. Sem nova migration para esta entrega.
+- O cliente acessa o formulário em `/perfil`, pelo menu da conta. A preferência não envia mensagem por si só. Sem nova migration para a Issue #46; a Issue #42 adiciona vínculo da notificação à reserva.
+
+## Disponibilidade e caixa de notificações (Issue #42)
+
+Aplicar a migration `20261109_0018` antes de iniciar esta versão. Tanto a solicitação de compra já disponível quanto a destinação da fila criam uma notificação `RESERVATION_AVAILABLE` na mesma transação, com unicidade por tipo/reserva. Não há backfill ou envio histórico.
+
+- `GET /api/v1/me/notifications?limit=20&before_id=123`: Bearer `USER`, cadastro de cliente e usuário/perfil ativos. Página `{items, next_before_id}`, ordem decrescente de id, `limit` de 1 a 100 e cursor opcional positivo. Itens: `id`, `reservation_id`, `type`, `channel`, `subject`, `message`, `status`, `created_at`, `sent_at`, `read_at`. Sem identidades ou e-mails de terceiros.
+- `PATCH /api/v1/me/notifications/{id}/read`: mesmo acesso, sem corpo; marca mensagem própria `SENT` como `READ`, preservando a primeira leitura em repetições. 404 `notification_not_found` para inexistente ou alheia; 409 `notification_not_delivered` para `PENDING`/`FAILED`; 422 `validation_error` para parâmetros inválidos; 500 `notification_persistence_error` com rollback. Consulta: 500 `notification_read_error`; falhas do cadastro seguem os códigos da preferência. 401/403 para sessão, papel ou cadastro inválidos.
+- `IN_APP` é entregue na persistência (`SENT`); `EMAIL` é enfileirado (`PENDING`). A caixa apresenta também e-mails pendentes ou com envio não confirmado, sem fabricar entrega ao marcar leitura.
+
+### Worker de envio por SMTP
+
+No ambiente do backend, configure as variáveis de `backend/.env.example` por secrets do provedor: `SMTP_HOST`, `SMTP_FROM_EMAIL`, `SMTP_PORT` (587 por padrão), `SMTP_SECURITY` (`starttls` ou `ssl`), `SMTP_TIMEOUT_SECONDS` (1–60, padrão 10), e, se necessário, `SMTP_USERNAME` e `SMTP_PASSWORD` juntos. Para SMTP com TLS desde a conexão, selecione `ssl` e a porta indicada pelo provedor, normalmente 465. Não há modo SMTP sem TLS nem desativação da verificação de certificados.
+
+Executar um lote (útil para scheduler externo):
+
+```bash
+cd backend
+python -m app.workers.notifications --limit 50
+```
+
+Para entrega contínua, configure um processo separado do servidor HTTP (por exemplo, Background Worker no provedor) com o mesmo banco e secrets:
+
+```bash
+python -m app.workers.notifications --watch --interval 30 --limit 50
+```
+
+O intervalo permitido é 1–60 segundos; Ctrl+C encerra o processo. Sem host/remetente configurados ou credenciais incompletas, o worker termina com código 2 sem consumir mensagens. Falha de persistência termina com código 1 e mensagem genérica; o supervisor deve sinalizar a falha. O worker imprime apenas contagens, sem destinatários, conteúdo ou credenciais. A publicação deste código não configura automaticamente o provedor SMTP nem inicia o worker.
+
+Antes do envio, o worker revalida conta/perfil/papel `USER`, preferência `EMAIL`, obra ativa e reserva `NOTIFIED` dentro do prazo, com locks compatíveis com a circulação. Supressão de uma mensagem obsoleta deixa `FAILED`. Claim é confirmado como `FAILED` antes de chamar SMTP; aceitação pelo servidor e confirmação no banco levam a `SENT`. Esta entrega faz **uma tentativa por mensagem, sem retry automático de FAILED**. Se houver queda após SMTP aceitar, o resultado pode permanecer `FAILED`; concilie com o provedor antes de qualquer ação manual. `SENT` não comprova entrega final ou leitura do e-mail. O worker não envia lembretes de devolução nem altera a expiração da reserva.
 
 API REST construída com FastAPI seguindo MVC com camadas de serviço e repositório.
 

@@ -129,3 +129,67 @@ def test_own_inbox_read_is_persisted_and_other_identity_gets_404(records):
         with pytest.raises(ApplicationError) as error:
             service.mark_read(other.id, page.items[0].id)
         assert error.value.code == "notification_not_found"
+
+
+def scope_dispatch_candidates(monkeypatch, client_id, barrier=None):
+    """Preserve real locks, but never send pending mail from another test fixture."""
+    from app.models.domain import PurchaseReservation
+    def candidates(self, limit):
+        rows = self.db.execute(select(Notification.id, PurchaseReservation.book_id, Notification.reservation_id)
+            .join(PurchaseReservation, PurchaseReservation.id == Notification.reservation_id)
+            .where(Notification.user_id == client_id, Notification.status == NotificationStatus.PENDING,
+                   Notification.channel == NotificationChannel.EMAIL)
+            .order_by(Notification.id).limit(limit)).all()
+        if barrier is not None:
+            barrier.wait(timeout=10)
+        return rows
+    monkeypatch.setattr(NotificationRepository, "pending_candidates", candidates)
+
+
+def test_two_dispatchers_send_a_pending_email_once(records, monkeypatch):
+    from threading import Barrier, Lock
+    from app.services.notification_dispatcher import NotificationDispatcher
+    engine, book_id, client_id = records
+    with Session(engine) as db:
+        db.get(Profile, client_id).notification_preference = NotificationChannel.EMAIL
+        db.commit()
+        create_purchase(db, client_id, book_id)
+    sent = []
+    mutex = Lock()
+    scope_dispatch_candidates(monkeypatch, client_id, Barrier(2))
+    class Sender:
+        def send(self, mail):
+            with mutex:
+                sent.append(mail.notification_id)
+    def dispatch(_):
+        return NotificationDispatcher(lambda: Session(engine), Sender()).dispatch_batch()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(dispatch, range(2)))
+    assert len(sent) == 1
+    with Session(engine) as db:
+        assert db.get(Notification, sent[0]).status == NotificationStatus.SENT
+
+
+@pytest.mark.parametrize("reason", ["opt_out", "cancelled"])
+def test_changed_preference_or_cancelled_reservation_suppresses_pending_email(records, reason, monkeypatch):
+    from unittest.mock import Mock
+    from app.services.notification_dispatcher import NotificationDispatcher
+    from app.models.domain import PurchaseReservation, ReservationStatus
+    engine, book_id, client_id = records
+    with Session(engine) as db:
+        db.get(Profile, client_id).notification_preference = NotificationChannel.EMAIL
+        db.commit()
+        create_purchase(db, client_id, book_id)
+        item = db.scalar(select(Notification).where(Notification.user_id == client_id))
+        notification_id = item.id
+        if reason == "opt_out":
+            db.get(Profile, client_id).notification_preference = NotificationChannel.IN_APP
+        else:
+            db.get(PurchaseReservation, item.reservation_id).status = ReservationStatus.CANCELLED
+        db.commit()
+    sender = Mock()
+    scope_dispatch_candidates(monkeypatch, client_id)
+    NotificationDispatcher(lambda: Session(engine), sender).dispatch_batch()
+    sender.send.assert_not_called()
+    with Session(engine) as db:
+        assert db.get(Notification, notification_id).status == NotificationStatus.FAILED

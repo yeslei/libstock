@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models.domain import Book, Notification, Profile, PurchaseReservation
+from app.models.domain import Book, Notification, NotificationChannel, NotificationStatus, Profile, PurchaseReservation
 from app.models.user import User
 
 
@@ -36,3 +36,31 @@ class NotificationRepository:
         return self.db.scalar(select(Notification).where(
             Notification.id == notification_id, Notification.user_id == user_id,
         ).with_for_update().execution_options(populate_existing=True))
+
+    def pending_candidates(self, limit: int):
+        return self.db.execute(select(Notification.id, PurchaseReservation.book_id, Notification.reservation_id)
+            .join(PurchaseReservation, PurchaseReservation.id == Notification.reservation_id)
+            .where(Notification.status == NotificationStatus.PENDING,
+                   Notification.channel == NotificationChannel.EMAIL,
+                   Notification.type == "RESERVATION_AVAILABLE")
+            .order_by(Notification.id).limit(limit)).all()
+
+    def lock_book_for_dispatch(self, book_id: int):
+        return self.db.scalar(select(Book).where(Book.id == book_id)
+            .with_for_update(skip_locked=True).execution_options(populate_existing=True))
+
+    def lock_reservation_for_dispatch(self, reservation_id: int):
+        return self.db.scalar(select(PurchaseReservation).where(PurchaseReservation.id == reservation_id)
+            .with_for_update().execution_options(populate_existing=True))
+
+    def lock_for_dispatch(self, notification_id: int):
+        return self.db.scalar(select(Notification).where(Notification.id == notification_id,
+            Notification.status == NotificationStatus.PENDING, Notification.channel == NotificationChannel.EMAIL,
+        ).with_for_update(skip_locked=True).execution_options(populate_existing=True))
+
+    def confirm_sent(self, notification_id: int, now) -> None:
+        item = self.db.scalar(select(Notification).where(Notification.id == notification_id)
+            .with_for_update().execution_options(populate_existing=True))
+        if item is not None and item.status == NotificationStatus.FAILED:
+            item.status = NotificationStatus.SENT
+            item.sent_at = now
