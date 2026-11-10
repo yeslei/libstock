@@ -1,5 +1,12 @@
 # Backend do LibStock
 
+## Preferência de notificações do cliente (Issue #46)
+
+- `GET /api/v1/me/notification-preferences`: retorna `{channel: "IN_APP" | "EMAIL", email: string}` do cliente autenticado; `email` é o endereço cadastrado, somente leitura.
+- `PATCH /api/v1/me/notification-preferences`: recebe somente `{channel: "IN_APP" | "EMAIL"}` e retorna o estado persistido no mesmo formato. `IN_APP` é o padrão existente e desativa novos envios por e-mail; `EMAIL` seleciona o endereço cadastrado. Alteração auditada, transacional e serializada com lock; atualizar para o mesmo canal não gera nova auditoria específica.
+- Ambas exigem Bearer e papel `USER`. 401 sem sessão; 403 `permission_denied`, `user_inactive`, `client_required` (sem cadastro de cliente) ou `client_inactive` (perfil/usuário inativo); 422 `validation_error` para canal inválido, nulo, ausente ou campos adicionais. Falha de consulta: 500 `notification_preference_read_error`; falha de gravação: 500 `notification_preference_persistence_error`, com rollback. Não há criação de entidade ou conflito de unicidade neste contrato.
+- O cliente acessa o formulário em `/perfil`, pelo menu da conta. A preferência não envia mensagem por si só: o envio ativo e a caixa de notificações pertencem à Issue #42. Sem nova migration para esta entrega.
+
 API REST construída com FastAPI seguindo MVC com camadas de serviço e repositório.
 
 ## Requisitos

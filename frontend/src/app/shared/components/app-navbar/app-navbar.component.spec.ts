@@ -25,6 +25,14 @@ describe('AppNavbarComponent', () => {
 
   function text(): string { fixture.detectChanges(); return fixture.nativeElement.textContent; }
 
+  it('oferece o perfil de notificações somente ao cliente', () => {
+    for (const role of ['USER', 'SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'] as const) {
+      user$.next({ id: 1, name: 'Conta', email: 'client@example.com', role_codes: [role], created_at: '' });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('a[href="/perfil"]') !== null).withContext(role).toBe(role === 'USER');
+    }
+  });
+
   it('não mostra mais o cadastro de exemplar do layout antigo: o estoquista acessa o balcão', () => {
     user$.next({ id: 1, name: 'Estoque', email: 'e@x.dev', role_codes: ['STOCK_KEEPER'], created_at: '' });
     expect(text()).not.toContain('Cadastrar exemplar');
