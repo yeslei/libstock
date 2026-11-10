@@ -1,5 +1,13 @@
 # Regras de negócio do LibStock
 
+## Preferência de notificações — Issue #46, 09/11/2026
+
+**Regra aprovada por decisão delegada pelo responsável:** o cliente autenticado escolhe um único canal, `IN_APP` (no aplicativo, padrão existente) ou `EMAIL` (e-mail cadastrado em `users.email`). A escolha é feita em `/perfil`; voltar para `IN_APP` desativa o envio de novos e-mails. Não há endereço alternativo nem mudança do e-mail por esta operação. A preferência usa a estrutura persistente existente, sem migration adicional.
+
+Somente usuário com papel `USER`, cadastro de cliente e usuário/perfil ativos pode consultar ou alterar a própria preferência. A identidade vem da sessão, não do corpo da requisição. Penalidade ou atraso de empréstimo não impede configurar comunicações. A alteração trava e reconsulta os registros, grava preferência, timestamp e auditoria do próprio cliente na mesma transação; falha de persistência desfaz tudo. Não há troca de canal de outros clientes por esta API.
+
+**Funcionalidade planejada na Issue #42:** disponibilização da caixa de notificações e envio ativo de disponibilidade. Salvar a preferência não confirma entrega de mensagem nem altera estados de reservas. A interface anuncia sucesso apenas após persistência; em falha de rede ou 5xx exige nova consulta antes de outra alteração.
+
 ## 1. Objetivo do sistema
 
 O LibStock gerencia obras bibliográficas, exemplares físicos e operações de

@@ -15,6 +15,13 @@ const SERVICE_DESK_ONLY: Pick<Route, 'canActivate' | 'data'> = {
 };
 
 export const routes: Routes = [
+  {
+    path: 'perfil',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['USER'] },
+    title: 'Meu perfil · LibStock',
+    loadComponent: () => import('./features/client-profile/client-profile.component').then((m) => m.ClientProfileComponent),
+  },
   { path: 'gestao/acervo/obras/:id/editar', redirectTo: 'balcao/acervo/:id/editar' },
   { path: 'gestao/acervo/obras/:id', redirectTo: 'balcao/acervo/:id' },
   { path: 'gestao/acervo', redirectTo: 'balcao/acervo' },
