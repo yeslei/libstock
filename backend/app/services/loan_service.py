@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.domain import CopyStatus, LoanStatus
 from app.repositories.loan_repository import LoanRepository
-from app.schemas.loan_schema import LoanCreate, LoanResponse
+from app.schemas.loan_schema import LoanCreate, LoanResponse, ReturnReminderResponse
 from app.services.client_pendency_service import ClientPendencyService
 
 
@@ -79,14 +79,12 @@ class LoanService:
                     "o exemplar já possui um empréstimo em aberto."
                 ),
             ) from exc
-
         except SQLAlchemyError as exc:
             self.db.rollback()
             raise HTTPException(
                 status_code=500,
                 detail="Não foi possível registrar o empréstimo.",
             ) from exc
-
     def register_return(
         self,
         loan_id: int,
@@ -144,3 +142,54 @@ class LoanService:
                 status_code=500,
                 detail="Não foi possível registrar a devolução.",
             ) from exc
+
+    def send_return_reminder(self, loan_id: int) -> ReturnReminderResponse:
+        try:
+            loan = self.repository.find_open_loan_for_reminder(loan_id)
+
+            if loan is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Empréstimo aberto não encontrado.",
+                )
+
+            subject = "Lembrete de devolução"
+            message = (
+                f"Seu empréstimo #{loan.id} deve ser devolvido até "
+                f"{loan.due_date.isoformat()}."
+            )
+            notification = self.repository.create_return_reminder(
+                client_id=loan.client_id,
+                subject=subject,
+                message=message,
+            )
+
+            self.db.commit()
+            self.db.refresh(notification)
+
+            return ReturnReminderResponse(
+                id=notification.id,
+                loan_id=loan.id,
+                client_id=loan.client_id,
+                channel=notification.channel,
+                status=notification.status,
+                subject=notification.subject or subject,
+                message=notification.message,
+                created_at=notification.created_at,
+            )
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Não foi possível registrar o lembrete de devolução.",
+            ) from exc
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível enviar o lembrete de devolução.",
+            ) from exc
+

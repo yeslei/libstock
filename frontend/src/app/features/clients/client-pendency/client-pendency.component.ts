@@ -26,6 +26,7 @@ export class ClientPendencyComponent implements OnInit {
   protected readonly data = signal<ClientPendency | null>(null);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
+  protected readonly sendingReminder = signal<number | null>(null);
   protected readonly modalOpen = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
@@ -72,6 +73,25 @@ export class ClientPendencyComponent implements OnInit {
         error: (error: ApiError) => {
           this.saving.set(false);
           this.error.set(error.detail || 'Não foi possível alterar a penalidade.');
+        },
+      });
+  }
+
+  protected sendReminder(loanId: number): void {
+    if (this.sendingReminder()) return;
+    this.sendingReminder.set(loanId);
+    this.error.set(null);
+    this.success.set(null);
+    this.api.sendReturnReminder(loanId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.sendingReminder.set(null);
+          this.success.set('Lembrete de devolução enviado com sucesso.');
+        },
+        error: (error: ApiError) => {
+          this.sendingReminder.set(null);
+          this.error.set(error.detail || 'Não foi possível enviar o lembrete de devolução.');
         },
       });
   }

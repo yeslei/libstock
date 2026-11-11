@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { ClientPenaltyUpdate, ClientPendency } from '../models/client-pendency.model';
+import { ClientPenaltyUpdate, ClientPendency, ReturnReminder } from '../models/client-pendency.model';
 
 @Injectable({ providedIn: 'root' })
 export class ClientPendencyService {
@@ -15,5 +15,9 @@ export class ClientPendencyService {
 
   updatePenalty(clientId: number, payload: ClientPenaltyUpdate): Observable<ClientPendency> {
     return this.http.patch<ClientPendency>(`${this.endpoint}/${clientId}/penalty`, payload);
+  }
+
+  sendReturnReminder(loanId: number): Observable<ReturnReminder> {
+    return this.http.post<ReturnReminder>(`/api/v1/loans/${loanId}/return-reminder`, {});
   }
 }

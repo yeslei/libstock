@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.domain import LoanStatus
+from app.models.domain import LoanStatus, NotificationChannel, NotificationStatus
 
 
 class LoanCreate(BaseModel):
@@ -21,3 +21,14 @@ class LoanResponse(BaseModel):
     status: LoanStatus
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReturnReminderResponse(BaseModel):
+    id: int
+    loan_id: int
+    client_id: int
+    channel: NotificationChannel
+    status: NotificationStatus
+    subject: str
+    message: str
+    created_at: datetime

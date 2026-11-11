@@ -61,6 +61,7 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `PATCH` | `/api/v1/users/{id}/inactivate` | Bearer (`ADMINISTRATOR`) | Inativa o usuário e revoga suas sessões |
 | `POST` | `/api/v1/employees/` | Bearer (`ADMINISTRATOR`) | Cadastra vendedor, estoquista ou administrador |
 | `POST` | `/api/v1/books/` | Bearer (`STOCK_KEEPER`, `ADMINISTRATOR`) | Cadastra uma obra e seu exemplar inicial ativo na mesma transação |
+| `POST` | `/api/v1/loans/{loan_id}/return-reminder` | Bearer (`SELLER`, `ADMINISTRATOR`) | Registra e envia um lembrete interno de devolução para um empréstimo aberto |
 
 ## Permissionamento
 

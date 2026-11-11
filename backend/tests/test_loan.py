@@ -370,6 +370,72 @@ def test_service_trata_falha_de_banco_com_rollback():
     assert db.rollbacks == 1
     assert db.commits == 0
 
+
+def test_service_envia_lembrete_para_emprestimo_aberto():
+    repository = MagicMock()
+    db = FakeSession()
+    client_service = MagicMock()
+    loan = _open_loan()
+    notification = SimpleNamespace(
+        id=501,
+        channel="IN_APP",
+        status="SENT",
+        subject="Lembrete de devolução",
+        message="Devolva o livro até a data prevista.",
+        created_at=datetime(2026, 10, 1, 18, 0, tzinfo=timezone.utc),
+    )
+    repository.find_open_loan_for_reminder.return_value = loan
+    repository.create_return_reminder.return_value = notification
+
+    service = LoanService(repository, db, client_service)
+
+    result = service.send_return_reminder(loan_id=100)
+
+    repository.find_open_loan_for_reminder.assert_called_once_with(100)
+    repository.create_return_reminder.assert_called_once()
+    assert result.id == 501
+    assert result.loan_id == 100
+    assert result.client_id == 42
+    assert result.status == "SENT"
+    assert db.commits == 1
+    assert db.rollbacks == 0
+
+
+def test_service_rejeita_lembrete_de_emprestimo_inexistente_ou_encerrado():
+    repository = MagicMock()
+    db = FakeSession()
+    repository.find_open_loan_for_reminder.return_value = None
+
+    service = LoanService(repository, db, MagicMock())
+
+    with pytest.raises(HTTPException) as exc:
+        service.send_return_reminder(loan_id=100)
+
+    assert exc.value.status_code == status.HTTP_404_NOT_FOUND
+    repository.create_return_reminder.assert_not_called()
+    assert db.rollbacks == 1
+
+
+def test_service_faz_rollback_se_falhar_ao_persistir_lembrete():
+    from sqlalchemy.exc import SQLAlchemyError
+
+    class DatabaseError(SQLAlchemyError):
+        pass
+
+    repository = MagicMock()
+    repository.find_open_loan_for_reminder.return_value = _open_loan()
+    repository.create_return_reminder.side_effect = DatabaseError("database error")
+    db = FakeSession()
+
+    service = LoanService(repository, db, MagicMock())
+
+    with pytest.raises(HTTPException) as exc:
+        service.send_return_reminder(loan_id=100)
+
+    assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert db.commits == 0
+    assert db.rollbacks == 1
+
 def test_service_registra_devolucao_e_libera_exemplar():
     repository = MagicMock()
     db = FakeSession()

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Path
 from app.dependencies.authentication import require_roles
 from app.dependencies.services import get_loan_service
 from app.models.user import User
-from app.schemas.loan_schema import LoanCreate, LoanResponse
+from app.schemas.loan_schema import LoanCreate, LoanResponse, ReturnReminderResponse
 from app.services.loan_service import LoanService
 
 
@@ -44,3 +44,16 @@ def register_return(
     loan_service: LoanService = Depends(get_loan_service),
 ) -> LoanResponse:
     return loan_service.register_return(loan_id)
+
+
+@router.post(
+    "/{loan_id}/return-reminder",
+    response_model=ReturnReminderResponse,
+    status_code=201,
+)
+def send_return_reminder(
+    loan_id: int = Path(gt=0),
+    _current_user: User = Depends(require_loan_creator),
+    loan_service: LoanService = Depends(get_loan_service),
+) -> ReturnReminderResponse:
+    return loan_service.send_return_reminder(loan_id)

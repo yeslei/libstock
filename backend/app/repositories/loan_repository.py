@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.domain import Copy, CopyStatus, Loan, LoanStatus
+from app.models.domain import Copy, CopyStatus, Loan, LoanStatus, Notification
 from app.schemas.loan_schema import LoanCreate
 
 
@@ -46,6 +46,33 @@ class LoanRepository:
             .where(Loan.id == loan_id)
             .with_for_update()
         )
+
+    def find_open_loan_for_reminder(self, loan_id: int) -> Loan | None:
+        return self.db.scalar(
+            select(Loan)
+            .where(Loan.id == loan_id, Loan.status == LoanStatus.OPEN)
+            .with_for_update()
+        )
+
+    def create_return_reminder(
+        self,
+        *,
+        client_id: int,
+        subject: str,
+        message: str,
+    ) -> Notification:
+        notification = Notification(
+            user_id=client_id,
+            type="RETURN_REMINDER",
+            channel="IN_APP",
+            subject=subject,
+            message=message,
+            status="SENT",
+            sent_at=datetime.now(timezone.utc),
+        )
+        self.db.add(notification)
+        self.db.flush()
+        return notification
 
     def find_copy_for_return(self, copy_id: int) -> Copy | None:
         return self.db.scalar(

@@ -27,9 +27,18 @@
       } @else {
         <div class="table-scroll"><table>
           <caption class="sr-only">Empréstimos pendentes</caption>
-          <thead><tr><th>Livro</th><th>Empréstimo</th><th>Vencimento</th></tr></thead>
+          <thead><tr><th>Livro</th><th>Empréstimo</th><th>Vencimento</th><th>Ação</th></tr></thead>
           <tbody>@for (loan of current.overdue_loans; track loan.loan_id) {
-            <tr><td>{{ loan.book_title }}</td><td>{{ loan.loan_date | date: 'dd/MM/yyyy' }}</td><td>{{ loan.due_date | date: 'dd/MM/yyyy' }}</td></tr>
+            <tr>
+              <td>{{ loan.book_title }}</td>
+              <td>{{ loan.loan_date | date: 'dd/MM/yyyy' }}</td>
+              <td>{{ loan.due_date | date: 'dd/MM/yyyy' }}</td>
+              <td>
+                <button class="button button--small" type="button" (click)="sendReminder(loan.loan_id)" [disabled]="sendingReminder() !== null">
+                  {{ sendingReminder() === loan.loan_id ? 'Enviando…' : 'Enviar lembrete' }}
+                </button>
+              </td>
+            </tr>
           }</tbody>
         </table></div>
       }

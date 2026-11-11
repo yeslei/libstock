@@ -6,6 +6,7 @@
 .eyebrow { color: $verde-medio !important; font-size: $font-size-xs; font-weight: 700; text-transform: uppercase; }
 .button, .modal-actions button { min-height: 44px; padding: 0 $space-4; border: 1px solid $primary; border-radius: $radius-md; background: $bg-surface; color: $primary; font-weight: 600; cursor: pointer; &:disabled { opacity: .55; cursor: not-allowed; } }
 .button--primary { background: $primary; color: #fff; }
+.button--small { min-height: 36px; padding: 0 $space-3; font-size: $font-size-sm; white-space: nowrap; }
 .status { padding: $space-3; background: $bg-subtle; color: $primary !important; font-weight: 600; }
 .status--danger { color: $error !important; }
 .state { display: flex; justify-content: center; gap: $space-2; padding: $space-8; color: $text-muted; }

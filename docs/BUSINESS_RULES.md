@@ -431,6 +431,28 @@ Ao registrar a devolução:
 - erro de banco e rollback;
 - autorização do endpoint.
 
+### Lembrete de devolução
+
+Status da regra: `IMPLEMENTED`.
+
+Endpoint: `POST /api/v1/loans/{loan_id}/return-reminder`.
+
+Atores autorizados:
+
+- `SELLER`;
+- `ADMINISTRATOR`.
+
+O lembrete só pode ser enviado para um empréstimo existente e com status
+`OPEN`. A operação bloqueia o empréstimo durante a consulta e grava uma
+notificação no cliente vinculado, no canal `IN_APP`, com status `SENT`.
+O registro da notificação e a confirmação da operação participam da mesma
+transação; falha de persistência provoca rollback. O envio por e-mail não faz
+parte desta entrega.
+
+Em caso de sucesso, a API retorna HTTP 201 e os dados da notificação criada.
+Empréstimo inexistente ou já encerrado retorna HTTP 404; conflito de
+persistência retorna HTTP 409; falha de banco retorna HTTP 500.
+
 ### Venda
 
 Status da regra: `IMPLEMENTED`.
