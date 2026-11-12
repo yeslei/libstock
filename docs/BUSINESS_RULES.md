@@ -633,6 +633,39 @@ O registro deve conter:
 - novo valor;
 - data/hora.
 
+Status: `IMPLEMENTED`
+Versão-alvo: V3 para a consulta; a gravação já existia desde a V1.
+
+### Imutabilidade
+
+`audit_logs` não possui endpoint de escrita, edição ou exclusão. O banco impede
+`UPDATE` e `DELETE` pelo trigger `trg_prevent_audit_log_modification`, e a
+tentativa retorna erro do PostgreSQL. Senhas e hashes não entram nos payloads:
+`PASSWORD_RESET` grava `old_value` e `new_value` nulos.
+
+### Consulta
+
+- `GET /api/v1/audit-logs`: restrito a `ADMINISTRATOR` autenticado.
+- Filtros opcionais: `entity_type`, `entity_id`, `operation`, `employee_id`,
+  `date_from` e `date_to`. As datas usam America/Sao_Paulo e são inclusivas.
+- Paginação: `limit` de 1 a 100 (padrão 50) e `offset` não negativo; resposta
+  `{items, total, limit, offset}`.
+- Ordem: `occurred_at` decrescente, com `id` decrescente como desempate.
+- Cada item contém `id`, `occurred_at`, `employee_id`, `employee_name`,
+  `entity_type`, `entity_id`, `operation`, `old_value` e `new_value`.
+  `employee_name` é nulo quando a ação foi do sistema (`employee_id` nulo).
+- Erros: 401 sem sessão; 403 para papéis diferentes de `ADMINISTRATOR`; 422
+  `invalid_pagination` e `invalid_date_range`; 500 `audit_log_query_error`.
+- A tela `/gestao/auditoria` consome o endpoint e aparece na sidebar apenas para
+  o administrador.
+
+### Limitações técnicas
+
+- A imutabilidade vale para a aplicação; um superusuário do banco pode
+  desabilitar o trigger.
+- Não há encadeamento por hash (tamper-evident), exportação, retenção definida
+  nem expurgo. Retenção e expurgo seguem como decisão pendente.
+
 ## 13. Regras pendentes
 
 - obrigatoriedade de título e autor;

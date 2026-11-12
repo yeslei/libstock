@@ -1,0 +1,111 @@
+<main class="audit-page">
+  <section class="audit-panel" aria-labelledby="audit-title">
+    <header class="audit-header">
+      <div>
+        <h1 id="audit-title">Auditoria</h1>
+        <p>Histórico imutável das alterações registradas pelo LibStock.</p>
+      </div>
+    </header>
+
+    <div class="audit-toolbar" role="group" aria-label="Filtros da auditoria">
+      <label for="audit-entity">Entidade</label>
+      <select id="audit-entity" (change)="filterEntity($event)" [value]="entityType()">
+        <option value="">Todas</option>
+        @for (option of entityOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+
+      <label for="audit-operation">Operação</label>
+      <select id="audit-operation" (change)="filterOperation($event)" [value]="operation()">
+        <option value="">Todas</option>
+        @for (option of operationOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+
+      <label for="audit-from">De</label>
+      <input id="audit-from" type="date" [value]="dateFrom()" (change)="filterDateFrom($event)" />
+
+      <label for="audit-to">Até</label>
+      <input id="audit-to" type="date" [value]="dateTo()" (change)="filterDateTo($event)" />
+    </div>
+
+    @if (error(); as message) {
+      <app-alert [message]="message" variant="error">
+        <button class="button" type="button" (click)="load()">Tentar novamente</button>
+      </app-alert>
+    }
+
+    @if (loading()) {
+      <div class="audit-state" role="status" aria-live="polite">
+        <app-spinner />
+        <span>Carregando auditoria…</span>
+      </div>
+    } @else if (!error()) {
+      @if (items().length === 0) {
+        <p class="audit-state" role="status">Nenhum registro encontrado para os filtros atuais.</p>
+      } @else {
+        <div class="table-scroll">
+          <table>
+            <caption class="sr-only">Registros de auditoria do LibStock</caption>
+            <thead>
+              <tr>
+                <th scope="col">Data/hora</th>
+                <th scope="col">Funcionário</th>
+                <th scope="col">Entidade</th>
+                <th scope="col">Operação</th>
+                <th scope="col">Detalhes</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track item.id) {
+                <tr>
+                  <td>{{ formatDate(item.occurred_at) }}</td>
+                  <td>{{ item.employee_name ?? 'Sistema' }}</td>
+                  <td>
+                    <strong>{{ entityLabel(item.entity_type) }}</strong>
+                    <span class="audit-id">#{{ item.entity_id }}</span>
+                  </td>
+                  <td>{{ operationLabel(item.operation) }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      [attr.aria-expanded]="expanded() === item.id"
+                      [attr.aria-controls]="'audit-detail-' + item.id"
+                      (click)="toggle(item)"
+                    >
+                      {{ expanded() === item.id ? 'Ocultar' : 'Ver' }}
+                    </button>
+                  </td>
+                </tr>
+                @if (expanded() === item.id) {
+                  <tr class="audit-detail">
+                    <td colspan="5" [id]="'audit-detail-' + item.id">
+                      <div class="audit-values">
+                        <div>
+                          <h2>Antes</h2>
+                          <pre>{{ oldPayload(item) }}</pre>
+                        </div>
+                        <div>
+                          <h2>Depois</h2>
+                          <pre>{{ newPayload(item) }}</pre>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <nav class="audit-pager" aria-label="Paginação da auditoria">
+          <button type="button" (click)="previousPage()" [disabled]="offset() === 0">Anterior</button>
+          <span>Página {{ page() }} de {{ pageCount() }} · {{ total() }} registros</span>
+          <button type="button" (click)="nextPage()" [disabled]="offset() + pageSize >= total()">Próxima</button>
+        </nav>
+      }
+    }
+  </section>
+</main>

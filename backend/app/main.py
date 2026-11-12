@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 
 from app.controllers.admin_catalog_controller import router as admin_catalog_router
+from app.controllers.audit_log_controller import router as audit_log_router
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.book_controller import router as book_router
 from app.controllers.catalog_controller import router as catalog_router
@@ -122,3 +123,4 @@ app.include_router(sale_router)
 app.include_router(receipt_router)
 app.include_router(notification_preference_router)
 app.include_router(notification_router)
+app.include_router(audit_log_router)

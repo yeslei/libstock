@@ -117,3 +117,40 @@ describe('Endereços antigos de cadastro (Issue #169)', () => {
   });
   it('o estoquista acessa /balcao/acervo/nova', async () => expect(await open('/balcao/acervo/nova')).toBe('/balcao/acervo/nova'));
 });
+
+describe('Auditoria (Issue #49)', () => {
+  async function open(role: RoleCode): Promise<string> {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(withStubs(routes)),
+        { provide: AuthService, useValue: { restoreSession: () => Promise.resolve() } },
+      ],
+    });
+    TestBed.inject(TokenStoreService).setSession('t', {
+      id: 1,
+      name: 'F',
+      email: 'f@x.dev',
+      role_codes: [role],
+      created_at: '',
+    });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/gestao/auditoria');
+    return router.url;
+  }
+
+  it('administrador acessa /gestao/auditoria', async () => {
+    expect(await open('ADMINISTRATOR')).toBe('/gestao/auditoria');
+  });
+
+  const denied: readonly (readonly [RoleCode, string])[] = [
+    ['SELLER', '/balcao/painel'],
+    ['STOCK_KEEPER', '/balcao/acervo'],
+    ['USER', '/'],
+  ];
+
+  for (const [role, fallback] of denied) {
+    it(`${role} não acessa /gestao/auditoria`, async () => {
+      expect(await open(role)).toBe(fallback);
+    });
+  }
+});
