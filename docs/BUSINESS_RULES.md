@@ -23,7 +23,7 @@ Não substitui a documentação técnica da API nem as migrations.
 - consulta pública do catálogo;
 - busca por título, autor, ISBN e código de barras;
 - cadastro inicial de obras;
-- gestão de destaques.
+- gestão de destaques;
 - atualização manual do status de exemplares entre AVAILABLE e INACTIVE (#31).
 
 ### Parcialmente implementado
@@ -1086,3 +1086,21 @@ Página inicial, catálogo e detalhes das obras permanecem acessíveis sem login
 **Defeito confirmado:** a consulta administrativa retornava HTTP 500 ao serializar cadastros existentes com e-mail em domínio reservado. A resposta preserva o e-mail persistido como texto; criação e alteração continuam validando `EmailStr`. Compatibilidade de leitura, sem alteração das regras de cadastro ou dos dados existentes.
 
 **Correção de apresentação:** a fila de cada obra fica recolhida inicialmente e pode ser expandida por teclado. Ações aparecem junto ao cliente; cancelamento fica em “Mais ações”. “Separar exemplar” é o novo rótulo de destinação, preservando a regra aprovada de primeiro cliente elegível e cinco dias corridos para retirada.
+
+## Status manual de exemplares — Issue #31
+
+**Regra aprovada:** estoquista e administrador podem solicitar a transição manual
+`AVAILABLE` ↔ `INACTIVE`. A operação preserva `is_active`, o código de barras,
+a destinação e os demais dados do exemplar. Os estados `BORROWED`, `SOLD` e
+`RESERVED` continuam sob controle dos fluxos de circulação e não aceitam essa
+transição.
+
+**Pré-condições:** exige funcionário ativo; rejeita versão desatualizada e
+exemplar com empréstimo aberto ou venda confirmada. Quando há mudança, status,
+timestamp e auditoria são persistidos na mesma transação. Repetir o status atual
+com a versão lida é idempotente; usar uma versão antiga resulta em conflito, sem
+sobrescrever a alteração concorrente.
+
+O controle fica nos detalhes da obra no balcão. A API protegida
+`PATCH /api/v1/copies/{copy_id}/status` recebe `status` e `expected_updated_at`;
+papéis não autorizados também são bloqueados no backend.

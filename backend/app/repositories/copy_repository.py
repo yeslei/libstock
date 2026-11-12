@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from app.models.domain import (
     Book,
     Copy,
+    CopyStatus,
     DestinationType,
     Employee,
     Loan,
+    LoanStatus,
     Profile,
     PurchaseReservation,
     ReservationStatus,
@@ -26,14 +28,6 @@ class CopyRepository:
     def is_employee(self, user_id: int) -> bool:
         # Funcionário ativo (perfil e usuário), como nos demais fluxos de balcão (Issue #151).
         return self.is_active_employee(user_id)
-
-    def is_active_employee(self, user_id: int) -> bool:
-        return self.db.scalar(
-            select(Employee.id)
-            .join(Profile, Profile.id == Employee.id)
-            .join(User, User.id == Profile.id)
-            .where(Employee.id == user_id, Profile.is_active.is_(True), User.is_active.is_(True))
-        ) is not None
 
     def find_for_update(self, copy_id: int) -> Copy | None:
         return self.db.scalar(

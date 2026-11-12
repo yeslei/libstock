@@ -72,6 +72,17 @@ class CopyResponse(CopyCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CopyStatusUpdate(BaseModel):
+    status: CopyStatus
+    expected_updated_at: AwareDatetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CopyStatusResponse(CopyResponse):
+    updated_at: AwareDatetime
+
+
 class CopyDeleteResponse(BaseModel):
     id: int
     book_id: int

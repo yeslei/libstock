@@ -3,27 +3,25 @@
 ## Execução posterior ao planejamento
 
 O usuário aprovou edição manual restrita AVAILABLE ↔ INACTIVE, preservando
-`is_active`. A implementação inclui PATCH autenticado, funcionário ativo,
-pré-condição por `updated_at`, lock, auditoria e ação com confirmação no acervo.
-As demais seções preservam o diagnóstico original e suas propostas; as regras
-vigentes da entrega estão em `BUSINESS_RULES.md`, seção da issue #31.
+`is_active`. A branch foi adaptada para partir exatamente do merge do PR #187:
+a ação foi integrada aos detalhes da obra existentes no balcão daquela base,
+sem trazer as mudanças intermediárias que introduziram outra tela de estoque.
+A implementação inclui PATCH autenticado, funcionário ativo, pré-condição por
+`updated_at`, lock, auditoria e confirmação na interface. As regras vigentes
+estão em `BUSINESS_RULES.md`, seção da Issue #31.
 
 Validação final da implementação:
 
-- Backend: 285 testes passaram em PostgreSQL descartável provisionado por Alembic,
-  incluindo leitura/PATCH/releitura HTTP, rollback real e duas sessões concorrentes.
-- Alembic: check sem diferenças; upgrade head, downgrade -1 e upgrade head passaram.
-- Frontend: build passou; aviso preexistente de orçamento CSS do catálogo (60 bytes).
-- Angular: 71 testes das áreas afetadas passaram. A suíte completa executou 103
-  testes, com 101 sucessos e duas falhas em `UserManagementComponent`: os testes
-  procuram botões Excluir/Inativar que não existem no template atual, não alterado
-  nesta entrega. O launcher Chromium Snap também registrou falha ao encerrar;
-  não considerar a execução completa como verde.
-- Um fixture antigo de `BookService.update` foi corrigido para usar `BookDetail`,
-  com `cover_url` e `copies`, permitindo a compilação da suíte Angular.
-- Ambiente disponível: Python 3.14 e PostgreSQL 18; a documentação declara Python
-  3.12 e PostgreSQL 17. A matriz declarada ainda deve ser validada no CI.
-- Não houve alteração estrutural, publicação ou criação/merge de PR.
+- Backend: 699 testes passaram e 206 foram ignorados.
+- Frontend: build de produção passou; os testes do `CopyService` passaram (9/9).
+- Componente do balcão: 58 de 60 testes passaram; duas asserções existentes de
+  apresentação falharam por diferenças de texto/espaçamento, não relacionadas
+  ao controle de status.
+- Não houve alteração estrutural, portanto nenhuma migration foi criada.
+
+O diagnóstico a seguir foi registrado antes da aprovação, sobre a árvore que
+derivou do commit `340ae8b`. As propostas e classificações daquela análise são
+históricas; não descrevem o estado final da implementação.
 
 ## Rastreabilidade e diagnóstico
 
@@ -36,7 +34,7 @@ Validação final da implementação:
 
 Este documento é um plano. As propostas abaixo não constituem regras de negócio aprovadas nem implementação da funcionalidade.
 
-## Estado atual verificado
+## Diagnóstico inicial da árvore 340ae8b
 
 | Área | Evidência no repositório | Consequência para a entrega |
 |---|---|---|
@@ -52,7 +50,7 @@ Este documento é um plano. As propostas abaixo não constituem regras de negóc
 
 Os estados atuais são AVAILABLE, BORROWED, RESERVED, SOLD e INACTIVE. A existência de um valor no enum não autoriza uma transição manual para ele.
 
-### Classificação dos achados
+### Classificação inicial dos achados
 
 - **Regra aprovada/implementada:** autenticação e autorização no backend, consistência transacional, identificação do funcionário, estados condicionados às operações de circulação e restrições persistentes existentes.
 - **Funcionalidade planejada:** atualização manual do status pelo responsável do acervo. Sua ausência não é classificada como defeito da versão atual.
@@ -60,7 +58,7 @@ Os estados atuais são AVAILABLE, BORROWED, RESERVED, SOLD e INACTIVE. A existê
 - **Limitação técnica verificada:** PostgreSQL local indisponível durante a validação. Não foi possível comprovar os fluxos persistentes contra o banco.
 - **Defeito confirmado da nova funcionalidade:** nenhum, pois ela ainda não está implementada. Há um achado estático diretamente relacionado à auditoria da devolução: o controller recebe o usuário atual, mas não o passa ao service; o trigger configura como ator o funcionário do empréstimo. Testar devolução por outro funcionário e corrigir a atribuição se a entrega abranger esse fluxo.
 
-## Decisões necessárias antes de implementar as transições
+## Decisões levantadas no plano original
 
 1. **Escopo:** confirmar se #31 pretende completar a atualização automática em empréstimos/devoluções ou incluir edição manual no acervo. A EAP indica circulação; o texto da história não define uma matriz manual. O plano abaixo propõe edição manual restrita, condicionada a essa definição. Se o escopo for apenas automático, concentrar a entrega na integração, auditoria, testes reais e feedback do fluxo existente, sem criar um PATCH genérico.
 2. **Matriz manual:** proposta inicial para avaliação: AVAILABLE → INACTIVE e INACTIVE → AVAILABLE. BORROWED e SOLD continuam controlados por suas operações; RESERVED depende de definição própria. Não implementar reservas, confirmação de venda ou cancelamento de empréstimo como efeito colateral.

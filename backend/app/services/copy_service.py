@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
     ApplicationError,
+    ActiveEmployeeRequiredError,
     AuditActorRequiredError,
     BookNotFoundError,
     CopyDeletionBlockedError,
@@ -12,6 +13,8 @@ from app.core.exceptions import (
     CopyNotFoundError,
     CopySalePriceNotAllowedError,
     CopySalePriceRequiredError,
+    CopyStateConflictError,
+    CopyTransitionNotAllowedError,
     CopyUpdateBlockedError,
     CopyUpdatePersistenceError,
     SQLSTATE_COPY_DESTINATION_FORBIDDEN,
@@ -24,7 +27,14 @@ from decimal import Decimal
 from app.models.domain import Book, CopyStatus, DestinationType
 from app.repositories.copy_repository import CopyRepository
 from app.services.copy_rules import require_commercial_price
-from app.schemas.copy_schema import CopyBatchCreate, CopyCreate, CopyDeleteResponse, CopyUpdate
+from app.schemas.copy_schema import (
+    CopyBatchCreate,
+    CopyCreate,
+    CopyDeleteResponse,
+    CopyStatusResponse,
+    CopyStatusUpdate,
+    CopyUpdate,
+)
 
 LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
 FOREIGN_KEY_VIOLATION = "23503"

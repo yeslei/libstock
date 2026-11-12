@@ -5,6 +5,8 @@ from app.schemas.copy_schema import (
     CopyCreate,
     CopyDeleteResponse,
     CopyResponse,
+    CopyStatusUpdate,
+    CopyStatusResponse,
     CopyUpdate,
 )
 from app.services.copy_service import CopyService

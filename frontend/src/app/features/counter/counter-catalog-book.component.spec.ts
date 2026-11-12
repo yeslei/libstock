@@ -25,6 +25,7 @@ const copy = (over: Partial<StaffCatalogCopy> = {}): StaffCatalogCopy => ({
   is_active: true,
   free: true,
   allocated_for_purchase: false,
+  updated_at: '2026-11-11T00:00:00Z',
   ...over,
 });
 
@@ -64,7 +65,11 @@ function setup(book$: Observable<StaffCatalogBookDetail>, roles: RoleCode[] = ['
   const counter = jasmine.createSpyObj<CounterService>('CounterService', ['getCatalogBook']);
   counter.getCatalogBook.and.returnValue(book$);
   const books = jasmine.createSpyObj<BookService>('BookService', ['update']);
-  const copies = jasmine.createSpyObj<CopyService>('CopyService', ['delete', 'update']);
+  const copies = jasmine.createSpyObj<CopyService>('CopyService', [
+    'delete',
+    'update',
+    'updateStatus',
+  ]);
   const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['getAllGenres']);
   catalog.getAllGenres.and.returnValue(of(CATALOG_GENRES));
   TestBed.configureTestingModule({
@@ -225,6 +230,78 @@ describe('Balcão: detalhes da obra', () => {
       'Inativo',
       'Vendido',
     ]);
+  });
+
+  describe('atualização manual de status do exemplar', () => {
+    it('estoquista confirma a indisponibilização e envia a versão exibida', () => {
+      const ctx = setup(of(detail()), ['STOCK_KEEPER']);
+      const updated = {
+        id: 1,
+        bookId: 7,
+        barcode: '00101',
+        destination: 'DIDACTIC' as const,
+        condition: null,
+        salePrice: null,
+        acquiredAt: null,
+        status: 'INACTIVE' as const,
+        isActive: true,
+        updatedAt: '2026-11-11T01:00:00Z',
+      };
+      ctx.copies.updateStatus.and.returnValue(of(updated));
+      selectCopy(ctx);
+      ctx.button('Indisponibilizar')!.click();
+      ctx.fixture.detectChanges();
+      confirmDialog(ctx);
+      expect(ctx.copies.updateStatus).toHaveBeenCalledOnceWith(
+        1,
+        'INACTIVE',
+        '2026-11-11T00:00:00Z',
+      );
+      expect(snackbarMessage()).toContain('Status do exemplar 00101 atualizado.');
+    });
+
+    it('permite disponibilizar exemplar inativo e não oferece alteração para outros estados ou SELLER', () => {
+      const inactive = setup(
+        of(detail({ copies: [copy({ status: 'INACTIVE' }), ...detail().copies.slice(1)] })),
+        ['ADMINISTRATOR'],
+      );
+      selectCopy(inactive);
+      expect(inactive.button('Disponibilizar')).toBeDefined();
+      inactive.copies.updateStatus.and.returnValue(of({
+        id: 1,
+        bookId: 7,
+        barcode: '00101',
+        destination: 'DIDACTIC',
+        condition: null,
+        salePrice: null,
+        acquiredAt: null,
+        status: 'AVAILABLE',
+        isActive: true,
+        updatedAt: '2026-11-11T01:00:00Z',
+      }));
+      inactive.button('Disponibilizar')!.click();
+      inactive.fixture.detectChanges();
+      confirmDialog(inactive);
+      expect(inactive.copies.updateStatus).toHaveBeenCalledOnceWith(
+        1,
+        'AVAILABLE',
+        '2026-11-11T00:00:00Z',
+      );
+      TestBed.resetTestingModule();
+
+      const borrowed = setup(
+        of(detail({ copies: [copy({ status: 'BORROWED', free: false }), ...detail().copies.slice(1)] })),
+        ['ADMINISTRATOR'],
+      );
+      selectCopy(borrowed);
+      expect(borrowed.button('Disponibilizar')).toBeUndefined();
+      TestBed.resetTestingModule();
+
+      const seller = setup(of(detail()), ['SELLER']);
+      selectCopy(seller);
+      expect(seller.button('Indisponibilizar')).toBeUndefined();
+      expect(seller.copies.updateStatus).not.toHaveBeenCalled();
+    });
   });
 
   describe('papéis autorizados a editar', () => {

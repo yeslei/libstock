@@ -47,8 +47,6 @@ describe('BookService', () => {
       copies: [],
       is_active: true,
       initial_copy: null,
-      cover_url: null,
-      copies: [],
     };
 
     service.update(10, updatePayload).subscribe((book) => expect(book).toEqual(response));

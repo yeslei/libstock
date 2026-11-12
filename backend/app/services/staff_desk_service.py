@@ -175,7 +175,8 @@ class StaffDeskService:
             StaffCatalogCopy(id=item['Copy'].id, barcode=item['Copy'].barcode, destination=item['Copy'].destination,
                              status=item['Copy'].status, condition=item['Copy'].condition,
                              sale_price=item['Copy'].sale_price, is_active=item['Copy'].is_active,
-                             free=bool(item['free']), allocated_for_purchase=bool(item['allocated_for_purchase']))
+                             free=bool(item['free']), allocated_for_purchase=bool(item['allocated_for_purchase']),
+                             updated_at=item['Copy'].updated_at)
             for item in copies])
 
     def copy_lookup(self, actor_id, term, limit, destination=None, available=None):

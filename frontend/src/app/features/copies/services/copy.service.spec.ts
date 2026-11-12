@@ -96,4 +96,33 @@ describe('CopyService', () => {
     expect(request.request.body).toEqual({ destination: 'DIDACTIC', condition: null });
     request.flush({ id: 5, book_id: 8, barcode: 'A-5', destination: 'DIDACTIC', condition: null, sale_price: null, acquired_at: null, status: 'AVAILABLE', is_active: true });
   });
+
+  it('atualiza status manual enviando versão e converte resposta', () => {
+    let result: unknown;
+    service.updateStatus(21, 'INACTIVE', '2026-11-11T00:00:00Z').subscribe((copy) => (result = copy));
+    const request = http.expectOne(`${COPIES_API}/21/status`);
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({
+      status: 'INACTIVE',
+      expected_updated_at: '2026-11-11T00:00:00Z',
+    });
+    request.flush({
+      id: 21,
+      book_id: 8,
+      barcode: 'ABC-021',
+      destination: 'DIDACTIC',
+      condition: null,
+      sale_price: null,
+      acquired_at: null,
+      status: 'INACTIVE',
+      is_active: true,
+      updated_at: '2026-11-11T01:00:00Z',
+    });
+    expect(result).toEqual(jasmine.objectContaining({
+      id: 21,
+      status: 'INACTIVE',
+      isActive: true,
+      updatedAt: '2026-11-11T01:00:00Z',
+    }));
+  });
 });

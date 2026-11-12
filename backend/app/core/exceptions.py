@@ -19,11 +19,6 @@ class ApplicationError(Exception):
         return self.message
 
 
-class CopyNotFoundError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Exemplar não encontrado.", "copy_not_found", 404)
-
-
 class CopyTransitionNotAllowedError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("Este exemplar não permite a alteração manual solicitada.", "copy_transition_not_allowed", 409)
@@ -32,11 +27,6 @@ class CopyTransitionNotAllowedError(ApplicationError):
 class CopyStateConflictError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("O exemplar foi alterado. Recarregue os dados e tente novamente.", "copy_state_conflict", 409)
-
-
-class CopyUpdatePersistenceError(ApplicationError):
-    def __init__(self) -> None:
-        super().__init__("Não foi possível atualizar o exemplar.", "copy_update_persistence_error", 500)
 
 
 class ActiveEmployeeRequiredError(ApplicationError):

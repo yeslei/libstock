@@ -1,4 +1,5 @@
 """Consultas de acervo do balcão (somente leitura): contrato, papéis, entrada e regras do service."""
+from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
@@ -150,7 +151,7 @@ def test_catalog_detail_unknown_book_is_404():
 
 def copy(id, destination, *, price=None, status=CopyStatus.AVAILABLE, active=True):
     return NS(id=id, barcode=f'C{id}', destination=destination, status=status, condition=None, sale_price=price,
-              is_active=active)
+              is_active=active, updated_at=datetime(2026, 11, 11, tzinfo=timezone.utc))
 
 
 def test_catalog_detail_exposes_copies_with_availability_flags():
@@ -165,6 +166,7 @@ def test_catalog_detail_exposes_copies_with_availability_flags():
     assert [(c.barcode, c.free, c.allocated_for_purchase) for c in detail.copies] == [
         ('C1', True, False), ('C2', False, True)]
     assert detail.copies[1].sale_price == Decimal('38.90') and detail.total_copies == 4
+    assert detail.copies[0].updated_at == datetime(2026, 11, 11, tzinfo=timezone.utc)
 
 
 def lookup_row(copy, free):
