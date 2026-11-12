@@ -1,5 +1,14 @@
 # Backend do LibStock
 
+## Auditoria somente leitura (Issue #49)
+
+A gravação continua pelos triggers existentes; `audit_logs` não aceita `UPDATE` nem `DELETE` (trigger no banco). Não há endpoint de escrita, edição ou exclusão e nenhuma migration nova.
+
+- `GET /api/v1/audit-logs?entity_type=&entity_id=&operation=&employee_id=&date_from=&date_to=&limit=50&offset=0`: Bearer `ADMINISTRATOR`. Resposta `{items, total, limit, offset}` ordenada por `occurred_at` e `id` decrescentes.
+- Cada item: `id`, `occurred_at`, `employee_id`, `employee_name`, `entity_type`, `entity_id`, `operation`, `old_value`, `new_value`. `employee_name` é nulo para ações do sistema.
+- Filtros de data usam America/Sao_Paulo e são inclusivos. `limit` vai de 1 a 100; `offset` não pode ser negativo. Sem token: 401; outros papéis: 403 `permission_denied`; parâmetros inválidos: 422 (`validation_error`, `invalid_pagination`, `invalid_date_range`); falha de leitura: 500 `audit_log_query_error`.
+- Frontend: `/gestao/auditoria`, com item "Auditoria" na sidebar apenas para administrador. A tela é somente leitura e exibe o JSON anterior/novo ao expandir a linha.
+
 ## Preferência de notificações do cliente (Issue #46)
 
 - `GET /api/v1/me/notification-preferences`: retorna `{channel: "IN_APP" | "EMAIL", email: string}` do cliente autenticado; `email` é o endereço cadastrado, somente leitura.
