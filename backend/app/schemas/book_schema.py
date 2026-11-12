@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.domain import CopyStatus, DestinationType
 
@@ -258,8 +258,12 @@ class BookAvailabilityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CopyDetailResponse(CopyResponse):
+    updated_at: AwareDatetime
+
+
 class BookDetailResponse(BookResponse):
     publication_year: int | None = None
     publisher: str | None = None
     edition: str | None = None
-    copies: list[CopyResponse] = Field(default_factory=list)
+    copies: list[CopyDetailResponse] = Field(default_factory=list)

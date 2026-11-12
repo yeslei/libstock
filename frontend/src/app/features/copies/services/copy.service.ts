@@ -6,9 +6,12 @@ import {
   CopyCreateRequest,
   CopyDeleteResult,
   CopyResponse,
+  CopyStatus,
+  CopyStatusResponse,
   CopyUpdateRequest,
   copyDeleteResultFromApi,
   copyResponseFromApi,
+  copyStatusResponseFromApi,
 } from '../models/copy.model';
 
 export const COPIES_API = '/api/v1/copies';
@@ -48,6 +51,19 @@ export class CopyService {
     return this.http
       .patch<Parameters<typeof copyResponseFromApi>[0]>(`${COPIES_API}/${copyId}`, body)
       .pipe(map(copyResponseFromApi));
+  }
+
+  updateStatus(
+    copyId: number,
+    status: Extract<CopyStatus, 'AVAILABLE' | 'INACTIVE'>,
+    expectedUpdatedAt: string,
+  ): Observable<CopyStatusResponse> {
+    return this.http
+      .patch<Parameters<typeof copyStatusResponseFromApi>[0]>(`${COPIES_API}/${copyId}/status`, {
+        status,
+        expected_updated_at: expectedUpdatedAt,
+      })
+      .pipe(map(copyStatusResponseFromApi));
   }
 
   /** Exclui exemplar disponível e sem histórico; o backend decide e responde 409 com os motivos do bloqueio. */

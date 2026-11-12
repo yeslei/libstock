@@ -32,6 +32,10 @@ export interface CopyResponse {
   readonly isActive: boolean;
 }
 
+export interface CopyStatusResponse extends CopyResponse {
+  readonly updatedAt: string;
+}
+
 interface CopyResponseApi {
   readonly id: number;
   readonly book_id: number;
@@ -42,6 +46,10 @@ interface CopyResponseApi {
   readonly acquired_at: string | null;
   readonly status: CopyStatus;
   readonly is_active: boolean;
+}
+
+interface CopyStatusResponseApi extends CopyResponseApi {
+  readonly updated_at: string;
 }
 
 export function copyResponseFromApi(copy: CopyResponseApi): CopyResponse {
@@ -56,6 +64,10 @@ export function copyResponseFromApi(copy: CopyResponseApi): CopyResponse {
     status: copy.status,
     isActive: copy.is_active,
   };
+}
+
+export function copyStatusResponseFromApi(copy: CopyStatusResponseApi): CopyStatusResponse {
+  return { ...copyResponseFromApi(copy), updatedAt: copy.updated_at };
 }
 
 /** Resposta de `DELETE /api/v1/copies/{id}`: o exemplar removido. */

@@ -121,6 +121,7 @@ class StaffCatalogCopy(BaseModel):
     is_active: bool
     free: bool
     allocated_for_purchase: bool
+    updated_at: datetime
 
 
 class StaffCatalogBookDetail(StaffCatalogBook):

@@ -128,6 +128,7 @@ export interface StaffCatalogCopy {
   readonly is_active: boolean;
   readonly free: boolean;
   readonly allocated_for_purchase: boolean;
+  readonly updated_at: string;
 }
 
 export interface StaffCatalogBookDetail extends StaffCatalogBook {

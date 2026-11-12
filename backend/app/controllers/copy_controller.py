@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
 from app.schemas.copy_schema import (
     CopyBatchCreate,
     CopyCreate,
     CopyDeleteResponse,
     CopyResponse,
+    CopyStatusUpdate,
+    CopyStatusResponse,
     CopyUpdate,
 )
 from app.services.copy_service import CopyService
@@ -21,6 +23,16 @@ router = APIRouter(prefix="/api/v1/copies", tags=["Copies"])
 def get_copy_service(db: Session = Depends(get_db)) -> CopyService:
     repository = CopyRepository(db)
     return CopyService(repository, db)
+
+
+@router.patch("/{copy_id}/status", response_model=CopyStatusResponse)
+def update_copy_status(
+    changes: CopyStatusUpdate,
+    copy_id: int = Path(gt=0),
+    copy_service: CopyService = Depends(get_copy_service),
+    current_user: User = Depends(require_roles("STOCK_KEEPER", "ADMINISTRATOR")),
+):
+    return copy_service.update_status(copy_id, changes, actor_id=current_user.id)
 
 @router.post(
     "/batch",

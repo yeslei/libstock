@@ -343,6 +343,16 @@
                 >
                   {{ copy.is_active ? 'Inativar' : 'Reativar' }}
                 </button>
+                @if (canUpdateCopyStatus && (copy.status === 'AVAILABLE' || copy.status === 'INACTIVE')) {
+                  <button
+                    class="btn"
+                    type="button"
+                    [disabled]="flow.submitting()"
+                    (click)="askManualStatus(s.data, copy)"
+                  >
+                    {{ copy.status === 'AVAILABLE' ? 'Indisponibilizar' : 'Disponibilizar' }}
+                  </button>
+                }
                 @let reason = deleteCopyBlockReason(s.data, copy);
                 <button
                   class="btn btn--danger"

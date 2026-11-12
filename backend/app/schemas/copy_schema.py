@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.models.domain import CopyStatus, DestinationType
 
@@ -70,6 +70,17 @@ class CopyResponse(CopyCreate):
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CopyStatusUpdate(BaseModel):
+    status: CopyStatus
+    expected_updated_at: AwareDatetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CopyStatusResponse(CopyResponse):
+    updated_at: AwareDatetime
 
 
 class CopyDeleteResponse(BaseModel):

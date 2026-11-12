@@ -19,6 +19,21 @@ class ApplicationError(Exception):
         return self.message
 
 
+class CopyTransitionNotAllowedError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Este exemplar não permite a alteração manual solicitada.", "copy_transition_not_allowed", 409)
+
+
+class CopyStateConflictError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("O exemplar foi alterado. Recarregue os dados e tente novamente.", "copy_state_conflict", 409)
+
+
+class ActiveEmployeeRequiredError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("A operação exige um funcionário ativo.", "active_employee_required", 403)
+
+
 class DuplicateEmailError(ApplicationError):
     def __init__(self) -> None:
         super().__init__("E-mail já cadastrado.", "duplicate_email", 409)

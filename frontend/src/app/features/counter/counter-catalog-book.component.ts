@@ -43,6 +43,7 @@ import {
  */
 const MANAGE_BOOK_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
 const MANAGE_COPY_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
+const MANUAL_STATUS_ROLES = ['STOCK_KEEPER', 'ADMINISTRATOR'];
 /** Papéis que o backend autoriza em `POST /api/v1/copies` e que a tela oferece (inclui o estoquista). */
 const ADD_COPY_ROLES = ['SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR'];
 const CONDITION_MAX = 30;
@@ -144,6 +145,9 @@ export class CounterCatalogBookComponent {
   protected readonly canAddCopy = this.roleCodes.some((role) => ADD_COPY_ROLES.includes(role));
   protected readonly canDeleteCopy = this.roleCodes.some((role) =>
     MANAGE_COPY_ROLES.includes(role),
+  );
+  protected readonly canUpdateCopyStatus = this.roleCodes.some((role) =>
+    MANUAL_STATUS_ROLES.includes(role),
   );
   protected readonly canEditCopy = this.canDeleteCopy;
   protected readonly selectedCopyId = signal<number | null>(null);
@@ -279,6 +283,25 @@ export class CounterCatalogBookComponent {
       confirmLabel: active ? 'Reativar exemplar' : 'Inativar exemplar',
       run: () => this.copies.update(copy.id, { isActive: active }),
       success: () => `Exemplar ${active ? 'reativado' : 'inativado'} com sucesso.`,
+    });
+  }
+
+  protected askManualStatus(book: StaffCatalogBookDetail, copy: StaffCatalogCopy): void {
+    if (
+      !this.canUpdateCopyStatus ||
+      (copy.status !== 'AVAILABLE' && copy.status !== 'INACTIVE')
+    ) return;
+    const status = copy.status === 'AVAILABLE' ? 'INACTIVE' : 'AVAILABLE';
+    const makingUnavailable = status === 'INACTIVE';
+    this.flow.ask({
+      title: `${makingUnavailable ? 'Indisponibilizar' : 'Disponibilizar'} exemplar ${copy.barcode}?`,
+      intro: makingUnavailable
+        ? 'Ele deixará de estar disponível para empréstimo e venda, mas continuará cadastrado no acervo.'
+        : 'Ele voltará a estar disponível para operações compatíveis, se permanecer ativo no acervo.',
+      details: [book.title, copy.barcode, destinationLabel(copy.destination)],
+      confirmLabel: makingUnavailable ? 'Indisponibilizar exemplar' : 'Disponibilizar exemplar',
+      run: () => this.copies.updateStatus(copy.id, status, copy.updated_at),
+      success: () => `Status do exemplar ${copy.barcode} atualizado.`,
     });
   }
 

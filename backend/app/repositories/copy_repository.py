@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from app.models.domain import (
     Book,
     Copy,
+    CopyStatus,
     DestinationType,
     Employee,
     Loan,
+    LoanStatus,
     Profile,
     PurchaseReservation,
     ReservationStatus,
@@ -26,6 +28,25 @@ class CopyRepository:
     def is_employee(self, user_id: int) -> bool:
         # Funcionário ativo (perfil e usuário), como nos demais fluxos de balcão (Issue #151).
         return self.is_active_employee(user_id)
+
+    def find_for_update(self, copy_id: int) -> Copy | None:
+        return self.db.scalar(
+            select(Copy).where(Copy.id == copy_id).with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
+    def has_circulation_commitment(self, copy_id: int) -> bool:
+        open_loan = select(Loan.id).where(Loan.copy_id == copy_id, Loan.status == LoanStatus.OPEN).exists()
+        confirmed_sale = (
+            select(SaleItem.id).join(Sale, Sale.id == SaleItem.sale_id)
+            .where(SaleItem.copy_id == copy_id, Sale.status == SaleStatus.CONFIRMED).exists()
+        )
+        return bool(self.db.scalar(select(open_loan | confirmed_sale)))
+
+    def update_status(self, copy: Copy, status: CopyStatus) -> None:
+        copy.status = status
+        self.db.flush()
+        self.db.refresh(copy)
 
     def set_audit_actor(self, employee_id: int) -> None:
         self.db.execute(

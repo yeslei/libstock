@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
     ApplicationError,
+    ActiveEmployeeRequiredError,
     AuditActorRequiredError,
     BookNotFoundError,
     CopyDeletionBlockedError,
@@ -12,6 +13,8 @@ from app.core.exceptions import (
     CopyNotFoundError,
     CopySalePriceNotAllowedError,
     CopySalePriceRequiredError,
+    CopyStateConflictError,
+    CopyTransitionNotAllowedError,
     CopyUpdateBlockedError,
     CopyUpdatePersistenceError,
     SQLSTATE_COPY_DESTINATION_FORBIDDEN,
@@ -24,7 +27,14 @@ from decimal import Decimal
 from app.models.domain import Book, CopyStatus, DestinationType
 from app.repositories.copy_repository import CopyRepository
 from app.services.copy_rules import require_commercial_price
-from app.schemas.copy_schema import CopyBatchCreate, CopyCreate, CopyDeleteResponse, CopyUpdate
+from app.schemas.copy_schema import (
+    CopyBatchCreate,
+    CopyCreate,
+    CopyDeleteResponse,
+    CopyStatusResponse,
+    CopyStatusUpdate,
+    CopyUpdate,
+)
 
 LAST_ACTIVE_COPY_MESSAGE = "An active book requires at least one active copy"
 FOREIGN_KEY_VIOLATION = "23503"
@@ -64,6 +74,36 @@ class CopyService:
     def __init__(self, repository: CopyRepository, db: Session):
         self.repository = repository
         self.db = db
+
+    def update_status(self, copy_id: int, changes: CopyStatusUpdate, *, actor_id: int) -> CopyStatusResponse:
+        try:
+            if not self.repository.is_active_employee(actor_id):
+                raise ActiveEmployeeRequiredError()
+            copy = self.repository.find_for_update(copy_id)
+            if copy is None:
+                raise CopyNotFoundError()
+            if copy.updated_at != changes.expected_updated_at:
+                raise CopyStateConflictError()
+            manual_states = {CopyStatus.AVAILABLE, CopyStatus.INACTIVE}
+            if copy.status not in manual_states or changes.status not in manual_states:
+                raise CopyTransitionNotAllowedError()
+            if self.repository.has_circulation_commitment(copy_id):
+                raise CopyTransitionNotAllowedError()
+            if copy.status != changes.status:
+                self.repository.set_audit_actor(actor_id)
+                self.repository.update_status(copy, changes.status)
+            # Materialize before commit; do not perform a fallible read after persistence.
+            response = CopyStatusResponse.model_validate(copy)
+            self.db.commit()
+            return response
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            if getattr(getattr(exc, "orig", None), "sqlstate", None) in {"40001", "40P01"}:
+                raise CopyStateConflictError() from exc
+            raise CopyUpdatePersistenceError() from exc
 
     def create_new_copy(self, copy_data: CopyCreate, actor_id: int):
         if not self.repository.is_employee(actor_id):
