@@ -234,12 +234,42 @@ Não existe classificação, tag ou campo de destinação secundário.
 |---|---|
 | `AVAILABLE` | disponível para operação compatível |
 | `BORROWED` | emprestado |
-| `RESERVED` | reservado |
+| `RESERVED` | valor previsto no enum, sem transição implementada (decisão pendente) |
 | `SOLD` | vendido e não reutilizável |
 | `INACTIVE` | fora do acervo operacional |
 
-As transições permitidas devem ser documentadas antes da implementação dos
-services de circulação.
+Regra aprovada: o status do exemplar é alterado apenas pelas operações do
+domínio, nunca por edição direta do campo. O contrato `PATCH /api/v1/copies/{id}`
+aceita `is_active`, mas não aceita `status` (`extra="forbid"` em `CopyUpdate`).
+
+| De | Para | Operação | Garantia |
+|---|---|---|---|
+| — | `AVAILABLE` | cadastro do exemplar (inicial ou em lote) | o backend sempre persiste `AVAILABLE` |
+| `AVAILABLE` | `BORROWED` | INSERT em `loans` | o status `BORROWED` exige empréstimo `OPEN` |
+| `BORROWED` | `AVAILABLE` | `loans.status` = `RETURNED` ou `CANCELLED` | devolução ou cancelamento do empréstimo |
+| `AVAILABLE` | `SOLD` | `sales.status` = `CONFIRMED` | o status `SOLD` exige venda confirmada |
+| `AVAILABLE` | `INACTIVE` | `PATCH /api/v1/copies/{id}` com `is_active=false` | bloqueado com empréstimo aberto |
+| `INACTIVE` | `AVAILABLE` | `PATCH /api/v1/copies/{id}` com `is_active=true` | só para exemplar inativo |
+
+Invariantes protegidas pelo service e por triggers do banco:
+
+- `SOLD` é terminal: exemplar em venda confirmada não retorna a outro status.
+- `BORROWED` não pode ser inativado nem vendido.
+- Enquanto existir empréstimo `OPEN`, o exemplar permanece `BORROWED`.
+- A troca de `destination` só é permitida em exemplar `AVAILABLE` ou `INACTIVE`
+  e exige `SELLER`, `STOCK_KEEPER` ou `ADMINISTRATOR`.
+- A reserva de compra não altera o status do exemplar: o vínculo é registrado em
+  `purchase_reservations.allocated_copy_id`.
+
+Limitação técnica: `RESERVED` existe no enum `CopyStatus` e é considerado nas
+consultas de disponibilidade, mas nenhuma operação grava esse status. Definir
+uma transição para `RESERVED` é decisão pendente, não regra aprovada.
+
+- Estado: `IMPLEMENTED`.
+- Versão-alvo: V1 (empréstimo, devolução e venda) e V2 (inativação/reativação).
+- Endpoints: `PATCH /api/v1/copies/{id}`.
+- Entidades: `Copy`, `Loan`, `Sale`, `PurchaseReservation`.
+- Testes: `tests/test_copy_update.py` e `tests/test_v2_review.py`.
 
 Regra aprovada: uma mesma obra pode possuir quantidades distintas de exemplares
 para diferentes destinações de acervo dentro do mesmo cadastro. A quantidade é
