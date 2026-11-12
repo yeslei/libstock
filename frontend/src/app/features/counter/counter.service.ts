@@ -1,4 +1,5 @@
 import { DashboardOverview } from './dashboard/dashboard.models';
+import { ClientNotification } from '../notifications/notification.service';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -284,6 +285,10 @@ export class CounterService {
 
   confirmReturn(loanId: number): Observable<CirculationResult> {
     return this.http.post<CirculationResult>(`${STAFF}/loans/${loanId}/confirm-return`, {});
+  }
+
+  sendReturnReminder(loanId: number): Observable<ClientNotification> {
+    return this.http.post<ClientNotification>(`${STAFF}/loans/${loanId}/return-reminder`, {});
   }
 
   listPurchaseReservations(

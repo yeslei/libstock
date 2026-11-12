@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.business_dates import BUSINESS_ZONE
 from app.core.exceptions import ApplicationError
-from app.models.domain import NotificationChannel, NotificationStatus, ReservationStatus
+from app.models.domain import LoanStatus, NotificationChannel, NotificationStatus, ReservationStatus
 from app.repositories.notification_preference_repository import NotificationPreferenceRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.schemas.notification_schema import NotificationPage, NotificationResponse
@@ -38,6 +38,49 @@ class NotificationService:
             status=NotificationStatus.SENT if channel == NotificationChannel.IN_APP else NotificationStatus.PENDING,
             sent_at=now if channel == NotificationChannel.IN_APP else None,
         )
+
+    def send_return_reminder(self, loan_id: int) -> NotificationResponse:
+        try:
+            data = self.repository.return_reminder_data(loan_id)
+            if data is None:
+                raise ApplicationError("Empréstimo não encontrado.", "loan_not_found", 404)
+
+            loan, book, profile, user = data
+            if loan.status != LoanStatus.OPEN:
+                raise ApplicationError("Este empréstimo já foi encerrado.", "loan_already_closed", 409)
+            if not profile.is_active or not user.is_active:
+                raise ApplicationError("O cliente está inativo.", "client_inactive", 403)
+
+            now = datetime.now(timezone.utc)
+            # Esta história entrega o lembrete no inbox do LibStock. O envio
+            # por e-mail continua pertencendo ao dispatcher de notificações.
+            channel = NotificationChannel.IN_APP
+            subject = "Lembrete de devolução"
+            message = (
+                f"Lembrete: devolva “{book.title}” até "
+                f"{loan.due_date.astimezone(BUSINESS_ZONE).strftime('%d/%m/%Y às %H:%M')} (horário de São Paulo)."
+            )
+            item = self.repository.create_return_reminder(
+                user_id=loan.client_id,
+                channel=channel,
+                subject=subject,
+                message=message,
+                status=NotificationStatus.SENT,
+                sent_at=now,
+            )
+            response = NotificationResponse.model_validate(item)
+            self.db.commit()
+            return response
+        except ApplicationError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise ApplicationError(
+                "Não foi possível registrar o lembrete de devolução.",
+                "return_reminder_persistence_error",
+                500,
+            ) from exc
 
     def list_own(self, user_id: int, *, before_id: int | None = None, limit: int = 20) -> NotificationPage:
         try:

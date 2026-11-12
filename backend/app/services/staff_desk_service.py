@@ -27,6 +27,9 @@ class StaffDeskService:
         today = business_today()
         return today, overdue_cutoff(today)
 
+    def ensure_staff_access(self, actor_id):
+        self._guard(actor_id)
+
     def _read(self, query):
         try:
             return query()

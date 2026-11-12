@@ -120,6 +120,16 @@ describe('CounterService', () => {
     }
   });
 
+  it('envia lembrete de devolução pelo endpoint protegido do balcão', () => {
+    service.sendReturnReminder(21).subscribe();
+    const request = http.expectOne('/api/v1/staff/loans/21/return-reminder');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({});
+    request.flush({ id: 8, reservation_id: null, type: 'RETURN_REMINDER', channel: 'IN_APP',
+      subject: 'Lembrete de devolução', message: 'Lembrete', status: 'SENT',
+      created_at: '2026-11-12T12:00:00Z', sent_at: '2026-11-12T12:00:00Z', read_at: null });
+  });
+
   it('nunca usa os endpoints transacionais antigos', () => {
     service.confirmReturn(1).subscribe();
     const request = http.expectOne(() => true);

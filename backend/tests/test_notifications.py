@@ -10,7 +10,7 @@ from app.controllers.notification_controller import get_notification_service
 from app.core.exceptions import ApplicationError
 from app.dependencies.authentication import get_current_user
 from app.main import app
-from app.models.domain import NotificationChannel as Channel, NotificationStatus as Status, ReservationStatus
+from app.models.domain import LoanStatus, NotificationChannel as Channel, NotificationStatus as Status, ReservationStatus
 from app.schemas.notification_schema import NotificationPage
 from app.services.notification_service import AVAILABILITY_EVENT, NotificationService
 
@@ -41,6 +41,44 @@ def test_enqueue_uses_preference_and_never_sends_or_commits(service, channel, st
     assert (values["sent_at"] is not None) == (channel == Channel.IN_APP)
     assert "14/11/2026" in values["message"] and "Dom Casmurro" in values["message"]
     db.commit.assert_not_called()
+
+
+def test_return_reminder_validates_open_loan_and_delivers_in_app(service):
+    target, db, repo, _ = service
+    loan = NS(id=21, client_id=7, status=LoanStatus.OPEN,
+              due_date=datetime(2026, 11, 20, 15, 0, tzinfo=timezone.utc))
+    profile = NS(is_active=True, notification_preference=Channel.EMAIL)
+    user = NS(is_active=True)
+    repo.return_reminder_data.return_value = (loan, NS(title="Dom Casmurro"), profile, user)
+    item = notification(reservation_id=None, type="RETURN_REMINDER", channel=Channel.IN_APP,
+                        status=Status.SENT, sent_at=datetime.now(timezone.utc))
+    repo.create_return_reminder.return_value = item
+
+    result = target.send_return_reminder(21)
+
+    repo.return_reminder_data.assert_called_once_with(21)
+    values = repo.create_return_reminder.call_args.kwargs
+    assert values["user_id"] == 7
+    assert values["channel"] == Channel.IN_APP
+    assert values["status"] == Status.SENT
+    assert result.type == "RETURN_REMINDER"
+    db.commit.assert_called_once()
+
+
+@pytest.mark.parametrize("data,code,status", [
+    (None, "loan_not_found", 404),
+    ((NS(id=21, client_id=7, status=LoanStatus.RETURNED), NS(title="Livro"), NS(is_active=True), NS(is_active=True)), "loan_already_closed", 409),
+])
+def test_return_reminder_rejects_missing_or_closed_loan(service, data, code, status):
+    target, db, repo, _ = service
+    repo.return_reminder_data.return_value = data
+
+    with pytest.raises(ApplicationError) as error:
+        target.send_return_reminder(21)
+
+    assert (error.value.code, error.value.status_code) == (code, status)
+    repo.create_return_reminder.assert_not_called()
+    db.rollback.assert_called_once()
 
 
 def test_list_is_scoped_and_uses_cursor_without_exposing_personal_data(service):
