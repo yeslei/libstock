@@ -131,6 +131,11 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `POST` | `/api/v1/employees/` | Bearer (`ADMINISTRATOR`) | Cadastra vendedor, estoquista ou administrador |
 | `POST` | `/api/v1/books/` | Bearer (`SELLER`, `STOCK_KEEPER`, `ADMINISTRATOR`) | Cadastra uma obra e seu exemplar inicial ativo na mesma transação |
 
+No balcão, atendentes e administradores também podem registrar um lembrete de devolução:
+`POST /api/v1/staff/loans/{loan_id}/return-reminder`. A operação exige empréstimo
+`OPEN`, cadastro de funcionário ativo e cria uma notificação `IN_APP` entregue
+imediatamente no inbox do cliente. Envio por e-mail permanece fora do escopo.
+
 ## Permissionamento
 
 ### V2: detalhes e solicitações

@@ -21,7 +21,7 @@ const loan = (over: Partial<StaffLoan> = {}): StaffLoan => ({
 });
 
 function setup<T>(component: new () => T, configure: (service: jasmine.SpyObj<CounterService>) => void) {
-  const service = jasmine.createSpyObj<CounterService>('CounterService', ['listLoans', 'confirmReturn']);
+  const service = jasmine.createSpyObj<CounterService>('CounterService', ['listLoans', 'confirmReturn', 'sendReturnReminder']);
   configure(service);
   TestBed.configureTestingModule({
     imports: [component],
@@ -62,7 +62,7 @@ describe('Balcão: empréstimos ativos', () => {
     expect(service.listLoans).toHaveBeenCalledWith({ q: '', clientId: undefined });
     expect(root.querySelector('h1')?.textContent).toBe('Empréstimos ativos');
     expect(Array.from(root.querySelectorAll('th')).map((th) => th.textContent?.trim())).toEqual([
-      'Cliente', 'Obra / exemplar', 'Retirada', 'Devolução', 'Status']);
+      'Cliente', 'Obra / exemplar', 'Retirada', 'Devolução', 'Status', 'Ação']);
     const rows = root.querySelectorAll('tbody tr');
     expect(rows.length).toBe(3);
     expect(rows[0].textContent).toContain('Ana Souza');
@@ -75,7 +75,7 @@ describe('Balcão: empréstimos ativos', () => {
     expect(rows[2].textContent).toContain('há 2 dia(s)');
     expect(root.querySelector('.counter')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('2 ativos • 1 atrasados');
     expect(root.textContent).toContain('Atraso gera pendência do cliente até a devolução ser registrada.');
-    expect(root.querySelector('tbody button')).toBeNull();
+    expect(root.querySelector('tbody button')?.textContent?.trim()).toBe('Enviar lembrete');
     expect(root.querySelector('a.page__back')?.getAttribute('href')).toBe('/balcao/emprestimos');
   });
 

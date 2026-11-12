@@ -2,7 +2,10 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models.domain import Book, Notification, NotificationChannel, NotificationStatus, Profile, PurchaseReservation
+from app.models.domain import (
+    Book, Copy, Loan, Notification, NotificationChannel, NotificationStatus,
+    Profile, PurchaseReservation,
+)
 from app.models.user import User
 
 
@@ -17,6 +20,34 @@ class NotificationRepository:
             .join(User, User.id == Profile.id)
             .where(PurchaseReservation.id == reservation_id)
             .execution_options(populate_existing=True)).first()
+
+    def return_reminder_data(self, loan_id: int):
+        return self.db.execute(
+            select(Loan, Book, Profile, User)
+            .join(Copy, Copy.id == Loan.copy_id)
+            .join(Book, Book.id == Copy.book_id)
+            .join(Profile, Profile.id == Loan.client_id)
+            .join(User, User.id == Loan.client_id)
+            .where(Loan.id == loan_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).first()
+
+    def create_return_reminder(self, *, user_id: int, channel, subject: str, message: str,
+                               status, sent_at):
+        item = Notification(
+            user_id=user_id,
+            reservation_id=None,
+            type="RETURN_REMINDER",
+            channel=channel,
+            subject=subject,
+            message=message,
+            status=status,
+            sent_at=sent_at,
+        )
+        self.db.add(item)
+        self.db.flush()
+        return item
 
     def enqueue(self, **values) -> None:
         # A reserva já foi serializada pelo lock da obra. O índice protege

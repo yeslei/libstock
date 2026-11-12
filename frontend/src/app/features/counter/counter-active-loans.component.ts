@@ -7,15 +7,16 @@ import { Subject, switchMap } from 'rxjs';
 import { LoadState } from '../../core/models/load-state.model';
 import { AlertComponent } from '../../shared/components/alert/alert.component';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner.component';
+import { ConfirmDialogComponent } from './confirm-dialog.component';
+import { ActionFlow, toLoadState } from './desk-flow';
 import { CounterContext } from './counter-context.service';
 import { CounterService, LIST_LIMIT, StaffLoan } from './counter.service';
-import { toLoadState } from './desk-flow';
 
 /** Frame "Funcionário / Empréstimos / Ativos": tabela somente leitura; atraso decidido pelo backend (regra V2). */
 @Component({
   selector: 'app-counter-active-loans',
   standalone: true,
-  imports: [DatePipe, RouterLink, AlertComponent, SpinnerComponent],
+  imports: [DatePipe, RouterLink, AlertComponent, SpinnerComponent, ConfirmDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './counter-active-loans.component.html',
   styleUrl: './counter-active-loans.component.scss',
@@ -28,6 +29,7 @@ export class CounterActiveLoansComponent implements OnInit {
   protected readonly term = signal('');
   protected readonly state = signal<LoadState<readonly StaffLoan[]>>({ status: 'loading' });
   protected readonly limit = LIST_LIMIT;
+  protected readonly flow = new ActionFlow(inject(DestroyRef), () => this.reload());
 
   /** Contadores do que está listado (respeitam a busca e o filtro de cliente). */
   protected readonly counters = computed(() => {
@@ -71,5 +73,19 @@ export class CounterActiveLoansComponent implements OnInit {
   protected clearClient(): void {
     this.context.client.set(null);
     this.reload();
+  }
+
+  protected sendReminder(loan: StaffLoan): void {
+    this.flow.ask({
+      title: 'Enviar lembrete de devolução?',
+      details: [
+        `Cliente: ${loan.client.name} (${loan.client.email})`,
+        `Obra: ${loan.book.title}`,
+        `Devolução prevista: ${new Date(loan.due_date).toLocaleDateString('pt-BR')}`,
+      ],
+      confirmLabel: 'Enviar lembrete',
+      run: () => this.service.sendReturnReminder(loan.id),
+      success: () => `Lembrete de devolução registrado para ${loan.client.name}.`,
+    });
   }
 }

@@ -11,6 +11,8 @@ from app.schemas.staff_desk_schema import (
     StaffLoan, StaffLoanRequest, StaffPurchaseReservation, StaffDashboardOverview,
 )
 from app.services.staff_desk_service import StaffDeskService
+from app.services.notification_service import NotificationService
+from app.schemas.notification_schema import NotificationResponse
 
 router = APIRouter(prefix='/api/v1/staff', tags=['Balcão do funcionário'])
 Term = Annotated[str | None, Query(max_length=100)]
@@ -23,6 +25,10 @@ catalog_reader = require_roles('SELLER', 'STOCK_KEEPER', 'ADMINISTRATOR')
 
 def get_staff_desk_service(db: Session = Depends(get_db)):
     return StaffDeskService(db, StaffDeskRepository(db))
+
+
+def get_staff_notification_service(db: Session = Depends(get_db)):
+    return NotificationService(db)
 
 
 @router.get('/dashboard', response_model=StaffDashboard)
@@ -52,6 +58,17 @@ def list_loan_requests(q: Term = None, client_id: ClientFilter = None, limit: Li
 def list_open_loans(q: Term = None, client_id: ClientFilter = None, limit: Limit = 50,
                     user: User = Depends(staff_only), service=Depends(get_staff_desk_service)):
     return service.loans(user.id, q, client_id, limit)
+
+
+@router.post('/loans/{loan_id}/return-reminder', response_model=NotificationResponse, status_code=201)
+def send_return_reminder(
+    loan_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    user: User = Depends(staff_only),
+    service: StaffDeskService = Depends(get_staff_desk_service),
+    notifications: NotificationService = Depends(get_staff_notification_service),
+) -> NotificationResponse:
+    service.ensure_staff_access(user.id)
+    return notifications.send_return_reminder(loan_id)
 
 
 @router.get('/purchase-reservations', response_model=list[StaffPurchaseReservation])
