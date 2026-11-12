@@ -22,8 +22,9 @@ from test_direct_sale_postgres import sale_service
 from app.controllers.client_tracking_controller import get_client_tracking_service
 from app.dependencies.authentication import get_current_user
 from app.models.domain import (
-    AuditLog, Book, Client, Copy, CopyStatus, Loan, LoanStatus, PurchaseReservation, ReservationStatus, SaleItem,
+    AuditLog, Book, Client, Copy, CopyStatus, Loan, LoanStatus, Profile, PurchaseReservation, ReservationStatus, SaleItem,
 )
+from app.models.user import User
 from app.repositories.circulation_repository import CirculationRepository
 from app.repositories.client_tracking_repository import ClientTrackingRepository
 from app.services.circulation_service import CirculationService
@@ -305,6 +306,34 @@ def test_no_eligible_reservation_is_a_stable_conflict_and_changes_nothing(desk):
     assert state(engine, first)[0] == 'WAITING' and state(engine, second)[0] == 'WAITING'
     with Session(engine) as db:
         assert CirculationRepository(db).lock_free_copy(book_id, commercial_copy(db, book_id).destination) is not None
+
+
+# ---- elegibilidade na criação da reserva (Issue #39) -------------------------
+
+@pytest.mark.parametrize('condition', ['penalized', 'inactive_profile', 'inactive_user', 'overdue'])
+def test_reserve_purchase_refuses_ineligible_client_without_persisting(desk, condition):  # noqa: F811
+    http, engine, book_id, client_id, seller_id = desk
+    with Session(engine) as db:
+        if condition == 'penalized':
+            db.get(Client, client_id).is_penalized = True
+        elif condition == 'inactive_profile':
+            db.get(Profile, client_id).is_active = False
+        elif condition == 'inactive_user':
+            db.get(User, client_id).is_active = False
+        else:
+            now = datetime.now(timezone.utc)
+            db.add(Loan(client_id=client_id, copy_id=commercial_copy(db, book_id).id, employee_id=seller_id,
+                        loan_date=now - timedelta(days=40), due_date=now - timedelta(days=10),
+                        status=LoanStatus.OPEN))
+        db.commit()
+
+    as_user(engine, client_id, 'USER')
+    response = http.post(MINE, json={'book_id': book_id})
+
+    assert (response.status_code, response.json()['code']) == (403, 'client_ineligible')
+    with Session(engine) as db:
+        assert db.scalar(select(func.count()).select_from(PurchaseReservation).where(
+            PurchaseReservation.client_id == client_id)) == 0
 
 
 # ---- concorrência (ordem forçada pelo lock do livro) -------------------------

@@ -881,7 +881,7 @@ Quando não existe mais nenhuma pendência:
 
 - `clients.is_penalized = false`.
 
-A penalização é sincronizada automaticamente pelo backend nas consultas de pendências e nas operações relevantes que utilizarem o serviço de sincronização. O empréstimo, devolução e reserva ainda não estão integrados. Esses três podem consumir o synchronize_penalty().
+A penalização é sincronizada automaticamente pelo backend nas consultas de pendências e nas operações relevantes que utilizarem o serviço de sincronização. Empréstimo, devolução e reserva não disparam essa sincronização: quando precisam decidir a aptidão do cliente, leem o `clients.is_penalized` já gravado e o atraso pela data de negócio de America/Sao_Paulo, pelo predicado compartilhado de `client_eligibility.py`.
 
 ### Aplicação e remoção manual
 
@@ -924,11 +924,9 @@ A sincronização utiliza lock transacional sobre o cliente para serializar alte
 
 Operações de circulação que dependam da aptidão do cliente devem reavaliar as pendências antes de prosseguir.
 
-O fluxo de empréstimo utiliza a validação da situação do cliente antes do registro da operação.
+Solicitação de empréstimo, solicitação de compra, reserva de compra e destinação de exemplar usam o mesmo predicado (`is_client_eligible` em `client_eligibility.py`, com o cliente travado) e recusam cliente inelegível com 403 `client_ineligible`, sem gravar.
 
-O serviço de consulta e sincronização de penalização permanece preparado para ser consumido por outros fluxos de circulação.
-
-A reserva ainda não está integrada ao controle de pendências.
+A reserva de compra (`POST /api/v1/purchase-reservations`) reavalia a elegibilidade antes de criar a reserva: usuário ou perfil inativo, cliente penalizado ou empréstimo `OPEN` em atraso resultam em 403 `client_ineligible`; a ausência de cadastro de cliente resulta em 403 `client_required`. A operação é atômica (rollback em caso de recusa ou falha de persistência) e NÃO sincroniza `clients.is_penalized`.
 
 ## 21. V2 — balcão operacional (Issue #122)
 
