@@ -24,6 +24,7 @@ Não substitui a documentação técnica da API nem as migrations.
 - busca por título, autor, ISBN e código de barras;
 - cadastro inicial de obras;
 - gestão de destaques.
+- atualização manual do status de exemplares entre AVAILABLE e INACTIVE (#31).
 
 ### Parcialmente implementado
 
@@ -38,7 +39,7 @@ Não substitui a documentação técnica da API nem as migrations.
 - reservas;
 - trocas;
 - notificações;
-- gestão operacional de exemplares.
+- demais funcionalidades de gestão operacional de exemplares ainda não descritas como implementadas.
 
 A existência de tabelas, enums ou views não significa que o fluxo esteja
 disponível pela API.

@@ -27,6 +27,33 @@ class CopyRepository:
         # Funcionário ativo (perfil e usuário), como nos demais fluxos de balcão (Issue #151).
         return self.is_active_employee(user_id)
 
+    def is_active_employee(self, user_id: int) -> bool:
+        return self.db.scalar(
+            select(Employee.id)
+            .join(Profile, Profile.id == Employee.id)
+            .join(User, User.id == Profile.id)
+            .where(Employee.id == user_id, Profile.is_active.is_(True), User.is_active.is_(True))
+        ) is not None
+
+    def find_for_update(self, copy_id: int) -> Copy | None:
+        return self.db.scalar(
+            select(Copy).where(Copy.id == copy_id).with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
+    def has_circulation_commitment(self, copy_id: int) -> bool:
+        open_loan = select(Loan.id).where(Loan.copy_id == copy_id, Loan.status == LoanStatus.OPEN).exists()
+        confirmed_sale = (
+            select(SaleItem.id).join(Sale, Sale.id == SaleItem.sale_id)
+            .where(SaleItem.copy_id == copy_id, Sale.status == SaleStatus.CONFIRMED).exists()
+        )
+        return bool(self.db.scalar(select(open_loan | confirmed_sale)))
+
+    def update_status(self, copy: Copy, status: CopyStatus) -> None:
+        copy.status = status
+        self.db.flush()
+        self.db.refresh(copy)
+
     def set_audit_actor(self, employee_id: int) -> None:
         self.db.execute(
             text("SELECT set_config('libstock.employee_id', :valor, true)"),

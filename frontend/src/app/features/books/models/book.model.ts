@@ -63,6 +63,10 @@ export interface BookUpdateRequest {
   readonly is_active?: boolean;
 }
 
+export interface CopyDetailResponse extends CopyResponse {
+  readonly updated_at: string;
+}
+
 export interface BookDetail extends BookResponse {
   readonly publication_year?: number | null;
   readonly publisher?: string | null;
