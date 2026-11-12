@@ -2,7 +2,9 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace as NS
 from unittest.mock import Mock
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi.testclient import TestClient
+from app.core.exceptions import ApplicationError
 from app.main import app
 from app.dependencies.authentication import get_current_user
 from app.controllers.client_tracking_controller import get_client_tracking_service
@@ -72,6 +74,96 @@ def test_reservation_position_is_backend_value_and_no_deadline_is_invented():
     assert result[0].queue_position == 3
     assert result[0].expires_at is None
     assert result[0].copy_barcode is None
+
+
+@pytest.fixture
+def reservation_service():
+    repo = Mock()
+    repo.lock_book.return_value = NS(id=2, is_active=True)
+    repo.lock_client.return_value = (NS(is_penalized=False), NS(is_active=True), NS(is_active=True))
+    repo.has_overdue_loan.return_value = False
+    repo.existing_reservation.return_value = None
+    repo.has_waiting_queue.return_value = False
+    repo.has_reservable_commercial_copy.return_value = True
+    repo.has_free_commercial_copy.return_value = False
+    repo.waiting_position.return_value = 1
+    repo.create_reservation.return_value = NS(id=8, book_id=2, status='WAITING', queue_position=1)
+    db = Mock()
+    return ClientTrackingService(db, repo), db, repo
+
+
+def test_purchase_reservation_persists_for_eligible_client(reservation_service):
+    service, db, repo = reservation_service
+    response = service.reserve_purchase(7, 2)
+    repo.create_reservation.assert_called_once_with(7, 2)
+    db.commit.assert_called_once()
+    assert (response.id, response.book_id, response.status, response.queue_position) == (8, 2, 'WAITING', 1)
+
+
+@pytest.mark.parametrize('condition', ['penalized', 'inactive_profile', 'inactive_user', 'overdue'])
+def test_purchase_reservation_refuses_ineligible_client(reservation_service, condition):
+    service, db, repo = reservation_service
+    client, profile, user = repo.lock_client.return_value
+    if condition == 'penalized':
+        client.is_penalized = True
+    elif condition == 'inactive_profile':
+        profile.is_active = False
+    elif condition == 'inactive_user':
+        user.is_active = False
+    else:
+        repo.has_overdue_loan.return_value = True
+
+    with pytest.raises(ApplicationError) as error:
+        service.reserve_purchase(7, 2)
+
+    assert (error.value.status_code, error.value.code) == (403, 'client_ineligible')
+    repo.create_reservation.assert_not_called()
+    db.commit.assert_not_called()
+    db.rollback.assert_called_once()
+
+
+@pytest.mark.parametrize('case,status,code', [
+    ('no_client', 403, 'client_required'),
+    ('book_missing', 404, 'book_not_found'),
+    ('book_inactive', 404, 'book_not_found'),
+    ('duplicate', 409, 'reservation_duplicate'),
+    ('unavailable', 409, 'reservation_unavailable'),
+    ('purchase_available', 409, 'purchase_available'),
+])
+def test_purchase_reservation_rejects_inconsistent_state(reservation_service, case, status, code):
+    service, db, repo = reservation_service
+    if case == 'no_client':
+        repo.lock_client.return_value = None
+    elif case == 'book_missing':
+        repo.lock_book.return_value = None
+    elif case == 'book_inactive':
+        repo.lock_book.return_value.is_active = False
+    elif case == 'duplicate':
+        repo.existing_reservation.return_value = NS(id=1)
+    elif case == 'unavailable':
+        repo.has_reservable_commercial_copy.return_value = False
+    else:
+        repo.has_free_commercial_copy.return_value = True
+
+    with pytest.raises(ApplicationError) as error:
+        service.reserve_purchase(7, 2)
+
+    assert (error.value.status_code, error.value.code) == (status, code)
+    repo.create_reservation.assert_not_called()
+    db.commit.assert_not_called()
+    db.rollback.assert_called_once()
+
+
+def test_purchase_reservation_commit_failure_rolls_back(reservation_service):
+    service, db, repo = reservation_service
+    db.commit.side_effect = SQLAlchemyError('failure')
+
+    with pytest.raises(ApplicationError) as error:
+        service.reserve_purchase(7, 2)
+
+    assert (error.value.status_code, error.value.code) == (500, 'reservation_persistence_error')
+    repo.create_reservation.assert_called_once_with(7, 2)
+    db.rollback.assert_called_once()
 
 
 @pytest.mark.parametrize('payload', [
