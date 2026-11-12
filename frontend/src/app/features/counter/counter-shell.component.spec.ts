@@ -132,6 +132,18 @@ describe('Layout do balcão (item Usuários por papel)', () => {
     const labels = Array.from(root.querySelectorAll('nav a')).map((a) => a.textContent?.trim());
     expect(labels).not.toContain('Usuários');
   });
+
+  it('mostra Auditoria apenas para administrador', async () => {
+    const root = await render(['ADMINISTRATOR']);
+    const link = Array.from(root.querySelectorAll('nav a')).find((a) => a.textContent?.trim() === 'Auditoria');
+    expect(link?.getAttribute('href')).toBe('/gestao/auditoria');
+  });
+
+  it('oculta Auditoria do vendedor', async () => {
+    const root = await render(['SELLER']);
+    const labels = Array.from(root.querySelectorAll('nav a')).map((a) => a.textContent?.trim());
+    expect(labels).not.toContain('Auditoria');
+  });
 });
 
 describe('Layout do balcão (menu do estoquista, Issue #169)', () => {
@@ -159,7 +171,7 @@ describe('Layout do balcão (menu do estoquista, Issue #169)', () => {
   });
 
   it('mantém o menu completo para ADMINISTRATOR', async () => {
-    expect(await labelsFor(['ADMINISTRATOR'])).toEqual(['Painel', 'Acervo', 'Clientes', 'Empréstimos', 'Devoluções', 'Vendas', 'Reservas', 'Usuários']);
+    expect(await labelsFor(['ADMINISTRATOR'])).toEqual(['Painel', 'Acervo', 'Clientes', 'Empréstimos', 'Devoluções', 'Vendas', 'Reservas', 'Usuários', 'Auditoria']);
   });
 
   it('mantém o menu de atendimento para quem acumula estoquista e vendedor', async () => {

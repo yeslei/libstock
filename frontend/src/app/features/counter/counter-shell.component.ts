@@ -30,6 +30,7 @@ const NAVIGATION: readonly NavEntry[] = [
   { label: 'Vendas', icon: 'cart', route: '/balcao/vendas', exact: false, roles: SERVICE_ROLES },
   { label: 'Reservas', icon: 'bookmark', route: '/balcao/reservas', exact: false, roles: SERVICE_ROLES },
   { label: 'Usuários', icon: 'users', route: '/gestao/usuarios', exact: false, roles: ['ADMINISTRATOR'] },
+  { label: 'Auditoria', icon: 'clock', route: '/gestao/auditoria', exact: false, roles: ['ADMINISTRATOR'] },
 ];
 
 /** Layout da área do funcionário: menu lateral (recolhível em telas pequenas) e conteúdo da rota filha. */

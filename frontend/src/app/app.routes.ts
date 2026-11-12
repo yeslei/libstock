@@ -326,6 +326,16 @@ export const routes: Routes = [
             (m) => m.UserDetailsComponent,
           ),
       },
+      {
+        path: 'auditoria',
+        canActivate: [authGuard, roleGuard],
+        data: { roles: ['ADMINISTRATOR'] },
+        title: 'Auditoria · LibStock',
+        loadComponent: () =>
+          import('./features/audit/audit-log-page/audit-log-page.component').then(
+            (m) => m.AuditLogPageComponent,
+          ),
+      },
     ],
   },
   {

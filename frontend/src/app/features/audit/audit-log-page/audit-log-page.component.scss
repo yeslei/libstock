@@ -1,0 +1,149 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+.audit-page {
+  min-height: 100dvh;
+  padding: $space-6;
+  background: $bg-page;
+}
+
+.audit-panel {
+  display: grid;
+  gap: $space-5;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: $space-6;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  background: $bg-surface;
+  box-shadow: $shadow-md;
+}
+
+.audit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $space-4;
+
+  h1 { color: $primary; }
+  p { color: $text-muted; }
+}
+
+.audit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $space-3;
+
+  label { font-weight: 600; }
+  input,
+  select {
+    min-height: 44px;
+    padding: 0 $space-4;
+    border: 1px solid $border;
+    border-radius: $radius-md;
+    background: $bg-surface;
+  }
+}
+
+.button,
+.audit-pager button,
+td button {
+  min-height: 44px;
+  padding: 0 $space-4;
+  border: 1px solid $primary;
+  border-radius: $radius-md;
+  background: $bg-surface;
+  color: $primary;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:focus-visible { @include focus-ring; }
+  &:disabled { cursor: not-allowed; opacity: 0.55; }
+}
+
+.audit-state {
+  display: flex;
+  justify-content: center;
+  gap: $space-2;
+  padding: $space-8;
+  color: $text-muted;
+}
+
+.table-scroll { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: $space-3;
+  border-bottom: 1px solid $border;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: $text-muted;
+  font-size: $font-size-xs;
+  text-transform: uppercase;
+}
+
+.audit-id {
+  display: block;
+  color: $text-muted;
+  font-size: $font-size-sm;
+}
+
+.audit-detail td { background: $bg-subtle; }
+
+.audit-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-4;
+
+  h2 {
+    margin-bottom: $space-2;
+    color: $text-muted;
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+  }
+
+  pre {
+    max-height: 260px;
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: $font-size-sm;
+  }
+}
+
+.audit-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $space-3;
+  color: $text-muted;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: $bp-md) {
+  .audit-page { padding: $space-3; }
+  .audit-panel { padding: $space-4; }
+  .audit-header { flex-direction: column; }
+  .audit-values { grid-template-columns: 1fr; }
+}
