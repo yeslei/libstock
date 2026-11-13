@@ -5,12 +5,14 @@ from app.repositories.purchase_request_repository import PurchaseRequestReposito
 from app.schemas.purchase_request_schema import PurchaseRequestCreate, PurchaseRequestResponse
 from app.core.business_dates import BUSINESS_ZONE as ZONE, business_today, reservation_pickup_deadline
 from app.services.client_eligibility import require_eligible_client
+from app.services.notification_service import NotificationService
 
 
 class PurchaseRequestService:
-    def __init__(self, db, repository: PurchaseRequestRepository):
+    def __init__(self, db, repository: PurchaseRequestRepository, notifications=None):
         self.db = db
         self.repository = repository
+        self.notifications = notifications if notifications is not None else NotificationService(db)
 
     def create(self, data: PurchaseRequestCreate, *, client_id: int) -> PurchaseRequestResponse:
         if data.pickup_date < business_today():
@@ -38,6 +40,8 @@ class PurchaseRequestService:
                                            'pickup_date_after_deadline', 422)
             request = self.repository.create(client_id, data.book_id, data.pickup_date, copy.id if copy else None,
                                              notified_at=now)
+            if copy is not None:
+                self.notifications.enqueue_availability(request.reservation_id)
             response = PurchaseRequestResponse.model_validate(request).model_copy(
                 update={'reservation_status': 'NOTIFIED' if copy else 'WAITING'})
             self.db.commit()

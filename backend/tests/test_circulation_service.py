@@ -13,7 +13,7 @@ def service():
     db = Mock()
     repository = Mock(spec=CirculationRepository)
     repository.is_active_employee.return_value = True
-    return CirculationService(db, repository), db, repository
+    return CirculationService(db, repository, notifications=Mock()), db, repository
 
 
 @pytest.mark.parametrize('method,args,lookup,code', [
@@ -121,6 +121,7 @@ def test_allocation_skips_ineligible_and_sets_deadline(service, monkeypatch):
     monkeypatch.setattr('app.services.circulation_service.is_client_locked_eligible',
                         lambda repository, client_id, today: client_id == 2)
     assert instance.allocate_purchase(1, 3) == {'id': 2}
+    instance.notifications.enqueue_availability.assert_called_once_with(2)
     assert (first.status.value, second.status.value, second.allocated_copy_id) == ('WAITING', 'NOTIFIED', 77)
     assert second.expires_at is not None and second.expires_at.hour == 23 and second.expires_at.microsecond == 999000
     repo.expire_due_reservations.assert_called_once()

@@ -1,0 +1,30 @@
+<main class="profile">
+  <header class="heading">
+    <h1>Meu perfil</h1>
+    <p>Escolha como receber as notificações do LibStock.</p>
+  </header>
+  @if (loading()) {
+    <p class="loading" role="status"><app-spinner /> Consultando preferências…</p>
+  }
+  @if (error()) {
+    <app-alert [message]="error()" />
+    @if (!preference() || uncertain()) {
+      <div class="recovery"><button type="button" (click)="load()" [disabled]="loading()">Atualizar consulta</button></div>
+    }
+  }
+  @if (success()) { <app-alert variant="success" [message]="success()" /> }
+  @if (preference(); as current) {
+    <form (ngSubmit)="save()" [attr.aria-busy]="saving()">
+      <h2>Notificações</h2>
+      <label for="notification-channel">Canal de notificação</label>
+      <select id="notification-channel" name="channel" [(ngModel)]="channel" [disabled]="saving() || loading() || uncertain()" aria-describedby="notification-help">
+        <option value="IN_APP">No aplicativo</option>
+        <option value="EMAIL">Por e-mail</option>
+      </select>
+      <p id="notification-help" class="help">Ao escolher “No aplicativo”, você desativa o envio por e-mail.</p>
+      <p class="email">E-mail cadastrado: <strong>{{ current.email }}</strong></p>
+      <button class="primary" type="submit" [disabled]="saving() || loading() || uncertain() || channel === current.channel">{{ saving() ? 'Salvando…' : 'Salvar preferência' }}</button>
+    </form>
+  }
+  <a class="back" routerLink="/">← Início</a>
+</main>

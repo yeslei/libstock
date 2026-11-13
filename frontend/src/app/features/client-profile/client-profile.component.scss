@@ -1,0 +1,20 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+.profile { max-width: 720px; margin: auto; padding: $space-8 $space-4 80px; }
+.heading { margin-bottom: $space-6; border-bottom: 1px solid $client-border; padding-bottom: $space-5; }
+h1 { color: $client-green; font-size: 30px; margin: 0 0 $space-2; }
+h2 { color: $client-green; font-size: 20px; margin: 0 0 $space-5; }
+.heading p, .help, .email { color: $text-muted; font-size: $font-size-sm; }
+.heading p { margin: 0; }
+form { margin-top: $space-6; }
+label { display: block; font-weight: 600; margin-bottom: $space-2; }
+select { display: block; width: 100%; max-width: 360px; padding: $space-3; border: 1px solid $client-border; border-radius: 8px; background: #fff; font: inherit; color: $client-green; }
+.help { margin: $space-2 0 $space-5; }
+.email { overflow-wrap: anywhere; }
+button { padding: $space-3 $space-5; border: 1px solid $client-border; border-radius: 8px; background: #fff; font: inherit; cursor: pointer; }
+.primary { background: $client-green; color: #fff; margin-top: $space-4; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.recovery { margin-top: $space-5; }
+.loading { display: flex; align-items: center; gap: $space-2; }
+.back { display: inline-block; margin-top: $space-8; color: $verde-medio; }
+button:focus-visible, select:focus-visible, a:focus-visible { @include focus-ring; }

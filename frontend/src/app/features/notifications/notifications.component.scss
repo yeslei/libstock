@@ -1,0 +1,24 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+.notifications { max-width: 880px; margin: auto; padding: $space-8 $space-4 80px; }
+.heading { border-bottom: 1px solid $client-border; padding-bottom: $space-5; margin-bottom: $space-6; }
+h1 { color: $client-green; font-size: 30px; margin: 0 0 $space-2; }
+.heading p { color: $text-muted; margin: 0 0 $space-3; }
+a { color: $verde-medio; }
+.notification-list { list-style: none; padding: 0; margin: $space-5 0; }
+.notification { padding: $space-5 0; border-bottom: 1px solid $client-border; }
+.notification-heading { display: flex; justify-content: space-between; align-items: baseline; gap: $space-4; }
+h2 { font-size: 18px; color: $client-green; margin: 0; overflow-wrap: anywhere; }
+.status { font-size: $font-size-xs; color: $text-muted; flex-shrink: 0; }
+.notification--unread .status { font-weight: 600; color: $verde-medio; }
+.meta, .guidance { font-size: $font-size-xs; color: $text-muted; }
+.meta { margin: $space-2 0 $space-3; }
+.message { font-size: $font-size-sm; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
+button { padding: $space-2 $space-4; border: 1px solid $client-border; border-radius: 8px; color: $client-green; background: #fff; font: inherit; font-size: $font-size-sm; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+.recovery, .pagination { margin-top: $space-5; }
+.empty { color: $text-muted; padding: $space-6 0; }
+.loading { display: flex; align-items: center; gap: $space-2; }
+.back { display: inline-block; margin-top: $space-8; }
+button:focus-visible, a:focus-visible { @include focus-ring; }
+@media (max-width: 599px) { .notification-heading { flex-direction: column; gap: $space-2; } h1 { font-size: 26px; } }

@@ -42,6 +42,7 @@
                   <th scope="col">Retirada</th>
                   <th scope="col">Devolução</th>
                   <th scope="col">Status</th>
+                  <th scope="col">Ação</th>
                 </tr>
               </thead>
               <tbody>
@@ -62,6 +63,11 @@
                         <span class="badge">Ativo</span>
                       }
                     </td>
+                    <td>
+                      <button class="btn" type="button" [disabled]="flow.submitting()" (click)="sendReminder(loan)">
+                        Enviar lembrete
+                      </button>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -74,3 +80,14 @@
 
   <p class="footnote">Atraso gera pendência do cliente até a devolução ser registrada.</p>
 </section>
+
+@if (flow.confirming(); as c) {
+  <app-confirm-dialog
+    [title]="c.title"
+    [details]="c.details"
+    [confirmLabel]="c.confirmLabel"
+    [busy]="flow.submitting()"
+    (confirmed)="flow.confirm()"
+    (cancelled)="flow.cancel()"
+  />
+}

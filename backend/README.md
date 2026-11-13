@@ -1,5 +1,74 @@
 # Backend do LibStock
 
+## Preferência de notificações do cliente (Issue #46)
+
+- `GET /api/v1/me/notification-preferences`: retorna `{channel: "IN_APP" | "EMAIL", email: string}` do cliente autenticado; `email` é o endereço cadastrado, somente leitura.
+- `PATCH /api/v1/me/notification-preferences`: recebe somente `{channel: "IN_APP" | "EMAIL"}` e retorna o estado persistido no mesmo formato. `IN_APP` é o padrão existente e desativa novos envios por e-mail; `EMAIL` seleciona o endereço cadastrado. Alteração auditada, transacional e serializada com lock; atualizar para o mesmo canal não gera nova auditoria específica.
+- Ambas exigem Bearer e papel `USER`. 401 sem sessão; 403 `permission_denied`, `user_inactive`, `client_required` (sem cadastro de cliente) ou `client_inactive` (perfil/usuário inativo); 422 `validation_error` para canal inválido, nulo, ausente ou campos adicionais. Falha de consulta: 500 `notification_preference_read_error`; falha de gravação: 500 `notification_preference_persistence_error`, com rollback. Não há criação de entidade ou conflito de unicidade neste contrato.
+- O cliente acessa o formulário em `/perfil`, pelo menu da conta. A preferência não envia mensagem por si só. Sem nova migration para a Issue #46; a Issue #42 adiciona vínculo da notificação à reserva.
+
+## Disponibilidade e caixa de notificações (Issue #42)
+
+Aplicar a migration `20261109_0018` antes de iniciar esta versão. Tanto a solicitação de compra já disponível quanto a destinação da fila criam uma notificação `RESERVATION_AVAILABLE` na mesma transação, com unicidade por tipo/reserva. Não há backfill ou envio histórico.
+
+O cliente acessa `/notificacoes` pelo menu da conta: lista compacta com canal, data, estado e paginação. Ações de leitura só aparecem para mensagens entregues; resultados incertos exigem nova consulta antes de outra gravação. Links levam às preferências em `/perfil` e à situação atual em `/minhas-reservas`.
+
+- `GET /api/v1/me/notifications?limit=20&before_id=123`: Bearer `USER`, cadastro de cliente e usuário/perfil ativos. Página `{items, next_before_id}`, ordem decrescente de id, `limit` de 1 a 100 e cursor opcional positivo. Itens: `id`, `reservation_id`, `type`, `channel`, `subject`, `message`, `status`, `created_at`, `sent_at`, `read_at`. Sem identidades ou e-mails de terceiros.
+- `PATCH /api/v1/me/notifications/{id}/read`: mesmo acesso, sem corpo; marca mensagem própria `SENT` como `READ`, preservando a primeira leitura em repetições. 404 `notification_not_found` para inexistente ou alheia; 409 `notification_not_delivered` para `PENDING`/`FAILED`; 422 `validation_error` para parâmetros inválidos; 500 `notification_persistence_error` com rollback. Consulta: 500 `notification_read_error`; falhas do cadastro seguem os códigos da preferência. 401/403 para sessão, papel ou cadastro inválidos.
+- `IN_APP` é entregue na persistência (`SENT`); `EMAIL` é enfileirado (`PENDING`). A caixa apresenta também e-mails pendentes ou com envio não confirmado, sem fabricar entrega ao marcar leitura.
+
+### Envio no Render gratuito (Issue #190)
+
+O `render.yaml` mantém apenas a API no plano `free`, com transporte Brevo por HTTPS e processamento da fila no próprio processo. Não é necessário criar Background Worker, cron pago ou workflow do GitHub Actions. SMTP nas portas 465/587 não funciona no Web Service Free do Render.
+
+No Render, abra o serviço da API → **Environment** e configure:
+
+| Variável | Valor |
+| --- | --- |
+| `MAIL_TRANSPORT` | `brevo` |
+| `BREVO_API_KEY` | Chave da API da sua conta Brevo Free (secret) |
+| `MAIL_FROM_EMAIL` | Remetente cadastrado e verificado no Brevo |
+| `NOTIFICATION_DELIVERY_IN_API` | `true` |
+| `NOTIFICATION_DELIVERY_INTERVAL_SECONDS` | `30` |
+| `MAIL_TIMEOUT_SECONDS` | `10` (opcional; 1–30 segundos) |
+
+Crie uma conta **Free** no Brevo, conclua a ativação transacional e verifique o remetente antes de gerar a chave da API. A documentação consultada em 09/11/2026 informa 300 e-mails/dia no plano gratuito, sem cartão. Não habilite upgrades ou créditos pagos para este cenário. O código não contrata serviços nem compra créditos. Se a cota for excedida ou a conta não estiver aprovada, o envio pode ser recusado; não há fallback pago.
+
+Não é obrigatório comprar domínio para configurar o código. Contudo, um endereço de provedor público não pode ser autenticado por você: o Brevo informa que pode substituir temporariamente o remetente por um domínio seu. Essa política e a aprovação dependem do provedor; não se promete identidade própria ou entregabilidade permanente sem domínio autenticado. Nunca use um domínio de terceiros como se fosse seu.
+
+Faça deploy da versão integrada em **main** (ou da branch configurada no serviço). O comando de início existente aplica `alembic upgrade head`; nenhuma migration nova foi criada nesta adaptação. Não substitua o start command do servidor HTTP pelo worker.
+
+Enquanto a API estiver acordada, ela verifica a fila a cada intervalo e processa **uma mensagem por ciclo**, fora do event loop HTTP, usando uma sessão própria. Ao suspender por inatividade, o Render interrompe o processamento; as mensagens ficam no PostgreSQL e a fila volta a ser consultada ao acordar. Não há garantia de horário exato ou entrega imediata nesse plano, nem pings de keep-alive artificiais. Na inicialização, configuração de envio ausente mantém a API disponível e não consome a fila. A preferência do cliente continua sendo obrigatória (`EMAIL`).
+
+Falha ou resposta ambígua da API de e-mail permanece `FAILED`, sem reenvio automático, inclusive recusas por cota. Confira o provedor antes de qualquer conciliação manual. `SENT` significa aceitação pelo provedor, não confirmação de entrega ao destinatário. O desligamento coordenado aguarda a tentativa em curso; encerramentos forçados continuam sujeitos à política de resultado incerto. A hospedagem gratuita pode suspender por seus próprios limites; confirme o plano e o uso no painel do provedor.
+
+Validação operacional: com uma conta aprovada e remetente verificado, configure um cliente de teste com preferência `EMAIL`, crie uma **nova** destinação e confira `PENDING → SENT` e a caixa de entrada. Sem chave/remetente não é possível validar entrega real; testes automatizados usam HTTP simulado e não enviam mensagens. Não reenvie mensagens históricas `FAILED` para fazer esse teste.
+
+Referências: [Render Free](https://render.com/docs/free), [Brevo Free](https://www.brevo.com/products/transactional-email/), [API de envio](https://developers.brevo.com/reference/send-transac-email) e [política de remetentes](https://help.brevo.com/hc/en-us/articles/14925263522578-Comply-with-Gmail-Yahoo-and-Microsoft-s-requirements-for-email-senders).
+
+### Worker separado e SMTP (opcionais)
+
+O worker CLI continua disponível para execução local ou em infraestrutura que você já possua. `MAIL_TRANSPORT=brevo` também funciona nele. Não o execute junto do modo interno na mesma instalação sem necessidade; os locks evitam duplicidade, mas não aumentam a cota do provedor.
+
+No ambiente do backend, configure as variáveis de `backend/.env.example` por secrets do provedor: `SMTP_HOST`, `SMTP_FROM_EMAIL`, `SMTP_PORT` (587 por padrão), `SMTP_SECURITY` (`starttls` ou `ssl`), `SMTP_TIMEOUT_SECONDS` (1–60, padrão 10), e, se necessário, `SMTP_USERNAME` e `SMTP_PASSWORD` juntos. Para SMTP com TLS desde a conexão, selecione `ssl` e a porta indicada pelo provedor, normalmente 465. Não há modo SMTP sem TLS nem desativação da verificação de certificados.
+
+Executar um lote (útil para scheduler externo):
+
+```bash
+cd backend
+python -m app.workers.notifications --limit 50
+```
+
+Para entrega contínua, configure um processo separado do servidor HTTP (por exemplo, Background Worker no provedor) com o mesmo banco e secrets:
+
+```bash
+python -m app.workers.notifications --watch --interval 30 --limit 50
+```
+
+O intervalo permitido é 1–60 segundos; Ctrl+C encerra o processo. Sem host/remetente configurados ou credenciais incompletas, o worker termina com código 2 sem consumir mensagens. Falha de persistência termina com código 1 e mensagem genérica; o supervisor deve sinalizar a falha. O worker imprime apenas contagens, sem destinatários, conteúdo ou credenciais. A publicação deste código não configura automaticamente o provedor SMTP nem inicia o worker.
+
+Antes do envio, o worker revalida conta/perfil/papel `USER`, preferência `EMAIL`, obra ativa e reserva `NOTIFIED` dentro do prazo, com locks compatíveis com a circulação. Supressão de uma mensagem obsoleta deixa `FAILED`. Claim é confirmado como `FAILED` antes de chamar SMTP; aceitação pelo servidor e confirmação no banco levam a `SENT`. Esta entrega faz **uma tentativa por mensagem, sem retry automático de FAILED**. Se houver queda após SMTP aceitar, o resultado pode permanecer `FAILED`; concilie com o provedor antes de qualquer ação manual. `SENT` não comprova entrega final ou leitura do e-mail. O worker não envia lembretes de devolução nem altera a expiração da reserva.
+
 API REST construída com FastAPI seguindo MVC com camadas de serviço e repositório.
 
 ## Requisitos
@@ -61,6 +130,11 @@ A documentação interativa estará em `http://localhost:8000/docs`.
 | `PATCH` | `/api/v1/users/{id}/inactivate` | Bearer (`ADMINISTRATOR`) | Inativa o usuário e revoga suas sessões |
 | `POST` | `/api/v1/employees/` | Bearer (`ADMINISTRATOR`) | Cadastra vendedor, estoquista ou administrador |
 | `POST` | `/api/v1/books/` | Bearer (`SELLER`, `STOCK_KEEPER`, `ADMINISTRATOR`) | Cadastra uma obra e seu exemplar inicial ativo na mesma transação |
+
+No balcão, atendentes e administradores também podem registrar um lembrete de devolução:
+`POST /api/v1/staff/loans/{loan_id}/return-reminder`. A operação exige empréstimo
+`OPEN`, cadastro de funcionário ativo e cria uma notificação `IN_APP` entregue
+imediatamente no inbox do cliente. Envio por e-mail permanece fora do escopo.
 
 ## Permissionamento
 
